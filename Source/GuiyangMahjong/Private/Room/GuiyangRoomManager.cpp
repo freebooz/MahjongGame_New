@@ -36,6 +36,7 @@ bool UGuiyangRoomManager::CreateRoom(const FString& PlayerId, const FString& Dis
     }
 
     FRoomRecord Record;
+    Record.PublicState.RoomInfo.MatchId = FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphens);
     Record.PublicState.RoomInfo.RoomId = RoomCode;
     Record.PublicState.RoomInfo.OwnerPlayerId = PlayerId;
     Record.PublicState.RoomInfo.RoundCount = Request.RoundCount;
@@ -456,6 +457,7 @@ bool UGuiyangRoomManager::GetPlayerRoomCode(const FString& PlayerId, FString& Ou
 FMahjongFinalSettlementResult UGuiyangRoomManager::BuildFinalSettlement(const FMahjongRoomState& State)
 {
     FMahjongFinalSettlementResult Result;
+    Result.MatchId = State.RoomInfo.MatchId;
     Result.RoomId = State.RoomInfo.RoomId;
     Result.CompletedRounds = State.RoomInfo.CurrentRound;
     TArray<FMahjongSeatInfo> RankedSeats = State.Seats.FilterByPredicate(

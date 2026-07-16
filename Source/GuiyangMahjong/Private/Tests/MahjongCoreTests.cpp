@@ -10,6 +10,8 @@
 #include "Table/MahjongTableEngine.h"
 #include "Auth/GuiyangLoginSaveGame.h"
 #include "Auth/GuiyangLoginSubsystem.h"
+#include "History/MahjongMatchHistorySaveGame.h"
+#include "History/GuiyangMatchHistorySubsystem.h"
 #include "Engine/GameInstance.h"
 #include "Kismet/GameplayStatics.h"
 #include "Network/MahjongNetworkTypes.h"
@@ -256,6 +258,7 @@ bool FMahjongMultiRoundRoomTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Draw keeps dealer by default"), State.RoomInfo.DealerSeat, 2);
     TestEqual(TEXT("Accumulated score survives final round"), State.Seats[2].Score, 6);
     const FMahjongFinalSettlementResult FinalResult = UGuiyangRoomManager::BuildFinalSettlement(State);
+    TestTrue(TEXT("Final settlement has stable match id"), !FinalResult.MatchId.IsEmpty());
     TestEqual(TEXT("Final settlement contains completed rounds"), FinalResult.CompletedRounds, 2);
     TestEqual(TEXT("Final settlement contains four ranked players"), FinalResult.Players.Num(), 4);
     TestEqual(TEXT("Highest score player ranks first"), FinalResult.Players[0].SeatIndex, 2);
@@ -865,6 +868,45 @@ bool FMahjongGuestLoginTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongMatchHistoryTest, "GuiyangMahjong.History.FinalSettlementPersistence", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongMatchHistoryTest::RunTest(const FString& Parameters)
+{
+    static const FString SlotName = TEXT("GuiyangMatchHistory");
+    UGameplayStatics::DeleteGameInSlot(SlotName, 0);
+
+    UGameInstance* FirstInstance = NewObject<UGameInstance>();
+    FirstInstance->Init();
+    UGuiyangMatchHistorySubsystem* FirstHistory = FirstInstance->GetSubsystem<UGuiyangMatchHistorySubsystem>();
+    TestNotNull(TEXT("Match history subsystem is available"), FirstHistory);
+    FMahjongFinalSettlementResult Result;
+    Result.MatchId = TEXT("match-history-test-1");
+    Result.RoomId = TEXT("654321");
+    Result.CompletedRounds = 4;
+    FMahjongFinalPlayerResult Player;
+    Player.Rank = 1;
+    Player.SeatIndex = 0;
+    Player.PlayerName = TEXT("Winner");
+    Player.TotalScore = 18;
+    Result.Players.Add(Player);
+    TestTrue(TEXT("Final settlement is persisted"), FirstHistory && FirstHistory->RecordFinalSettlement(Result));
+    TestFalse(TEXT("Duplicate match id is ignored"), FirstHistory && FirstHistory->RecordFinalSettlement(Result));
+    TestEqual(TEXT("Only one history record exists"), FirstHistory ? FirstHistory->GetRecords().Num() : 0, 1);
+    FirstInstance->Shutdown();
+
+    UGameInstance* SecondInstance = NewObject<UGameInstance>();
+    SecondInstance->Init();
+    UGuiyangMatchHistorySubsystem* SecondHistory = SecondInstance->GetSubsystem<UGuiyangMatchHistorySubsystem>();
+    TestEqual(TEXT("History reloads from SaveGame"), SecondHistory ? SecondHistory->GetRecords().Num() : 0, 1);
+    if (SecondHistory)
+    {
+        TestEqual(TEXT("Reloaded history keeps match id"), SecondHistory->GetRecords()[0].MatchId, Result.MatchId);
+        SecondHistory->ClearHistory();
+    }
+    SecondInstance->Shutdown();
+    UGameplayStatics::DeleteGameInSlot(SlotName, 0);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongLoginPersistenceSecurityTest, "GuiyangMahjong.Security.LoginSaveContainsNoSecrets", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FMahjongLoginPersistenceSecurityTest::RunTest(const FString& Parameters)
 {
@@ -877,6 +919,16 @@ bool FMahjongLoginPersistenceSecurityTest::RunTest(const FString& Parameters)
             || Name.Contains(TEXT("Password"), ESearchCase::IgnoreCase);
     }
     TestFalse(TEXT("登录 SaveGame 不得声明 Token、Secret 或 Password 字段"), bContainsSecretField);
+    bool bHistoryContainsSecretField = false;
+    for (TFieldIterator<FProperty> It(UMahjongMatchHistorySaveGame::StaticClass(), EFieldIteratorFlags::ExcludeSuper); It; ++It)
+    {
+        const FString Name = It->GetName();
+        bHistoryContainsSecretField |= Name.Contains(TEXT("Token"), ESearchCase::IgnoreCase)
+            || Name.Contains(TEXT("Secret"), ESearchCase::IgnoreCase)
+            || Name.Contains(TEXT("Password"), ESearchCase::IgnoreCase)
+            || Name.Contains(TEXT("Hand"), ESearchCase::IgnoreCase);
+    }
+    TestFalse(TEXT("Match history SaveGame must not declare secrets or hands"), bHistoryContainsSecretField);
 
     bool bPublicStateContainsHand = false;
     for (TFieldIterator<FProperty> It(FMahjongPublicTableState::StaticStruct(), EFieldIteratorFlags::IncludeSuper); It; ++It)

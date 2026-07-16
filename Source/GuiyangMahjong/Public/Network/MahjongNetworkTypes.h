@@ -83,6 +83,7 @@ USTRUCT(BlueprintType)
 struct GUIYANGMAHJONG_API FMahjongRoomInfo
 {
     GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FString MatchId;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FString RoomId = TEXT("100001");
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FString RuleSummary = TEXT("贵阳捉鸡·四人房");
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 MaxPlayers = 4;
@@ -121,6 +122,7 @@ USTRUCT(BlueprintType)
 struct GUIYANGMAHJONG_API FMahjongFinalSettlementResult
 {
     GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FString MatchId;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FString RoomId;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 CompletedRounds = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongFinalPlayerResult> Players;

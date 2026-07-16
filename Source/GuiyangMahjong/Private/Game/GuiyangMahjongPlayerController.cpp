@@ -3,6 +3,7 @@
 #include "UI/MobileRootHUDWidget.h"
 #include "Game/GuiyangMahjongGameMode.h"
 #include "Auth/GuiyangLoginSubsystem.h"
+#include "History/GuiyangMatchHistorySubsystem.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformMisc.h"
 #include "Misc/CommandLine.h"
@@ -216,6 +217,9 @@ void AGuiyangMahjongPlayerController::Client_RestoreReconnectSnapshot_Implementa
 void AGuiyangMahjongPlayerController::Client_ShowFinalSettlement_Implementation(
     const FMahjongFinalSettlementResult& Result)
 {
+    if (UGuiyangMatchHistorySubsystem* History = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangMatchHistorySubsystem>() : nullptr)
+        History->RecordFinalSettlement(Result);
     OnFinalSettlementShown.Broadcast(Result);
     UE_LOG(LogMahjongUI, Log, TEXT("最终大结算已显示：Room=%s，Rounds=%d"),
         *Result.RoomId, Result.CompletedRounds);
