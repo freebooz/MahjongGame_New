@@ -22,6 +22,9 @@ public:
     bool FinishRound(const FString& RoomCode, const FMahjongSettlementResult& Settlement,
         FMahjongRoomState& OutState, EMahjongRoomError& OutError);
     bool RequestNextRound(const FString& PlayerId, FMahjongRoomState& OutState, EMahjongRoomError& OutError);
+    bool MarkDisconnected(const FString& PlayerId, FMahjongRoomState& OutState, EMahjongRoomError& OutError);
+    bool ReconnectPlayer(const FString& PlayerId, FMahjongRoomState& OutState,
+        int32& OutRemainingSeconds, EMahjongRoomError& OutError);
     bool GetRoomState(const FString& RoomCode, FMahjongRoomState& OutState) const;
     bool GetPlayerRoomCode(const FString& PlayerId, FString& OutRoomCode) const;
     int32 GetRoomCount() const { return Rooms.Num(); }
@@ -39,6 +42,7 @@ private:
         FString PasswordSalt;
         FString PasswordDigest;
         TMap<FString, FPasswordAttemptState> PasswordAttemptsByPlayer;
+        TMap<FString, FDateTime> DisconnectedAtUtcByPlayer;
     };
 
     TMap<FString, FRoomRecord> Rooms;

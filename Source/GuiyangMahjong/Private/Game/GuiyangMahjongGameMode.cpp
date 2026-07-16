@@ -7,6 +7,7 @@
 #include "Table/MahjongTableEngine.h"
 #include "HAL/PlatformTime.h"
 #include "EngineUtils.h"
+#include "Misc/SecureHash.h"
 
 AGuiyangMahjongGameMode::AGuiyangMahjongGameMode()
 {
@@ -24,17 +25,101 @@ void AGuiyangMahjongGameMode::InitGame(const FString& MapName, const FString& Op
 void AGuiyangMahjongGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
-    if (AGuiyangMahjongPlayerState* State = NewPlayer ? NewPlayer->GetPlayerState<AGuiyangMahjongPlayerState>() : nullptr)
-    {
-        const FString GuestId = TEXT("guest-") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
-        State->AuthenticateServer(GuestId, FString::Printf(TEXT("游客%s"), *GuestId.Right(4)), EGuiyangLoginProvider::Guest);
-    }
 }
 
 void AGuiyangMahjongGameMode::Logout(AController* Exiting)
 {
-    if (AGuiyangMahjongPlayerController* Controller = Cast<AGuiyangMahjongPlayerController>(Exiting)) HandleLeaveRoom(Controller);
+    if (AGuiyangMahjongPlayerController* Controller = Cast<AGuiyangMahjongPlayerController>(Exiting))
+    {
+        AGuiyangMahjongPlayerState* Player = Controller->GetPlayerState<AGuiyangMahjongPlayerState>();
+        FMahjongRoomState State;
+        if (Player && RoomManager && RoomManager->GetRoomState(Player->RoomCode, State)
+            && (State.Lifecycle == EMahjongRoomLifecycle::Playing
+                || State.Lifecycle == EMahjongRoomLifecycle::WaitingNextRound
+                || State.Lifecycle == EMahjongRoomLifecycle::Starting
+                || State.Lifecycle == EMahjongRoomLifecycle::Settlement))
+        {
+            EMahjongRoomError Error;
+            if (RoomManager->MarkDisconnected(Player->MahjongPlayerId, State, Error)) PublishRoomState(State);
+        }
+        else
+        {
+            HandleLeaveRoom(Controller);
+        }
+    }
     Super::Logout(Exiting);
+}
+
+void AGuiyangMahjongGameMode::HandleAuthenticateSession(AGuiyangMahjongPlayerController* Controller,
+    const FString& PlayerId, const FString& DisplayName, const EGuiyangLoginProvider Provider,
+    const FString& SessionToken)
+{
+    const FString CleanPlayerId = PlayerId.TrimStartAndEnd();
+    const FString CleanDisplayName = DisplayName.TrimStartAndEnd();
+    const bool bProviderAllowed = Provider == EGuiyangLoginProvider::Guest
+        || Provider == EGuiyangLoginProvider::SimulatedWechat;
+    if (!Controller || CleanPlayerId.IsEmpty() || CleanPlayerId.Len() > 80
+        || CleanDisplayName.IsEmpty() || CleanDisplayName.Len() > 24
+        || SessionToken.Len() < 16 || SessionToken.Len() > 256 || !bProviderAllowed)
+    {
+        if (Controller) Controller->Client_ShowErrorMessage(TEXT("登录会话格式无效"));
+        return;
+    }
+
+    const FString CandidateDigest = HashSessionToken(SessionToken);
+    if (CandidateDigest.IsEmpty())
+    {
+        Controller->Client_ShowErrorMessage(TEXT("登录会话校验失败"));
+        return;
+    }
+    if (const FString* ExistingDigest = SessionTokenDigestsByPlayer.Find(CleanPlayerId))
+    {
+        if (!ConstantTimeDigestEquals(*ExistingDigest, CandidateDigest))
+        {
+            Controller->Client_ShowErrorMessage(TEXT("重连凭据不匹配"));
+            return;
+        }
+    }
+    else
+    {
+        SessionTokenDigestsByPlayer.Add(CleanPlayerId, CandidateDigest);
+    }
+
+    for (TActorIterator<AGuiyangMahjongPlayerController> It(GetWorld()); It; ++It)
+    {
+        if (*It == Controller) continue;
+        const AGuiyangMahjongPlayerState* Other = It->GetPlayerState<AGuiyangMahjongPlayerState>();
+        if (Other && Other->MahjongPlayerId == CleanPlayerId && Other->HasValidServerSession())
+        {
+            Controller->Client_ShowErrorMessage(TEXT("该账号已经在线"));
+            return;
+        }
+    }
+
+    AGuiyangMahjongPlayerState* Player = Controller->GetPlayerState<AGuiyangMahjongPlayerState>();
+    if (!Player || !Player->AuthenticateServer(CleanPlayerId, CleanDisplayName, Provider))
+    {
+        Controller->Client_ShowErrorMessage(TEXT("服务器认证失败"));
+        return;
+    }
+
+    FString RoomCode;
+    if (!RoomManager || !RoomManager->GetPlayerRoomCode(CleanPlayerId, RoomCode)) return;
+    FMahjongRoomState State;
+    EMahjongRoomError Error;
+    int32 RemainingSeconds = 0;
+    if (!RoomManager->ReconnectPlayer(CleanPlayerId, State, RemainingSeconds, Error))
+    {
+        Controller->Client_ShowErrorMessage(ErrorToMessage(Error));
+        return;
+    }
+    const FMahjongSeatInfo* Seat = State.Seats.FindByPredicate([&CleanPlayerId](const FMahjongSeatInfo& Item)
+    {
+        return Item.PlayerId == CleanPlayerId;
+    });
+    Player->EnterRoomServer(State.RoomInfo.RoomId, Seat ? Seat->SeatIndex : INDEX_NONE, Seat ? Seat->bReady : false);
+    PublishRoomState(State);
+    PublishReconnectSnapshot(Controller, State, RemainingSeconds);
 }
 
 void AGuiyangMahjongGameMode::HandleCreateRoom(AGuiyangMahjongPlayerController* Controller, const FMahjongCreateRoomRequest& Request)
@@ -285,10 +370,55 @@ void AGuiyangMahjongGameMode::FinalizeRoundIfNeeded()
     PublishRoomState(State);
 }
 
+void AGuiyangMahjongGameMode::PublishReconnectSnapshot(AGuiyangMahjongPlayerController* Controller,
+    const FMahjongRoomState& RoomState, const int32 RemainingReconnectSeconds)
+{
+    if (!Controller) return;
+    const AGuiyangMahjongPlayerState* Player = Controller->GetPlayerState<AGuiyangMahjongPlayerState>();
+    if (!Player || Player->SeatIndex == INDEX_NONE) return;
+
+    FMahjongReconnectSnapshot Snapshot;
+    Snapshot.RoomState = RoomState;
+    Snapshot.RemainingReconnectSeconds = RemainingReconnectSeconds;
+    TArray<FMahjongAction> Actions;
+    if (TableEngine && ActiveRoomCode == RoomState.RoomInfo.RoomId)
+    {
+        Snapshot.TableState = TableEngine->GetPublicState();
+        TableEngine->GetPrivateState(Player->SeatIndex, Snapshot.PrivateState);
+        Actions = TableEngine->GetAvailableActions(Player->SeatIndex);
+    }
+    Controller->Client_RestoreReconnectSnapshot(Snapshot, Actions);
+    FMahjongSettlementResult Settlement;
+    if (TableEngine && TableEngine->GetSettlementResult(Settlement)) Controller->Client_ShowSettlement(Settlement);
+}
+
+FString AGuiyangMahjongGameMode::HashSessionToken(const FString& SessionToken)
+{
+    FTCHARToUTF8 Utf8(*SessionToken);
+    if (Utf8.Length() <= 0) return FString();
+    uint8 Digest[FSHA1::DigestSize];
+    FSHA1::HashBuffer(Utf8.Get(), Utf8.Length(), Digest);
+    return BytesToHex(Digest, UE_ARRAY_COUNT(Digest)).ToLower();
+}
+
+bool AGuiyangMahjongGameMode::ConstantTimeDigestEquals(const FString& Left, const FString& Right)
+{
+    uint32 Difference = static_cast<uint32>(Left.Len() ^ Right.Len());
+    const int32 Count = FMath::Max(Left.Len(), Right.Len());
+    for (int32 Index = 0; Index < Count; ++Index)
+    {
+        const TCHAR LeftChar = Left.IsValidIndex(Index) ? Left[Index] : 0;
+        const TCHAR RightChar = Right.IsValidIndex(Index) ? Right[Index] : 0;
+        Difference |= static_cast<uint32>(LeftChar ^ RightChar);
+    }
+    return Difference == 0;
+}
+
 FString AGuiyangMahjongGameMode::ErrorToMessage(const EMahjongRoomError Error)
 {
     switch (Error)
     {
+    case EMahjongRoomError::SessionExpired: return TEXT("重连保留时间已结束");
     case EMahjongRoomError::AlreadyInRoom: return TEXT("你已经在房间中");
     case EMahjongRoomError::RoomNotFound: return TEXT("房间不存在");
     case EMahjongRoomError::RoomFull: return TEXT("房间已满");

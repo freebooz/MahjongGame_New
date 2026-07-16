@@ -2,6 +2,7 @@
 #include "GuiyangMahjong.h"
 #include "UI/MobileRootHUDWidget.h"
 #include "Game/GuiyangMahjongGameMode.h"
+#include "Auth/GuiyangLoginSubsystem.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformMisc.h"
 #include "Misc/CommandLine.h"
@@ -16,6 +17,17 @@ void AGuiyangMahjongPlayerController::BeginPlay()
     if (!IsLocalController() || IsRunningDedicatedServer())
     {
         return;
+    }
+
+    if (const UGuiyangLoginSubsystem* Login = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangLoginSubsystem>() : nullptr)
+    {
+        if (Login->IsSessionValid())
+        {
+            const FGuiyangLoginProfile& Profile = Login->GetCurrentProfile();
+            Server_AuthenticateSession(Profile.PlayerId, Profile.DisplayName, Profile.Provider,
+                Login->GetSessionTokenForNetwork());
+        }
     }
 
     UClass* RootHUDClass = LoadClass<UMobileRootHUDWidget>(nullptr, TEXT("/Game/UI/Screens/WBP_RootHUD.WBP_RootHUD_C"));
@@ -49,6 +61,13 @@ void AGuiyangMahjongPlayerController::BeginPlay()
             GetWorldTimerManager().SetTimer(ExitTimer, [] { FPlatformMisc::RequestExit(false); }, 1.0f, false);
         }), 2.0f, false);
     }
+}
+
+void AGuiyangMahjongPlayerController::Server_AuthenticateSession_Implementation(const FString& PlayerId,
+    const FString& DisplayName, const EGuiyangLoginProvider Provider, const FString& SessionToken)
+{
+    if (AGuiyangMahjongGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGuiyangMahjongGameMode>() : nullptr)
+        Mode->HandleAuthenticateSession(this, PlayerId, DisplayName, Provider, SessionToken);
 }
 
 void AGuiyangMahjongPlayerController::ConnectToServer(const FString& ServerIP, const int32 Port, const FString& PlayerName)
@@ -181,6 +200,17 @@ void AGuiyangMahjongPlayerController::Client_ShowSettlement_Implementation(const
 {
     UE_LOG(LogMahjongUI, Log, TEXT("显示单局结算：%s"), *Result.ToDebugString());
     OnSettlementShown.Broadcast(Result);
+}
+
+void AGuiyangMahjongPlayerController::Client_RestoreReconnectSnapshot_Implementation(
+    const FMahjongReconnectSnapshot& Snapshot, const TArray<FMahjongAction>& AvailableActions)
+{
+    LastClientActionSequence = Snapshot.PrivateState.LastAcceptedClientSequence;
+    OnReconnectRestored.Broadcast(Snapshot);
+    OnPrivateHandUpdated.Broadcast(Snapshot.PrivateState);
+    OnAvailableActionsUpdated.Broadcast(AvailableActions);
+    UE_LOG(LogMahjongReconnect, Log, TEXT("重连快照恢复完成：Room=%s，Seat=%d，Round=%d"),
+        *Snapshot.RoomState.RoomInfo.RoomId, Snapshot.PrivateState.SeatIndex, Snapshot.TableState.RoundId);
 }
 
 void AGuiyangMahjongPlayerController::Client_ShowErrorMessage_Implementation(const FString& Message)

@@ -138,6 +138,7 @@ struct GUIYANGMAHJONG_API FMahjongPrivatePlayerState
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 RoundId = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TurnId = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 SeatIndex = INDEX_NONE;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 LastAcceptedClientSequence = -1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongHand Hand;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 StateSequence = 0;
 };

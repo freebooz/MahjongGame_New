@@ -215,6 +215,7 @@ bool UGuiyangRoomManager::LeaveRoom(const FString& PlayerId, FMahjongRoomState& 
     *Seat = FMahjongSeatInfo();
     Seat->SeatIndex = SeatIndex;
     PlayerRoomCodes.Remove(PlayerId);
+    Record->DisconnectedAtUtcByPlayer.Remove(PlayerId);
 
     int32 OccupiedCount = 0;
     for (const FMahjongSeatInfo& Item : Record->PublicState.Seats)
@@ -370,6 +371,77 @@ bool UGuiyangRoomManager::RequestNextRound(const FString& PlayerId, FMahjongRoom
     }
     ++Record->PublicState.StateSequence;
     OutState = Record->PublicState;
+    return true;
+}
+
+bool UGuiyangRoomManager::MarkDisconnected(const FString& PlayerId, FMahjongRoomState& OutState,
+    EMahjongRoomError& OutError)
+{
+    OutError = EMahjongRoomError::None;
+    const FString* RoomCode = PlayerRoomCodes.Find(PlayerId);
+    FRoomRecord* Record = RoomCode ? Rooms.Find(*RoomCode) : nullptr;
+    if (!Record)
+    {
+        OutError = EMahjongRoomError::NotInRoom;
+        return false;
+    }
+    FMahjongSeatInfo* Seat = FindSeat(Record->PublicState, PlayerId);
+    if (!Seat)
+    {
+        OutError = EMahjongRoomError::NotInRoom;
+        return false;
+    }
+    Seat->bOnline = false;
+    Seat->bReady = false;
+    Record->DisconnectedAtUtcByPlayer.Add(PlayerId, FDateTime::UtcNow());
+    ++Record->PublicState.StateSequence;
+    OutState = Record->PublicState;
+    UE_LOG(LogMahjongReconnect, Log, TEXT("玩家断线，座位已保留：Room=%s，Player=%s，Seat=%d"),
+        **RoomCode, *PlayerId, Seat->SeatIndex);
+    return true;
+}
+
+bool UGuiyangRoomManager::ReconnectPlayer(const FString& PlayerId, FMahjongRoomState& OutState,
+    int32& OutRemainingSeconds, EMahjongRoomError& OutError)
+{
+    OutError = EMahjongRoomError::None;
+    OutRemainingSeconds = 0;
+    const FString* RoomCode = PlayerRoomCodes.Find(PlayerId);
+    FRoomRecord* Record = RoomCode ? Rooms.Find(*RoomCode) : nullptr;
+    if (!Record)
+    {
+        OutError = EMahjongRoomError::NotInRoom;
+        return false;
+    }
+    FMahjongSeatInfo* Seat = FindSeat(Record->PublicState, PlayerId);
+    if (!Seat)
+    {
+        OutError = EMahjongRoomError::NotInRoom;
+        return false;
+    }
+
+    const int32 TimeoutSeconds = Record->PublicState.RuleSnapshot.Config.ReconnectTimeoutSeconds;
+    if (const FDateTime* DisconnectedAt = Record->DisconnectedAtUtcByPlayer.Find(PlayerId))
+    {
+        const int32 ElapsedSeconds = FMath::Max(0, FMath::FloorToInt((FDateTime::UtcNow() - *DisconnectedAt).GetTotalSeconds()));
+        OutRemainingSeconds = FMath::Max(0, TimeoutSeconds - ElapsedSeconds);
+        if (ElapsedSeconds > TimeoutSeconds)
+        {
+            OutError = EMahjongRoomError::SessionExpired;
+            return false;
+        }
+    }
+    else
+    {
+        OutRemainingSeconds = TimeoutSeconds;
+    }
+
+    Seat->bOnline = true;
+    Record->DisconnectedAtUtcByPlayer.Remove(PlayerId);
+    ++Record->PublicState.StateSequence;
+    OutState = Record->PublicState;
+    UE_LOG(LogMahjongReconnect, Log, TEXT("玩家重连并恢复座位：Room=%s，Player=%s，Seat=%d"),
+        **RoomCode, *PlayerId, Seat->SeatIndex);
     return true;
 }
 

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "Core/MahjongTypes.h"
+#include "Auth/GuiyangLoginTypes.h"
 #include "Network/MahjongNetworkTypes.h"
 #include "GuiyangMahjongPlayerController.generated.h"
 
@@ -10,6 +11,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongPrivateHandUpdated, const FM
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongAvailableActionsUpdated, const TArray<FMahjongAction>&, Actions);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongSettlementShown, const FMahjongSettlementResult&, Result);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongErrorShown, const FString&, Message);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongReconnectRestored, const FMahjongReconnectSnapshot&, Snapshot);
 
 class UMobileRootHUDWidget;
 
@@ -25,12 +27,15 @@ public:
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongAvailableActionsUpdated OnAvailableActionsUpdated;
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongSettlementShown OnSettlementShown;
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongErrorShown OnErrorShown;
+    UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongReconnectRestored OnReconnectRestored;
 
     /** 校验地址后执行 ClientTravel；不直接修改房间或牌局状态。 */
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void ConnectToServer(const FString& ServerIP, int32 Port, const FString& PlayerName);
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void RetryLastConnection();
 
     UFUNCTION(Server, Reliable) void Server_RequestCreateRoom();
+    UFUNCTION(Server, Reliable) void Server_AuthenticateSession(const FString& PlayerId, const FString& DisplayName,
+        EGuiyangLoginProvider Provider, const FString& SessionToken);
     UFUNCTION(Server, Reliable) void Server_RequestCreateRoomWithConfig(const FMahjongCreateRoomRequest& Request);
     UFUNCTION(Server, Reliable) void Server_RequestJoinRoom(const FString& PlayerName);
     UFUNCTION(Server, Reliable) void Server_RequestJoinRoomByCode(const FMahjongJoinRoomRequest& Request);
@@ -44,6 +49,8 @@ public:
     UFUNCTION(Client, Reliable) void Client_ShowAvailableActions(const TArray<FMahjongAction>& Actions);
     UFUNCTION(Client, Reliable) void Client_ShowSettlement(const FMahjongSettlementResult& Result);
     UFUNCTION(Client, Reliable) void Client_ShowErrorMessage(const FString& Message);
+    UFUNCTION(Client, Reliable) void Client_RestoreReconnectSnapshot(
+        const FMahjongReconnectSnapshot& Snapshot, const TArray<FMahjongAction>& AvailableActions);
 
     UFUNCTION(BlueprintPure, Category="麻将|网络") const FString& GetPendingPlayerName() const { return PendingPlayerName; }
 

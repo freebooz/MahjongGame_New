@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Auth/GuiyangLoginTypes.h"
 #include "Network/MahjongNetworkTypes.h"
 #include "GuiyangMahjongGameMode.generated.h"
 
@@ -18,6 +19,8 @@ public:
     virtual void Logout(AController* Exiting) override;
 
     void HandleCreateRoom(class AGuiyangMahjongPlayerController* Controller, const FMahjongCreateRoomRequest& Request);
+    void HandleAuthenticateSession(class AGuiyangMahjongPlayerController* Controller, const FString& PlayerId,
+        const FString& DisplayName, EGuiyangLoginProvider Provider, const FString& SessionToken);
     void HandleJoinRoom(class AGuiyangMahjongPlayerController* Controller, const FMahjongJoinRoomRequest& Request);
     void HandleToggleReady(class AGuiyangMahjongPlayerController* Controller);
     void HandleNextRound(class AGuiyangMahjongPlayerController* Controller);
@@ -31,6 +34,7 @@ private:
     int32 LastPublishedSettlementSequence = INDEX_NONE;
     int32 LastFinalizedSettlementSequence = INDEX_NONE;
     FString ActiveRoomCode;
+    TMap<FString, FString> SessionTokenDigestsByPlayer;
     FTimerHandle ActionTimeoutHandle;
     int32 ArmedTimeoutRoundId = INDEX_NONE;
     int32 ArmedTimeoutTurnId = INDEX_NONE;
@@ -42,5 +46,9 @@ private:
     void FinalizeRoundIfNeeded();
     void RefreshActionTimeoutTimer();
     void HandleActionTimeout(int32 ExpectedRoundId, int32 ExpectedTurnId, EMahjongTablePhase ExpectedPhase);
+    void PublishReconnectSnapshot(class AGuiyangMahjongPlayerController* Controller,
+        const FMahjongRoomState& RoomState, int32 RemainingReconnectSeconds);
+    static FString HashSessionToken(const FString& SessionToken);
+    static bool ConstantTimeDigestEquals(const FString& Left, const FString& Right);
     static FString ErrorToMessage(EMahjongRoomError Error);
 };

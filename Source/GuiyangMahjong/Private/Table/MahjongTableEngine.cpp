@@ -284,6 +284,8 @@ bool UMahjongTableEngine::GetPrivateState(const int32 SeatIndex, FMahjongPrivate
     OutState.RoundId = PublicState.RoundId;
     OutState.TurnId = PublicState.TurnId;
     OutState.SeatIndex = SeatIndex;
+    OutState.LastAcceptedClientSequence = LastClientSequences.IsValidIndex(SeatIndex)
+        ? LastClientSequences[SeatIndex] : -1;
     OutState.Hand = Hands[SeatIndex];
     OutState.StateSequence = PublicState.StateSequence;
     return true;

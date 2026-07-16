@@ -208,6 +208,15 @@ bool FMahjongMultiRoundRoomTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Four ready players start first round"), State.Lifecycle, EMahjongRoomLifecycle::Starting);
     TestTrue(TEXT("Room enters first playing round"), Manager->BeginPlaying(RoomCode, State, Error));
     TestEqual(TEXT("Current round increments to one"), State.RoomInfo.CurrentRound, 1);
+    TestTrue(TEXT("Active player can be marked disconnected"), Manager->MarkDisconnected(TEXT("round-p1"), State, Error));
+    TestFalse(TEXT("Disconnected seat is retained but offline"), State.Seats[1].bOnline);
+    FString RetainedRoomCode;
+    TestTrue(TEXT("Disconnected player keeps room mapping"), Manager->GetPlayerRoomCode(TEXT("round-p1"), RetainedRoomCode));
+    int32 RemainingReconnectSeconds = 0;
+    TestTrue(TEXT("Player reconnects within retention window"), Manager->ReconnectPlayer(
+        TEXT("round-p1"), State, RemainingReconnectSeconds, Error));
+    TestTrue(TEXT("Reconnected seat becomes online"), State.Seats[1].bOnline);
+    TestTrue(TEXT("Reconnect snapshot reports positive remaining time"), RemainingReconnectSeconds > 0);
 
     FMahjongSettlementResult Settlement;
     Settlement.WinnerSeat = 2;
@@ -356,6 +365,9 @@ bool FMahjongActionTimeoutTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Current turn timeout auto-plays"), TurnEngine->ResolveActionTimeout(
         Initial.RoundId, Initial.TurnId, Initial.Phase).bSuccess);
     TestEqual(TEXT("Turn timeout creates exactly one discard"), TurnEngine->GetPublicState().Discards.Num(), 1);
+    FMahjongPrivatePlayerState TimedOutPlayer;
+    TurnEngine->GetPrivateState(0, TimedOutPlayer);
+    TestEqual(TEXT("Private snapshot carries last accepted sequence"), TimedOutPlayer.LastAcceptedClientSequence, 0);
 
     UMahjongTableEngine* ReactionEngine = NewObject<UMahjongTableEngine>();
     TestTrue(TEXT("Reaction-timeout table starts"), ReactionEngine->StartRound(Rules, Seats, 0, 107, Error));
@@ -866,6 +878,15 @@ bool FMahjongLoginPersistenceSecurityTest::RunTest(const FString& Parameters)
         bPublicStateContainsHand |= It->GetName().Contains(TEXT("Hand"), ESearchCase::IgnoreCase);
     }
     TestFalse(TEXT("公共牌桌状态不得包含私有手牌字段"), bPublicStateContainsHand);
+    bool bReconnectSnapshotContainsCredential = false;
+    for (TFieldIterator<FProperty> It(FMahjongReconnectSnapshot::StaticStruct(), EFieldIteratorFlags::IncludeSuper); It; ++It)
+    {
+        const FString Name = It->GetName();
+        bReconnectSnapshotContainsCredential |= Name.Contains(TEXT("Token"), ESearchCase::IgnoreCase)
+            || Name.Contains(TEXT("Secret"), ESearchCase::IgnoreCase)
+            || Name.Contains(TEXT("Password"), ESearchCase::IgnoreCase);
+    }
+    TestFalse(TEXT("Reconnect snapshot must not expose credentials"), bReconnectSnapshotContainsCredential);
     return true;
 }
 
