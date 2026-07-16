@@ -19,6 +19,7 @@ void UMobileMahjongHUDWidget::NativeConstruct()
         PC->OnPrivateHandUpdated.AddUniqueDynamic(this, &ThisClass::HandlePrivateHand);
         PC->OnAvailableActionsUpdated.AddUniqueDynamic(this, &ThisClass::HandleAvailableActions);
         PC->OnSettlementShown.AddUniqueDynamic(this, &ThisClass::HandleSettlement);
+        PC->OnFinalSettlementShown.AddUniqueDynamic(this, &ThisClass::HandleFinalSettlement);
         PC->OnErrorShown.AddUniqueDynamic(this, &ThisClass::HandleError);
     }
     if (AGuiyangMahjongGameState* GS = GetWorld()->GetGameState<AGuiyangMahjongGameState>())
@@ -36,6 +37,7 @@ void UMobileMahjongHUDWidget::NativeDestruct()
         PC->OnPrivateHandUpdated.RemoveDynamic(this, &ThisClass::HandlePrivateHand);
         PC->OnAvailableActionsUpdated.RemoveDynamic(this, &ThisClass::HandleAvailableActions);
         PC->OnSettlementShown.RemoveDynamic(this, &ThisClass::HandleSettlement);
+        PC->OnFinalSettlementShown.RemoveDynamic(this, &ThisClass::HandleFinalSettlement);
         PC->OnErrorShown.RemoveDynamic(this, &ThisClass::HandleError);
     }
     if (AGuiyangMahjongGameState* GS = GetWorld()->GetGameState<AGuiyangMahjongGameState>())
@@ -113,6 +115,25 @@ void UMobileMahjongHUDWidget::HandleSettlement(const FMahjongSettlementResult& R
     {
         SettlementInstance->SetVisibility(ESlateVisibility::Visible);
         SettlementInstance->SetSettlementResult(Result);
+    }
+}
+
+void UMobileMahjongHUDWidget::HandleFinalSettlement(const FMahjongFinalSettlementResult& Result)
+{
+    if (!SettlementInstance)
+    {
+        UClass* SettlementClass = LoadClass<UMobileSettlementWidget>(nullptr,
+            TEXT("/Game/UI/Dialogs/WBP_Settlement.WBP_Settlement_C"));
+        if (SettlementClass)
+        {
+            SettlementInstance = CreateWidget<UMobileSettlementWidget>(GetOwningPlayer(), SettlementClass);
+            PopupLayer->AddChildToOverlay(SettlementInstance);
+        }
+    }
+    if (SettlementInstance)
+    {
+        SettlementInstance->SetVisibility(ESlateVisibility::Visible);
+        SettlementInstance->SetFinalSettlementResult(Result);
     }
 }
 

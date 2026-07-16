@@ -12,6 +12,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongAvailableActionsUpdated, con
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongSettlementShown, const FMahjongSettlementResult&, Result);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongErrorShown, const FString&, Message);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongReconnectRestored, const FMahjongReconnectSnapshot&, Snapshot);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongFinalSettlementShown, const FMahjongFinalSettlementResult&, Result);
 
 class UMobileRootHUDWidget;
 
@@ -28,6 +29,7 @@ public:
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongSettlementShown OnSettlementShown;
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongErrorShown OnErrorShown;
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongReconnectRestored OnReconnectRestored;
+    UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongFinalSettlementShown OnFinalSettlementShown;
 
     /** 校验地址后执行 ClientTravel；不直接修改房间或牌局状态。 */
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void ConnectToServer(const FString& ServerIP, int32 Port, const FString& PlayerName);
@@ -51,6 +53,7 @@ public:
     UFUNCTION(Client, Reliable) void Client_ShowErrorMessage(const FString& Message);
     UFUNCTION(Client, Reliable) void Client_RestoreReconnectSnapshot(
         const FMahjongReconnectSnapshot& Snapshot, const TArray<FMahjongAction>& AvailableActions);
+    UFUNCTION(Client, Reliable) void Client_ShowFinalSettlement(const FMahjongFinalSettlementResult& Result);
 
     UFUNCTION(BlueprintPure, Category="麻将|网络") const FString& GetPendingPlayerName() const { return PendingPlayerName; }
 

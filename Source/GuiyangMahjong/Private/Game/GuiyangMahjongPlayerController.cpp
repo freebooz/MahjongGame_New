@@ -213,6 +213,14 @@ void AGuiyangMahjongPlayerController::Client_RestoreReconnectSnapshot_Implementa
         *Snapshot.RoomState.RoomInfo.RoomId, Snapshot.PrivateState.SeatIndex, Snapshot.TableState.RoundId);
 }
 
+void AGuiyangMahjongPlayerController::Client_ShowFinalSettlement_Implementation(
+    const FMahjongFinalSettlementResult& Result)
+{
+    OnFinalSettlementShown.Broadcast(Result);
+    UE_LOG(LogMahjongUI, Log, TEXT("最终大结算已显示：Room=%s，Rounds=%d"),
+        *Result.RoomId, Result.CompletedRounds);
+}
+
 void AGuiyangMahjongPlayerController::Client_ShowErrorMessage_Implementation(const FString& Message)
 {
     UE_LOG(LogMahjongUI, Warning, TEXT("显示中文错误提示：%s"), *Message);

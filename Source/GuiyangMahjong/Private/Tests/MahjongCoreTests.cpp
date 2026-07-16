@@ -255,6 +255,12 @@ bool FMahjongMultiRoundRoomTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("Configured rounds end in final settlement"), State.Lifecycle, EMahjongRoomLifecycle::Settlement);
     TestEqual(TEXT("Draw keeps dealer by default"), State.RoomInfo.DealerSeat, 2);
     TestEqual(TEXT("Accumulated score survives final round"), State.Seats[2].Score, 6);
+    const FMahjongFinalSettlementResult FinalResult = UGuiyangRoomManager::BuildFinalSettlement(State);
+    TestEqual(TEXT("Final settlement contains completed rounds"), FinalResult.CompletedRounds, 2);
+    TestEqual(TEXT("Final settlement contains four ranked players"), FinalResult.Players.Num(), 4);
+    TestEqual(TEXT("Highest score player ranks first"), FinalResult.Players[0].SeatIndex, 2);
+    TestEqual(TEXT("Equal scores use seat order for stable ranking"), FinalResult.Players[1].SeatIndex, 0);
+    TestEqual(TEXT("First result has rank one"), FinalResult.Players[0].Rank, 1);
     TestFalse(TEXT("Finished room rejects another round"), Manager->RequestNextRound(TEXT("round-p0"), State, Error));
     return true;
 }

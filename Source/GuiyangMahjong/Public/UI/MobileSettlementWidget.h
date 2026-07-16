@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Core/MahjongTypes.h"
+#include "Network/MahjongNetworkTypes.h"
 #include "MobileSettlementWidget.generated.h"
 
 class UButton; class UTextBlock; class UVerticalBox;
@@ -23,4 +24,6 @@ protected:
     UFUNCTION() void HandleNextRound(); UFUNCTION() void HandleBackLobby();
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void SetSettlementResult(const FMahjongSettlementResult& Result);
+    UFUNCTION(BlueprintCallable, Category="麻将|UI") void SetFinalSettlementResult(
+        const FMahjongFinalSettlementResult& Result);
 };

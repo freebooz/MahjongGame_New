@@ -453,6 +453,30 @@ bool UGuiyangRoomManager::GetPlayerRoomCode(const FString& PlayerId, FString& Ou
     return true;
 }
 
+FMahjongFinalSettlementResult UGuiyangRoomManager::BuildFinalSettlement(const FMahjongRoomState& State)
+{
+    FMahjongFinalSettlementResult Result;
+    Result.RoomId = State.RoomInfo.RoomId;
+    Result.CompletedRounds = State.RoomInfo.CurrentRound;
+    TArray<FMahjongSeatInfo> RankedSeats = State.Seats.FilterByPredicate(
+        [](const FMahjongSeatInfo& Seat) { return Seat.bOccupied; });
+    RankedSeats.Sort([](const FMahjongSeatInfo& Left, const FMahjongSeatInfo& Right)
+    {
+        if (Left.Score != Right.Score) return Left.Score > Right.Score;
+        return Left.SeatIndex < Right.SeatIndex;
+    });
+    for (int32 Index = 0; Index < RankedSeats.Num(); ++Index)
+    {
+        FMahjongFinalPlayerResult Player;
+        Player.Rank = Index + 1;
+        Player.SeatIndex = RankedSeats[Index].SeatIndex;
+        Player.PlayerName = RankedSeats[Index].PlayerName;
+        Player.TotalScore = RankedSeats[Index].Score;
+        Result.Players.Add(MoveTemp(Player));
+    }
+    return Result;
+}
+
 FString UGuiyangRoomManager::GenerateUniqueRoomCode()
 {
     if (!bRandomInitialized)

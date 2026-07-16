@@ -221,6 +221,7 @@ void AGuiyangMahjongGameMode::TryStartTable(const FMahjongRoomState& StartingRoo
     ActiveRoomCode = StartingRoomState.RoomInfo.RoomId;
     LastPublishedSettlementSequence = INDEX_NONE;
     LastFinalizedSettlementSequence = INDEX_NONE;
+    LastPublishedFinalRoomSequence = INDEX_NONE;
     ArmedTimeoutRoundId = INDEX_NONE;
     ArmedTimeoutTurnId = INDEX_NONE;
     ArmedTimeoutPhase = EMahjongTablePhase::WaitingForPlayers;
@@ -368,6 +369,9 @@ void AGuiyangMahjongGameMode::FinalizeRoundIfNeeded()
             Player->EnterRoomServer(State.RoomInfo.RoomId, Player->SeatIndex, false);
     }
     PublishRoomState(State);
+    if (State.Lifecycle == EMahjongRoomLifecycle::Settlement
+        && State.RoomInfo.CurrentRound >= State.RoomInfo.RoundCount)
+        PublishFinalSettlement(State);
 }
 
 void AGuiyangMahjongGameMode::PublishReconnectSnapshot(AGuiyangMahjongPlayerController* Controller,
@@ -390,6 +394,18 @@ void AGuiyangMahjongGameMode::PublishReconnectSnapshot(AGuiyangMahjongPlayerCont
     Controller->Client_RestoreReconnectSnapshot(Snapshot, Actions);
     FMahjongSettlementResult Settlement;
     if (TableEngine && TableEngine->GetSettlementResult(Settlement)) Controller->Client_ShowSettlement(Settlement);
+    if (RoomState.Lifecycle == EMahjongRoomLifecycle::Settlement
+        && RoomState.RoomInfo.CurrentRound >= RoomState.RoomInfo.RoundCount)
+        Controller->Client_ShowFinalSettlement(UGuiyangRoomManager::BuildFinalSettlement(RoomState));
+}
+
+void AGuiyangMahjongGameMode::PublishFinalSettlement(const FMahjongRoomState& RoomState)
+{
+    if (RoomState.StateSequence == LastPublishedFinalRoomSequence) return;
+    const FMahjongFinalSettlementResult Result = UGuiyangRoomManager::BuildFinalSettlement(RoomState);
+    for (TActorIterator<AGuiyangMahjongPlayerController> It(GetWorld()); It; ++It)
+        It->Client_ShowFinalSettlement(Result);
+    LastPublishedFinalRoomSequence = RoomState.StateSequence;
 }
 
 FString AGuiyangMahjongGameMode::HashSessionToken(const FString& SessionToken)

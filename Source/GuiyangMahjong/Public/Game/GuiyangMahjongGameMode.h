@@ -33,6 +33,7 @@ private:
     UPROPERTY(Transient) TObjectPtr<class UMahjongTableEngine> TableEngine;
     int32 LastPublishedSettlementSequence = INDEX_NONE;
     int32 LastFinalizedSettlementSequence = INDEX_NONE;
+    int32 LastPublishedFinalRoomSequence = INDEX_NONE;
     FString ActiveRoomCode;
     TMap<FString, FString> SessionTokenDigestsByPlayer;
     FTimerHandle ActionTimeoutHandle;
@@ -48,6 +49,7 @@ private:
     void HandleActionTimeout(int32 ExpectedRoundId, int32 ExpectedTurnId, EMahjongTablePhase ExpectedPhase);
     void PublishReconnectSnapshot(class AGuiyangMahjongPlayerController* Controller,
         const FMahjongRoomState& RoomState, int32 RemainingReconnectSeconds);
+    void PublishFinalSettlement(const FMahjongRoomState& RoomState);
     static FString HashSessionToken(const FString& SessionToken);
     static bool ConstantTimeDigestEquals(const FString& Left, const FString& Right);
     static FString ErrorToMessage(EMahjongRoomError Error);

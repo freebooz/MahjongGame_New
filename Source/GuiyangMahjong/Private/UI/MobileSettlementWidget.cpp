@@ -14,6 +14,7 @@ void UMobileSettlementWidget::NativeConstruct()
 
 void UMobileSettlementWidget::SetSettlementResult(const FMahjongSettlementResult& Result)
 {
+    Btn_NextRound->SetVisibility(ESlateVisibility::Visible);
     Txt_ResultTitle->SetText(FText::FromString(Result.bDrawGame ? TEXT("本局流局") : FString::Printf(TEXT("座位 %d 胡牌"), Result.WinnerSeat)));
     Txt_HuType->SetText(FText::FromString(Result.bSelfDraw ? TEXT("自摸") : TEXT("点炮")));
     FString JiSummary = Result.FlippedJiTile.IsValid()
@@ -32,6 +33,22 @@ void UMobileSettlementWidget::SetSettlementResult(const FMahjongSettlementResult
         Panel_PlayerScores->AddChildToVerticalBox(Row);
     }
     UE_LOG(LogMahjongUI, Log, TEXT("结算弹窗数据刷新完成"));
+}
+
+void UMobileSettlementWidget::SetFinalSettlementResult(const FMahjongFinalSettlementResult& Result)
+{
+    Txt_ResultTitle->SetText(FText::FromString(TEXT("最终大结算")));
+    Txt_HuType->SetText(FText::FromString(FString::Printf(TEXT("完成 %d 局"), Result.CompletedRounds)));
+    Txt_JiResult->SetText(FText::FromString(FString::Printf(TEXT("房间号：%s"), *Result.RoomId)));
+    Panel_PlayerScores->ClearChildren();
+    for (const FMahjongFinalPlayerResult& Player : Result.Players)
+    {
+        UTextBlock* Row = NewObject<UTextBlock>(this);
+        Row->SetText(FText::FromString(FString::Printf(TEXT("第 %d 名　座位 %d　%s　总分 %+d"),
+            Player.Rank, Player.SeatIndex, *Player.PlayerName, Player.TotalScore)));
+        Panel_PlayerScores->AddChildToVerticalBox(Row);
+    }
+    Btn_NextRound->SetVisibility(ESlateVisibility::Collapsed);
 }
 
 void UMobileSettlementWidget::HandleNextRound()

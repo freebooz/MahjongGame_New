@@ -27,6 +27,7 @@ public:
         int32& OutRemainingSeconds, EMahjongRoomError& OutError);
     bool GetRoomState(const FString& RoomCode, FMahjongRoomState& OutState) const;
     bool GetPlayerRoomCode(const FString& PlayerId, FString& OutRoomCode) const;
+    static FMahjongFinalSettlementResult BuildFinalSettlement(const FMahjongRoomState& State);
     int32 GetRoomCount() const { return Rooms.Num(); }
 
 private:

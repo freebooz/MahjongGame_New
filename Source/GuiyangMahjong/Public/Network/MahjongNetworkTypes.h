@@ -107,6 +107,25 @@ struct GUIYANGMAHJONG_API FMahjongRoomState
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 StateSequence = 0;
 };
 
+USTRUCT(BlueprintType)
+struct GUIYANGMAHJONG_API FMahjongFinalPlayerResult
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 Rank = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 SeatIndex = INDEX_NONE;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FString PlayerName;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TotalScore = 0;
+};
+
+USTRUCT(BlueprintType)
+struct GUIYANGMAHJONG_API FMahjongFinalSettlementResult
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FString RoomId;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 CompletedRounds = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongFinalPlayerResult> Players;
+};
+
 /** 可公开复制给所有客户端的牌桌快照，严格不包含手牌内容和牌墙顺序。 */
 USTRUCT(BlueprintType)
 struct GUIYANGMAHJONG_API FMahjongPublicTableState

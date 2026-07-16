@@ -41,6 +41,7 @@ protected:
     UFUNCTION() void HandlePrivateHand(const FMahjongPrivatePlayerState& State);
     UFUNCTION() void HandleAvailableActions(const TArray<FMahjongAction>& Actions);
     UFUNCTION() void HandleSettlement(const FMahjongSettlementResult& Result);
+    UFUNCTION() void HandleFinalSettlement(const FMahjongFinalSettlementResult& Result);
     UFUNCTION() void HandleError(const FString& Message);
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshTableState(const FMahjongPublicTableState& State);
