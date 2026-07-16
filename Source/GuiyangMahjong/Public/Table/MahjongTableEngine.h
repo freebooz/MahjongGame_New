@@ -38,7 +38,9 @@ private:
     TArray<int32> LastClientSequences;
     TArray<int32> CurrentScores;
     TArray<int32> GangDeltas;
+    TArray<int32> SpecialJiDeltas;
     int32 LastDiscardSeat = INDEX_NONE;
+    int32 FirstSpecialJiDiscardSequence = INDEX_NONE;
     FMahjongTile LastDrawnTile;
     bool bQiangGangWindow = false;
     int32 PendingBuGangSeat = INDEX_NONE;
@@ -58,6 +60,9 @@ private:
     void SettleWin(const TArray<int32>& WinningSeats, int32 LoserSeat, bool bSelfDraw, const FMahjongTile& WinningTile);
     void SettleDrawGame();
     void ApplyGangScore(int32 GangSeat);
+    void RecordSpecialJiDiscard(int32 SeatIndex, const FMahjongDiscardRecord& Record);
+    void RecordZeRenJiClaim(int32 ClaimSeat, EMahjongActionType ClaimType);
+    bool IsSpecialJiTarget(const FMahjongTile& Tile, bool bForZeRen) const;
     TArray<int32> CountJiForSettlement(const FMahjongTile& FlippedJiTile, const TArray<int32>& WinningSeats,
         bool bSelfDraw, const FMahjongTile& WinningTile) const;
     void RefreshSeatCounts();

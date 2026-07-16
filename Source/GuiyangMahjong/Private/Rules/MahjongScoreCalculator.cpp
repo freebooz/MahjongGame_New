@@ -12,6 +12,15 @@ FMahjongSettlementResult UMahjongScoreCalculator::CalculateWins(const TArray<int
     const int32 LoserSeat, const bool bSelfDraw, const TArray<int32>& JiCounts,
     const TArray<int32>& GangDeltas, const TArray<int32>& CurrentScores, const FMahjongRuleConfig& Config)
 {
+    return CalculateWinsWithSpecialJi(WinningSeats, LoserSeat, bSelfDraw, JiCounts, {},
+        GangDeltas, CurrentScores, Config);
+}
+
+FMahjongSettlementResult UMahjongScoreCalculator::CalculateWinsWithSpecialJi(const TArray<int32>& WinningSeats,
+    const int32 LoserSeat, const bool bSelfDraw, const TArray<int32>& JiCounts,
+    const TArray<int32>& SpecialJiDeltas, const TArray<int32>& GangDeltas,
+    const TArray<int32>& CurrentScores, const FMahjongRuleConfig& Config)
+{
     FMahjongSettlementResult Result;
     Result.WinningSeats = WinningSeats;
     Result.WinnerSeat = WinningSeats.IsEmpty() ? INDEX_NONE : WinningSeats[0];
@@ -32,6 +41,7 @@ FMahjongSettlementResult UMahjongScoreCalculator::CalculateWins(const TArray<int
     for (int32 Seat = 0; Seat < 4; ++Seat)
     {
         Result.PlayerResults[Seat].SeatIndex = Seat;
+        Result.PlayerResults[Seat].SpecialJiScoreDelta = SpecialJiDeltas.IsValidIndex(Seat) ? SpecialJiDeltas[Seat] : 0;
         Result.PlayerResults[Seat].GangScoreDelta = GangDeltas.IsValidIndex(Seat) ? GangDeltas[Seat] : 0;
     }
 
@@ -70,7 +80,8 @@ FMahjongSettlementResult UMahjongScoreCalculator::CalculateWins(const TArray<int
     for (int32 Seat = 0; Seat < 4; ++Seat)
     {
         FMahjongPlayerScoreResult& Player = Result.PlayerResults[Seat];
-        Player.TotalDelta = Player.BaseScoreDelta + Player.JiScoreDelta + Player.GangScoreDelta;
+        Player.TotalDelta = Player.BaseScoreDelta + Player.JiScoreDelta
+            + Player.SpecialJiScoreDelta + Player.GangScoreDelta;
         Player.TotalScore = (CurrentScores.IsValidIndex(Seat) ? CurrentScores[Seat] : 0) + Player.TotalDelta;
     }
     UE_LOG(LogMahjongScore, Log, TEXT("Round settlement completed: %s"), *Result.ToDebugString());

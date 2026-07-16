@@ -550,6 +550,109 @@ bool FMahjongActionCheckTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongSpecialJiRuleTest, "GuiyangMahjong.Rules.SpecialJiConfig", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongSpecialJiRuleTest::RunTest(const FString& Parameters)
+{
+    FMahjongRuleConfig Config;
+    Config.WuGuJiValue = 3;
+    Config.JiCountingScope = EMahjongJiCountingScope::HandOnly;
+    FMahjongHand Hand = MahjongTest::MakeHand({25, 0,1,2,3,4,5,6,7,8,10,11,12,13});
+    FMahjongMeld Meld;
+    Meld.Type = EMahjongMeldType::Peng;
+    Meld.Tiles = { MahjongTest::MakeTile(25, 100), MahjongTest::MakeTile(25, 101), MahjongTest::MakeTile(25, 102) };
+    Hand.Melds.Add(Meld);
+    TestTrue(TEXT("Eight dots is WuGu Ji"), UGuiyangJiCalculator::IsWuGuJi(Hand.Tiles[0]));
+    TestEqual(TEXT("Hand-only scope ignores meld WuGu Ji"),
+        UGuiyangJiCalculator::CountJiUnits(Hand, FMahjongTile(), Config), 3);
+    Config.JiCountingScope = EMahjongJiCountingScope::HandAndMeld;
+    TestEqual(TEXT("Hand-and-meld scope counts configured WuGu units"),
+        UGuiyangJiCalculator::CountJiUnits(Hand, FMahjongTile(), Config), 12);
+    const FGuiyangRuleSnapshot FirstSnapshot = UGuiyangRuleSnapshotLibrary::CreateSnapshot(Config);
+    Config.WuGuJiValue = 4;
+    const FGuiyangRuleSnapshot SecondSnapshot = UGuiyangRuleSnapshotLibrary::CreateSnapshot(Config);
+    TestNotEqual(TEXT("Special Ji values participate in rule hash"), FirstSnapshot.RuleHash, SecondSnapshot.RuleHash);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongSpecialJiEventTest, "GuiyangMahjong.Table.ChongFengAndZeRenJi", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongSpecialJiEventTest::RunTest(const FString& Parameters)
+{
+    TArray<FMahjongSeatInfo> Seats;
+    Seats.SetNum(4);
+    for (int32 Seat = 0; Seat < 4; ++Seat)
+    {
+        Seats[Seat].SeatIndex = Seat;
+        Seats[Seat].PlayerId = FString::Printf(TEXT("special-ji-p%d"), Seat);
+        Seats[Seat].bOccupied = true;
+        Seats[Seat].Score = 100;
+    }
+    FMahjongRuleConfig Config;
+    Config.JiScore = 2;
+    Config.ChongFengJiValue = 2;
+    Config.ZeRenJiValue = 3;
+    UMahjongTableEngine* Engine = NewObject<UMahjongTableEngine>();
+    FString Error;
+    TestTrue(TEXT("Special Ji table starts"), Engine->StartRound(
+        UGuiyangRuleSnapshotLibrary::CreateSnapshot(Config), Seats, 0, 105, Error));
+
+    Engine->SetHandForServerTest(0, MahjongTest::MakeHand({9,0,1,2,3,4,5,6,7,8,10,11,12,13}));
+    Engine->SetHandForServerTest(1, MahjongTest::MakeHand({9,9,0,2,4,6,8,10,12,14,16,18,20}));
+    const FMahjongHand NoHu = MahjongTest::MakeHand({6,8,10,12,14,16,18,20,22,24,26,5,7});
+    Engine->SetHandForServerTest(2, NoHu);
+    Engine->SetHandForServerTest(3, NoHu);
+
+    FMahjongActionRequest Play;
+    Play.Type = EMahjongActionType::Play;
+    Play.RoundId = Engine->GetPublicState().RoundId;
+    Play.TurnId = Engine->GetPublicState().TurnId;
+    Play.TargetTileId = 0;
+    Play.ClientSequence = 1;
+    TestTrue(TEXT("First basic Ji discard succeeds"), Engine->SubmitPlayTile(0, Play).bSuccess);
+    TestEqual(TEXT("First Ji discard records ChongFeng event"), Engine->GetPublicState().JiEvents.Num(), 1);
+    TestEqual(TEXT("ChongFeng event belongs to discarder"), Engine->GetPublicState().JiEvents[0].ActorSeat, 0);
+
+    for (int32 Seat = 2; Seat < 4; ++Seat)
+    {
+        if (Engine->GetAvailableActions(Seat).IsEmpty()) continue;
+        FMahjongActionRequest Pass;
+        Pass.Type = EMahjongActionType::Pass;
+        Pass.RoundId = Engine->GetPublicState().RoundId;
+        Pass.TurnId = Engine->GetPublicState().TurnId;
+        Pass.ClientSequence = 1;
+        Engine->SubmitReaction(Seat, Pass);
+    }
+    FMahjongActionRequest PengRequest;
+    PengRequest.Type = EMahjongActionType::Peng;
+    PengRequest.RoundId = Engine->GetPublicState().RoundId;
+    PengRequest.TurnId = Engine->GetPublicState().TurnId;
+    PengRequest.ClientSequence = 1;
+    TestTrue(TEXT("Other player claims first Ji by Peng"), Engine->SubmitReaction(1, PengRequest).bSuccess);
+    TestEqual(TEXT("Peng creates ZeRen event"), Engine->GetPublicState().JiEvents.Num(), 2);
+    TestEqual(TEXT("ZeRen event targets discarder"), Engine->GetPublicState().JiEvents[1].TargetSeat, 0);
+
+    FMahjongPrivatePlayerState Claimant;
+    Engine->GetPrivateState(1, Claimant);
+    Claimant.Hand.Tiles = MahjongTest::MakeHand({0,1,2, 3,4,5, 18,18,18, 13,13}).Tiles;
+    Engine->SetHandForServerTest(1, Claimant.Hand);
+    FMahjongActionRequest Hu;
+    Hu.Type = EMahjongActionType::Hu;
+    Hu.RoundId = Engine->GetPublicState().RoundId;
+    Hu.TurnId = Engine->GetPublicState().TurnId;
+    Hu.ClientSequence = 2;
+    TestTrue(TEXT("Claimant self draw settles special Ji"), Engine->SubmitTurnAction(1, Hu).bSuccess);
+    FMahjongSettlementResult Settlement;
+    Engine->GetSettlementResult(Settlement);
+    TestEqual(TEXT("Settlement carries both special Ji events"), Settlement.JiEvents.Num(), 2);
+    TestEqual(TEXT("Responsibility payer receives configured negative delta"),
+        Settlement.PlayerResults[0].SpecialJiScoreDelta, -6);
+    TestEqual(TEXT("Responsibility claimant receives configured positive delta"),
+        Settlement.PlayerResults[1].SpecialJiScoreDelta, 6);
+    int32 TotalDelta = 0;
+    for (const FMahjongPlayerScoreResult& Player : Settlement.PlayerResults) TotalDelta += Player.TotalDelta;
+    TestEqual(TEXT("Special Ji settlement remains zero sum"), TotalDelta, 0);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongJiTest, "GuiyangMahjong.Rules.Ji", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FMahjongJiTest::RunTest(const FString& Parameters)
 {

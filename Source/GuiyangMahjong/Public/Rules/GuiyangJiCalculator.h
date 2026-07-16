@@ -14,4 +14,9 @@ public:
     UFUNCTION(BlueprintPure, Category="麻将|捉鸡") static bool IsBasicJi(const FMahjongTile& Tile);
     UFUNCTION(BlueprintPure, Category="麻将|捉鸡") static int32 GetFlippedJiRuleIndex(const FMahjongTile& FlippedTile);
     UFUNCTION(BlueprintPure, Category="麻将|捉鸡") static int32 CountJi(const FMahjongHand& Hand, const FMahjongTile& FlippedTile);
+    static bool IsWuGuJi(const FMahjongTile& Tile);
+    static int32 CountTileJiUnits(const FMahjongTile& Tile, const FMahjongTile& FlippedTile,
+        const FMahjongRuleConfig& Config);
+    static int32 CountJiUnits(const FMahjongHand& Hand, const FMahjongTile& FlippedTile,
+        const FMahjongRuleConfig& Config);
 };

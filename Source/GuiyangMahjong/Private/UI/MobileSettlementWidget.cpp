@@ -26,7 +26,9 @@ void UMobileSettlementWidget::SetSettlementResult(const FMahjongSettlementResult
     for (const FMahjongPlayerScoreResult& Player : Result.PlayerResults)
     {
         UTextBlock* Row = NewObject<UTextBlock>(this);
-        Row->SetText(FText::FromString(FString::Printf(TEXT("座位 %d　基础 %+d　鸡 %+d　杠 %+d　合计 %+d"), Player.SeatIndex, Player.BaseScoreDelta, Player.JiScoreDelta, Player.GangScoreDelta, Player.TotalDelta)));
+        Row->SetText(FText::FromString(FString::Printf(TEXT("座位 %d　基础 %+d　鸡 %+d　特殊鸡 %+d　杠 %+d　合计 %+d"),
+            Player.SeatIndex, Player.BaseScoreDelta, Player.JiScoreDelta,
+            Player.SpecialJiScoreDelta, Player.GangScoreDelta, Player.TotalDelta)));
         Panel_PlayerScores->AddChildToVerticalBox(Row);
     }
     UE_LOG(LogMahjongUI, Log, TEXT("结算弹窗数据刷新完成"));

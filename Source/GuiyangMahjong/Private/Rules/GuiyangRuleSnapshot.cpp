@@ -39,6 +39,13 @@ FMahjongRuleConfig UGuiyangRuleSnapshotLibrary::NormalizeConfig(const FMahjongRu
     Result.RuleVersion = FMath::Max(1, Result.RuleVersion);
     Result.BaseScore = FMath::Clamp(Result.BaseScore, 1, 100);
     Result.JiScore = FMath::Clamp(Result.JiScore, 0, 100);
+    Result.BasicJiValue = FMath::Clamp(Result.BasicJiValue, 0, 16);
+    Result.FlippedJiValue = FMath::Clamp(Result.FlippedJiValue, 0, 16);
+    Result.WuGuJiValue = FMath::Clamp(Result.WuGuJiValue, 0, 16);
+    Result.ChongFengJiValue = FMath::Clamp(Result.ChongFengJiValue, 0, 16);
+    Result.WuGuChongFengJiValue = FMath::Clamp(Result.WuGuChongFengJiValue, 0, 16);
+    Result.ZeRenJiValue = FMath::Clamp(Result.ZeRenJiValue, 0, 16);
+    Result.WuGuZeRenJiValue = FMath::Clamp(Result.WuGuZeRenJiValue, 0, 16);
     Result.GangScore = FMath::Clamp(Result.GangScore, 0, 100);
     Result.ZiMoMultiplier = FMath::Clamp(Result.ZiMoMultiplier, 1, 16);
     Result.DianPaoMultiplier = FMath::Clamp(Result.DianPaoMultiplier, 1, 16);
@@ -51,11 +58,17 @@ FString UGuiyangRuleSnapshotLibrary::BuildCanonicalDefinition(const FMahjongRule
     // 固定字段顺序可确保不同服务端进程生成相同哈希；新增字段时应提升规则版本。
     return FString::Printf(
         TEXT("RuleId=%s|RuleVersion=%d|TileSet=%d|ChongFengJi=%d|ZeRenJi=%d|WuGuJi=%d|")
+        TEXT("WuGuChongFeng=%d|WuGuZeRen=%d|JiScope=%d|BasicJiValue=%d|FlippedJiValue=%d|")
+        TEXT("WuGuJiValue=%d|ChongFengJiValue=%d|WuGuChongFengJiValue=%d|ZeRenJiValue=%d|WuGuZeRenJiValue=%d|")
         TEXT("QiangGangHu=%d|YiPaoDuoXiang=%d|QiDui=%d|BaseScore=%d|JiScore=%d|GangScore=%d|")
         TEXT("ZiMoMultiplier=%d|DianPaoMultiplier=%d|ReconnectTimeoutSeconds=%d"),
         *Config.RuleId.ToString(), Config.RuleVersion, static_cast<int32>(Config.TileSetMode),
         Config.bEnableChongFengJi ? 1 : 0, Config.bEnableZeRenJi ? 1 : 0,
-        Config.bEnableWuGuJi ? 1 : 0, Config.bEnableQiangGangHu ? 1 : 0,
+        Config.bEnableWuGuJi ? 1 : 0, Config.bWuGuCanChongFeng ? 1 : 0,
+        Config.bWuGuCanZeRen ? 1 : 0, static_cast<int32>(Config.JiCountingScope),
+        Config.BasicJiValue, Config.FlippedJiValue, Config.WuGuJiValue,
+        Config.ChongFengJiValue, Config.WuGuChongFengJiValue, Config.ZeRenJiValue,
+        Config.WuGuZeRenJiValue, Config.bEnableQiangGangHu ? 1 : 0,
         Config.bEnableYiPaoDuoXiang ? 1 : 0, Config.bEnableQiDui ? 1 : 0,
         Config.BaseScore, Config.JiScore, Config.GangScore, Config.ZiMoMultiplier,
         Config.DianPaoMultiplier, Config.ReconnectTimeoutSeconds);

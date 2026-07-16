@@ -48,6 +48,22 @@ enum class EMahjongMeldType : uint8
     Chi, Peng, MingGang, AnGang, BuGang
 };
 
+UENUM(BlueprintType)
+enum class EMahjongJiCountingScope : uint8
+{
+    HandOnly,
+    HandAndMeld,
+    HandAndDiscard,
+    HandMeldAndDiscard
+};
+
+UENUM(BlueprintType)
+enum class EMahjongJiEventType : uint8
+{
+    ChongFeng,
+    ZeRen
+};
+
 /** 牌墙组成。贵阳主流规则默认只使用万、条、筒三门 108 张牌。 */
 UENUM(BlueprintType)
 enum class EMahjongTileSetMode : uint8
@@ -143,9 +159,22 @@ struct GUIYANGMAHJONG_API FMahjongPlayerScoreResult
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 SeatIndex = INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 BaseScoreDelta = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 JiScoreDelta = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 SpecialJiScoreDelta = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 GangScoreDelta = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TotalDelta = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TotalScore = 0;
+};
+
+USTRUCT(BlueprintType)
+struct GUIYANGMAHJONG_API FMahjongJiEvent
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EMahjongJiEventType Type = EMahjongJiEventType::ChongFeng;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongTile Tile;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ActorSeat = INDEX_NONE;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TargetSeat = INDEX_NONE;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ValueUnits = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 DiscardSequence = INDEX_NONE;
 };
 
 USTRUCT(BlueprintType)
@@ -160,6 +189,7 @@ struct GUIYANGMAHJONG_API FMahjongSettlementResult
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongTile WinningTile;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongTile FlippedJiTile;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<int32> PlayerJiCounts;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongJiEvent> JiEvents;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongTile> JiTiles;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongPlayerScoreResult> PlayerResults;
     FString ToDebugString() const;
@@ -176,11 +206,21 @@ struct GUIYANGMAHJONG_API FMahjongRuleConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableChongFengJi = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableZeRenJi = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableWuGuJi = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bWuGuCanChongFeng = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bWuGuCanZeRen = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableQiangGangHu = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableYiPaoDuoXiang = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableQiDui = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 BaseScore = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 JiScore = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 BasicJiValue = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 FlippedJiValue = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 WuGuJiValue = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ChongFengJiValue = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 WuGuChongFengJiValue = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ZeRenJiValue = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 WuGuZeRenJiValue = 1;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) EMahjongJiCountingScope JiCountingScope = EMahjongJiCountingScope::HandAndMeld;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 GangScore = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ZiMoMultiplier = 2;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 DianPaoMultiplier = 1;

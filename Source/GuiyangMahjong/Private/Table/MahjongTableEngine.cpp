@@ -47,11 +47,13 @@ bool UMahjongTableEngine::StartRound(const FGuiyangRuleSnapshot& RuleSnapshot, c
     LastClientSequences.Init(-1, 4);
     CurrentScores.Init(0, 4);
     GangDeltas.Init(0, 4);
+    SpecialJiDeltas.Init(0, 4);
     for (const FMahjongSeatInfo& Seat : Seats)
     {
         if (CurrentScores.IsValidIndex(Seat.SeatIndex)) CurrentScores[Seat.SeatIndex] = Seat.Score;
     }
     LastDiscardSeat = INDEX_NONE;
+    FirstSpecialJiDiscardSequence = INDEX_NONE;
     LastDrawnTile = Hands[DealerSeat].Tiles.IsEmpty() ? FMahjongTile() : Hands[DealerSeat].Tiles.Last();
     bQiangGangWindow = false;
     PendingBuGangSeat = INDEX_NONE;
@@ -161,6 +163,7 @@ FMahjongActionResult UMahjongTableEngine::SubmitPlayTile(const int32 SeatIndex, 
     Record.Tile = PlayedTile;
     Record.Sequence = ++PublicState.ServerActionSequence;
     PublicState.Discards.Add(Record);
+    RecordSpecialJiDiscard(SeatIndex, Record);
     PublicState.LastDiscard = PlayedTile;
     LastDiscardSeat = SeatIndex;
     ++PublicState.StateSequence;
@@ -489,6 +492,7 @@ void UMahjongTableEngine::ApplyClaim(const int32 SeatIndex, const EMahjongAction
     Meld.Tiles.Add(PublicState.LastDiscard);
     Hands[SeatIndex].Melds.Add(Meld);
     PublicState.PublicMelds.Add(Meld);
+    RecordZeRenJiClaim(SeatIndex, Type);
     if (!PublicState.Discards.IsEmpty()) PublicState.Discards.Last().bClaimed = true;
     PublicState.CurrentTurnSeat = SeatIndex;
     ++PublicState.TurnId;
@@ -587,11 +591,12 @@ void UMahjongTableEngine::SettleWin(const TArray<int32>& WinningSeats, const int
         PublicState.RemainingTileCount = DeckManager->GetRemainingCount();
     }
     const TArray<int32> JiCounts = CountJiForSettlement(FlippedJiTile, WinningSeats, bSelfDraw, WinningTile);
-    SettlementResult = UMahjongScoreCalculator::CalculateWins(WinningSeats, LoserSeat, bSelfDraw,
-        JiCounts, GangDeltas, CurrentScores, LockedRules.Config);
+    SettlementResult = UMahjongScoreCalculator::CalculateWinsWithSpecialJi(WinningSeats, LoserSeat, bSelfDraw,
+        JiCounts, SpecialJiDeltas, GangDeltas, CurrentScores, LockedRules.Config);
     SettlementResult.WinningTile = WinningTile;
     SettlementResult.FlippedJiTile = FlippedJiTile;
     SettlementResult.PlayerJiCounts = JiCounts;
+    SettlementResult.JiEvents = PublicState.JiEvents;
     PublicState.WinningSeats = WinningSeats;
     PublicState.CurrentTurnSeat = WinningSeats.IsEmpty() ? INDEX_NONE : WinningSeats[0];
     PublicState.Phase = EMahjongTablePhase::Settlement;
@@ -605,13 +610,15 @@ void UMahjongTableEngine::SettleDrawGame()
 {
     SettlementResult = FMahjongSettlementResult();
     SettlementResult.bDrawGame = true;
+    SettlementResult.JiEvents = PublicState.JiEvents;
     SettlementResult.PlayerResults.SetNum(4);
     for (int32 Seat = 0; Seat < 4; ++Seat)
     {
         FMahjongPlayerScoreResult& Player = SettlementResult.PlayerResults[Seat];
         Player.SeatIndex = Seat;
         Player.GangScoreDelta = GangDeltas.IsValidIndex(Seat) ? GangDeltas[Seat] : 0;
-        Player.TotalDelta = Player.GangScoreDelta;
+        Player.SpecialJiScoreDelta = SpecialJiDeltas.IsValidIndex(Seat) ? SpecialJiDeltas[Seat] : 0;
+        Player.TotalDelta = Player.GangScoreDelta + Player.SpecialJiScoreDelta;
         Player.TotalScore = (CurrentScores.IsValidIndex(Seat) ? CurrentScores[Seat] : 0) + Player.TotalDelta;
     }
     PublicState.WinningSeats.Reset();
@@ -635,6 +642,53 @@ void UMahjongTableEngine::ApplyGangScore(const int32 GangSeat)
     }
 }
 
+void UMahjongTableEngine::RecordSpecialJiDiscard(const int32 SeatIndex, const FMahjongDiscardRecord& Record)
+{
+    if (FirstSpecialJiDiscardSequence != INDEX_NONE || !IsSpecialJiTarget(Record.Tile, false)) return;
+    FirstSpecialJiDiscardSequence = Record.Sequence;
+    if (!LockedRules.Config.bEnableChongFengJi) return;
+
+    FMahjongJiEvent Event;
+    Event.Type = EMahjongJiEventType::ChongFeng;
+    Event.Tile = Record.Tile;
+    Event.ActorSeat = SeatIndex;
+    Event.ValueUnits = UGuiyangJiCalculator::IsWuGuJi(Record.Tile)
+        ? LockedRules.Config.WuGuChongFengJiValue : LockedRules.Config.ChongFengJiValue;
+    Event.DiscardSequence = Record.Sequence;
+    PublicState.JiEvents.Add(Event);
+}
+
+void UMahjongTableEngine::RecordZeRenJiClaim(const int32 ClaimSeat, const EMahjongActionType ClaimType)
+{
+    if (!LockedRules.Config.bEnableZeRenJi || (ClaimType != EMahjongActionType::Peng
+        && ClaimType != EMahjongActionType::MingGang) || PublicState.Discards.IsEmpty()) return;
+    const FMahjongDiscardRecord& Discard = PublicState.Discards.Last();
+    if (Discard.Sequence != FirstSpecialJiDiscardSequence || !IsSpecialJiTarget(Discard.Tile, true)) return;
+
+    const int32 Units = UGuiyangJiCalculator::IsWuGuJi(Discard.Tile)
+        ? LockedRules.Config.WuGuZeRenJiValue : LockedRules.Config.ZeRenJiValue;
+    const int32 Score = Units * LockedRules.Config.JiScore;
+    if (!SpecialJiDeltas.IsValidIndex(ClaimSeat) || !SpecialJiDeltas.IsValidIndex(Discard.SeatIndex)) return;
+    SpecialJiDeltas[ClaimSeat] += Score;
+    SpecialJiDeltas[Discard.SeatIndex] -= Score;
+
+    FMahjongJiEvent Event;
+    Event.Type = EMahjongJiEventType::ZeRen;
+    Event.Tile = Discard.Tile;
+    Event.ActorSeat = ClaimSeat;
+    Event.TargetSeat = Discard.SeatIndex;
+    Event.ValueUnits = Units;
+    Event.DiscardSequence = Discard.Sequence;
+    PublicState.JiEvents.Add(Event);
+}
+
+bool UMahjongTableEngine::IsSpecialJiTarget(const FMahjongTile& Tile, const bool bForZeRen) const
+{
+    if (UGuiyangJiCalculator::IsBasicJi(Tile)) return true;
+    if (!LockedRules.Config.bEnableWuGuJi || !UGuiyangJiCalculator::IsWuGuJi(Tile)) return false;
+    return bForZeRen ? LockedRules.Config.bWuGuCanZeRen : LockedRules.Config.bWuGuCanChongFeng;
+}
+
 TArray<int32> UMahjongTableEngine::CountJiForSettlement(const FMahjongTile& FlippedJiTile,
     const TArray<int32>& WinningSeats, const bool bSelfDraw, const FMahjongTile& WinningTile) const
 {
@@ -644,7 +698,22 @@ TArray<int32> UMahjongTableEngine::CountJiForSettlement(const FMahjongTile& Flip
     {
         FMahjongHand ScoringHand = Hands[Seat];
         if (!bSelfDraw && WinningSeats.Contains(Seat)) ScoringHand.Tiles.Add(WinningTile);
-        Counts.Add(UGuiyangJiCalculator::CountJi(ScoringHand, FlippedJiTile));
+        int32 Units = UGuiyangJiCalculator::CountJiUnits(ScoringHand, FlippedJiTile, LockedRules.Config);
+        const bool bCountDiscards = LockedRules.Config.JiCountingScope == EMahjongJiCountingScope::HandAndDiscard
+            || LockedRules.Config.JiCountingScope == EMahjongJiCountingScope::HandMeldAndDiscard;
+        if (bCountDiscards)
+        {
+            for (const FMahjongDiscardRecord& Discard : PublicState.Discards)
+            {
+                if (Discard.SeatIndex == Seat && !Discard.bClaimed)
+                    Units += UGuiyangJiCalculator::CountTileJiUnits(Discard.Tile, FlippedJiTile, LockedRules.Config);
+            }
+        }
+        for (const FMahjongJiEvent& Event : PublicState.JiEvents)
+        {
+            if (Event.Type == EMahjongJiEventType::ChongFeng && Event.ActorSeat == Seat) Units += Event.ValueUnits;
+        }
+        Counts.Add(Units);
     }
     return Counts;
 }

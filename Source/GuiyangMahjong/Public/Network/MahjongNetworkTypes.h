@@ -123,6 +123,7 @@ struct GUIYANGMAHJONG_API FMahjongPublicTableState
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<int32> WinningSeats;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongTile LastDiscard;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongTile FlippedJiTile;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongJiEvent> JiEvents;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 StateSequence = 0;
 };
 
