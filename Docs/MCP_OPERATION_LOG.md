@@ -84,3 +84,13 @@
 - Editor 构建：成功
 - 自动化：`GuiyangMahjong` 14/14 Success
 - 发布检查：本机缺少 `gh`，GitHub 发布流程按技能安全边界暂停，等待安装并登录 GitHub CLI
+
+## 操作 008：权威牌桌、轮转与反应优先级
+
+- 时间：2026-07-16
+- 写入：TableEngine、RoundId/TurnId/ActionSequence、公开/私有快照、GameMode 启桌和动作路由
+- 服务端流程：发牌、出牌、无人声明摸牌轮转、碰、明杠、胡、一炮多响
+- 安全验证：重复请求、过期回合、伪造牌 ID 均拒绝且不推进服务端动作序号
+- Editor 构建：成功
+- 自动化：`GuiyangMahjong` 16/16 Success
+- 已知缺口：暗杠/补杠/抢杠胡、完整鸡牌结算、超时、重连和下一局尚未接入

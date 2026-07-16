@@ -111,12 +111,16 @@ USTRUCT(BlueprintType)
 struct GUIYANGMAHJONG_API FMahjongPublicTableState
 {
     GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 RoundId = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TurnId = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ServerActionSequence = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EMahjongTablePhase Phase = EMahjongTablePhase::WaitingForPlayers;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 CurrentTurnSeat = INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 RemainingTileCount = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongSeatInfo> Seats;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongDiscardRecord> Discards;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongMeld> PublicMelds;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<int32> WinningSeats;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongTile LastDiscard;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 StateSequence = 0;
 };
@@ -126,6 +130,8 @@ USTRUCT(BlueprintType)
 struct GUIYANGMAHJONG_API FMahjongPrivatePlayerState
 {
     GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 RoundId = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TurnId = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 SeatIndex = INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongHand Hand;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 StateSequence = 0;

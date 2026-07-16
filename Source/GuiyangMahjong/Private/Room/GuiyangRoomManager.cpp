@@ -252,6 +252,29 @@ bool UGuiyangRoomManager::GetRoomState(const FString& RoomCode, FMahjongRoomStat
     return true;
 }
 
+bool UGuiyangRoomManager::BeginPlaying(const FString& RoomCode, FMahjongRoomState& OutState, EMahjongRoomError& OutError)
+{
+    OutError = EMahjongRoomError::None;
+    FRoomRecord* Record = Rooms.Find(RoomCode);
+    if (!Record)
+    {
+        OutError = EMahjongRoomError::RoomNotFound;
+        return false;
+    }
+    if (Record->PublicState.Lifecycle != EMahjongRoomLifecycle::Starting
+        || !UGuiyangRuleSnapshotLibrary::VerifySnapshot(Record->PublicState.RuleSnapshot))
+    {
+        OutError = EMahjongRoomError::InvalidRequest;
+        return false;
+    }
+    Record->PublicState.Lifecycle = EMahjongRoomLifecycle::Playing;
+    Record->PublicState.bGameStarting = false;
+    ++Record->PublicState.RoomInfo.CurrentRound;
+    ++Record->PublicState.StateSequence;
+    OutState = Record->PublicState;
+    return true;
+}
+
 bool UGuiyangRoomManager::GetPlayerRoomCode(const FString& PlayerId, FString& OutRoomCode) const
 {
     const FString* RoomCode = PlayerRoomCodes.Find(PlayerId);

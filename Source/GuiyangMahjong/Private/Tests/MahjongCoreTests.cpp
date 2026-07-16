@@ -7,6 +7,7 @@
 #include "Rules/MahjongScoreCalculator.h"
 #include "Rules/GuiyangRuleSnapshot.h"
 #include "Room/GuiyangRoomManager.h"
+#include "Table/MahjongTableEngine.h"
 #include "Auth/GuiyangLoginSaveGame.h"
 #include "Auth/GuiyangLoginSubsystem.h"
 #include "Engine/GameInstance.h"
@@ -181,6 +182,141 @@ bool FMahjongRoomReadyTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("生命周期必须进入 Starting"), State.Lifecycle, EMahjongRoomLifecycle::Starting);
     TestFalse(TEXT("启动后不得取消准备"), Manager->ToggleReady(TEXT("p0"), State, Error));
     TestEqual(TEXT("启动后准备请求返回已开局"), Error, EMahjongRoomError::GameAlreadyStarted);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongAuthoritativeTurnTest, "GuiyangMahjong.Table.AuthoritativeTurnAndReplayGuard", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongAuthoritativeTurnTest::RunTest(const FString& Parameters)
+{
+    TArray<FMahjongSeatInfo> Seats;
+    Seats.SetNum(4);
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        Seats[Index].SeatIndex = Index;
+        Seats[Index].PlayerId = FString::Printf(TEXT("table-p%d"), Index);
+        Seats[Index].PlayerName = FString::Printf(TEXT("牌桌玩家%d"), Index);
+        Seats[Index].bOccupied = true;
+        Seats[Index].bOnline = true;
+    }
+    const FGuiyangRuleSnapshot Rules = UGuiyangRuleSnapshotLibrary::CreateSnapshot(FMahjongRuleConfig());
+    UMahjongTableEngine* First = NewObject<UMahjongTableEngine>();
+    UMahjongTableEngine* Second = NewObject<UMahjongTableEngine>();
+    FString Error;
+    TestTrue(TEXT("第一张牌桌应成功开局"), First->StartRound(Rules, Seats, 0, 20260716, Error));
+    TestTrue(TEXT("第二张牌桌应成功开局"), Second->StartRound(Rules, Seats, 0, 20260716, Error));
+
+    const FMahjongPublicTableState& Initial = First->GetPublicState();
+    TestEqual(TEXT("开局阶段为庄家出牌"), Initial.Phase, EMahjongTablePhase::PlayerTurn);
+    TestEqual(TEXT("庄家座位为 0"), Initial.CurrentTurnSeat, 0);
+    TestEqual(TEXT("108 张牌发完 53 张后剩余 55 张"), Initial.RemainingTileCount, 55);
+    TestEqual(TEXT("庄家公开牌数为 14"), Initial.Seats[0].HandTileCount, 14);
+    for (int32 Seat = 1; Seat < 4; ++Seat) TestEqual(TEXT("闲家公开牌数为 13"), Initial.Seats[Seat].HandTileCount, 13);
+
+    FMahjongPrivatePlayerState FirstDealer;
+    FMahjongPrivatePlayerState SecondDealer;
+    TestTrue(TEXT("可读取庄家私有快照"), First->GetPrivateState(0, FirstDealer));
+    TestTrue(TEXT("可读取第二桌庄家私有快照"), Second->GetPrivateState(0, SecondDealer));
+    TestEqual(TEXT("相同种子产生相同庄家手牌数量"), FirstDealer.Hand.Tiles.Num(), SecondDealer.Hand.Tiles.Num());
+    for (int32 Index = 0; Index < FirstDealer.Hand.Tiles.Num(); ++Index)
+        TestEqual(TEXT("相同种子必须产生相同牌序"), FirstDealer.Hand.Tiles[Index].UniqueId, SecondDealer.Hand.Tiles[Index].UniqueId);
+
+    FMahjongActionRequest Play;
+    Play.Type = EMahjongActionType::Play;
+    Play.RoundId = Initial.RoundId;
+    Play.TurnId = Initial.TurnId;
+    Play.TargetTileId = FirstDealer.Hand.Tiles[0].UniqueId;
+    Play.ClientSequence = 1;
+    const FMahjongActionResult Played = First->SubmitPlayTile(0, Play);
+    TestTrue(TEXT("庄家合法出牌必须成功"), Played.bSuccess);
+    TestFalse(TEXT("完全相同的请求不得重放"), First->SubmitPlayTile(0, Play).bSuccess);
+
+    if (First->GetPublicState().Phase == EMahjongTablePhase::WaitingForAction)
+    {
+        for (int32 Seat = 1; Seat < 4 && First->GetPublicState().Phase == EMahjongTablePhase::WaitingForAction; ++Seat)
+        {
+            if (First->GetAvailableActions(Seat).IsEmpty()) continue;
+            FMahjongActionRequest Pass;
+            Pass.Type = EMahjongActionType::Pass;
+            Pass.RoundId = First->GetPublicState().RoundId;
+            Pass.TurnId = First->GetPublicState().TurnId;
+            Pass.ClientSequence = 1;
+            TestTrue(TEXT("反应窗口过牌必须成功"), First->SubmitReaction(Seat, Pass).bSuccess);
+        }
+    }
+
+    const FMahjongPublicTableState& Advanced = First->GetPublicState();
+    TestEqual(TEXT("无人声明后轮到下一座位"), Advanced.CurrentTurnSeat, 1);
+    TestEqual(TEXT("下一家摸牌后持有 14 张"), Advanced.Seats[1].HandTileCount, 14);
+    TestEqual(TEXT("轮转摸牌后牌墙剩余 54 张"), Advanced.RemainingTileCount, 54);
+    TestEqual(TEXT("弃牌记录必须由服务端生成"), Advanced.Discards.Num(), 1);
+
+    FMahjongPrivatePlayerState NextPlayer;
+    First->GetPrivateState(1, NextPlayer);
+    FMahjongActionRequest Forged;
+    Forged.Type = EMahjongActionType::Play;
+    Forged.RoundId = Advanced.RoundId;
+    Forged.TurnId = Advanced.TurnId;
+    Forged.TargetTileId = 999999;
+    Forged.ClientSequence = 2;
+    const int32 SequenceBefore = Advanced.ServerActionSequence;
+    TestFalse(TEXT("伪造不属于手牌的牌 ID 必须被拒绝"), First->SubmitPlayTile(1, Forged).bSuccess);
+    TestEqual(TEXT("拒绝请求不得推进服务端动作序号"), First->GetPublicState().ServerActionSequence, SequenceBefore);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongReactionPriorityTest, "GuiyangMahjong.Table.ReactionPriorityAndMultiHu", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongReactionPriorityTest::RunTest(const FString& Parameters)
+{
+    TArray<FMahjongSeatInfo> Seats;
+    Seats.SetNum(4);
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        Seats[Index].SeatIndex = Index;
+        Seats[Index].PlayerId = FString::Printf(TEXT("priority-p%d"), Index);
+        Seats[Index].PlayerName = FString::Printf(TEXT("优先级玩家%d"), Index);
+        Seats[Index].bOccupied = true;
+    }
+    UMahjongTableEngine* Engine = NewObject<UMahjongTableEngine>();
+    const FGuiyangRuleSnapshot Rules = UGuiyangRuleSnapshotLibrary::CreateSnapshot(FMahjongRuleConfig());
+    FString Error;
+    TestTrue(TEXT("优先级测试牌桌开局成功"), Engine->StartRound(Rules, Seats, 0, 99, Error));
+
+    FMahjongHand Discarder = MahjongTest::MakeHand({0,1,2,3,4,5,6,7,8,9,10,11,12,13});
+    FMahjongHand PengPlayer = MahjongTest::MakeHand({0,0,3,4,5,6,7,8,9,10,11,12,13});
+    const FMahjongHand WaitingHu = MahjongTest::MakeHand({1,2, 3,4,5, 9,10,11, 18,18,18, 31,31});
+    TestTrue(TEXT("注入出牌者测试手牌"), Engine->SetHandForServerTest(0, Discarder));
+    TestTrue(TEXT("注入碰牌候选手牌"), Engine->SetHandForServerTest(1, PengPlayer));
+    TestTrue(TEXT("注入第一胡家手牌"), Engine->SetHandForServerTest(2, WaitingHu));
+    TestTrue(TEXT("注入第二胡家手牌"), Engine->SetHandForServerTest(3, WaitingHu));
+
+    FMahjongActionRequest Play;
+    Play.Type = EMahjongActionType::Play;
+    Play.RoundId = Engine->GetPublicState().RoundId;
+    Play.TurnId = Engine->GetPublicState().TurnId;
+    Play.TargetTileId = Discarder.Tiles[0].UniqueId;
+    Play.ClientSequence = 1;
+    TestTrue(TEXT("测试牌出牌成功"), Engine->SubmitPlayTile(0, Play).bSuccess);
+    TestTrue(TEXT("座位1必须获得碰候选"), Engine->GetAvailableActions(1).ContainsByPredicate([](const FMahjongAction& A) { return A.Type == EMahjongActionType::Peng; }));
+    TestTrue(TEXT("座位2必须获得胡候选"), Engine->GetAvailableActions(2).ContainsByPredicate([](const FMahjongAction& A) { return A.Type == EMahjongActionType::Hu; }));
+    TestTrue(TEXT("座位3必须获得胡候选"), Engine->GetAvailableActions(3).ContainsByPredicate([](const FMahjongAction& A) { return A.Type == EMahjongActionType::Hu; }));
+
+    for (const TPair<int32, EMahjongActionType> Response : {
+        TPair<int32, EMahjongActionType>(1, EMahjongActionType::Peng),
+        TPair<int32, EMahjongActionType>(2, EMahjongActionType::Hu),
+        TPair<int32, EMahjongActionType>(3, EMahjongActionType::Hu) })
+    {
+        FMahjongActionRequest Reaction;
+        Reaction.Type = Response.Value;
+        Reaction.RoundId = Engine->GetPublicState().RoundId;
+        Reaction.TurnId = Engine->GetPublicState().TurnId;
+        Reaction.ClientSequence = 1;
+        TestTrue(TEXT("声明动作必须成功记录"), Engine->SubmitReaction(Response.Key, Reaction).bSuccess);
+    }
+    TestEqual(TEXT("胡牌必须压过碰并进入结算"), Engine->GetPublicState().Phase, EMahjongTablePhase::Settlement);
+    TestEqual(TEXT("默认一炮多响应保留两个胡家"), Engine->GetPublicState().WinningSeats.Num(), 2);
+    TestTrue(TEXT("第一胡家在赢家列表"), Engine->GetPublicState().WinningSeats.Contains(2));
+    TestTrue(TEXT("第二胡家在赢家列表"), Engine->GetPublicState().WinningSeats.Contains(3));
+    TestFalse(TEXT("碰牌玩家不得成为赢家"), Engine->GetPublicState().WinningSeats.Contains(1));
     return true;
 }
 

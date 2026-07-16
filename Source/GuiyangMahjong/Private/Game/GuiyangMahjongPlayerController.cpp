@@ -138,11 +138,21 @@ void AGuiyangMahjongPlayerController::Server_RequestPlayTile_Implementation(cons
         Client_ShowErrorMessage(TEXT("出牌请求无效"));
         return;
     }
+    if (AGuiyangMahjongGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGuiyangMahjongGameMode>() : nullptr)
+    {
+        Mode->HandleLegacyPlayTile(this, Tile, ++LastClientActionSequence);
+        return;
+    }
     UE_LOG(LogMahjongServer, Log, TEXT("收到出牌请求：%s"), *Tile.ToDebugString());
 }
 
 void AGuiyangMahjongPlayerController::Server_RequestAction_Implementation(const FMahjongActionRequest Request)
 {
+    if (AGuiyangMahjongGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGuiyangMahjongGameMode>() : nullptr)
+    {
+        Mode->HandleTableAction(this, Request);
+        return;
+    }
     if (Request.ClientSequence <= LastClientActionSequence || Request.Type == EMahjongActionType::Draw)
     {
         UE_LOG(LogMahjongNet, Warning, TEXT("RPC拒绝：操作序号重复或客户端请求了服务端专属摸牌操作，序号=%d"), Request.ClientSequence);

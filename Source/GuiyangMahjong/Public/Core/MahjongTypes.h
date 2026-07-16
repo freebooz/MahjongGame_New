@@ -119,6 +119,8 @@ struct GUIYANGMAHJONG_API FMahjongActionRequest
 {
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EMahjongActionType Type = EMahjongActionType::Pass;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 RoundId = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TurnId = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TargetTileId = INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<int32> ConsumedTileIds;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ClientSequence = 0;

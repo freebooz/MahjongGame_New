@@ -4,6 +4,9 @@
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "Game/GuiyangMahjongPlayerState.h"
 #include "Room/GuiyangRoomManager.h"
+#include "Table/MahjongTableEngine.h"
+#include "HAL/PlatformTime.h"
+#include "EngineUtils.h"
 
 AGuiyangMahjongGameMode::AGuiyangMahjongGameMode()
 {
@@ -79,6 +82,7 @@ void AGuiyangMahjongGameMode::HandleToggleReady(AGuiyangMahjongPlayerController*
     if (const FMahjongSeatInfo* Seat = State.Seats.FindByPredicate([Player](const FMahjongSeatInfo& Item) { return Item.PlayerId == Player->MahjongPlayerId; }))
         Player->EnterRoomServer(State.RoomInfo.RoomId, Seat->SeatIndex, Seat->bReady);
     PublishRoomState(State);
+    if (State.Lifecycle == EMahjongRoomLifecycle::Starting) TryStartTable(State);
 }
 
 void AGuiyangMahjongGameMode::HandleLeaveRoom(AGuiyangMahjongPlayerController* Controller)
@@ -108,6 +112,75 @@ bool AGuiyangMahjongGameMode::ResolvePlayer(AGuiyangMahjongPlayerController* Con
 void AGuiyangMahjongGameMode::PublishRoomState(const FMahjongRoomState& State)
 {
     if (AGuiyangMahjongGameState* MahjongState = GetGameState<AGuiyangMahjongGameState>()) MahjongState->SetRoomStateAuthority(State);
+}
+
+void AGuiyangMahjongGameMode::TryStartTable(const FMahjongRoomState& StartingRoomState)
+{
+    if (TableEngine || !RoomManager) return;
+    TableEngine = NewObject<UMahjongTableEngine>(this);
+    FString Error;
+    const int32 Seed = static_cast<int32>(FPlatformTime::Cycles64());
+    if (!TableEngine->StartRound(StartingRoomState.RuleSnapshot, StartingRoomState.Seats, 0, Seed, Error))
+    {
+        TableEngine = nullptr;
+        return;
+    }
+    FMahjongRoomState PlayingState;
+    EMahjongRoomError RoomError;
+    if (!RoomManager->BeginPlaying(StartingRoomState.RoomInfo.RoomId, PlayingState, RoomError))
+    {
+        TableEngine = nullptr;
+        return;
+    }
+    PublishRoomState(PlayingState);
+    PublishTableSnapshots();
+}
+
+void AGuiyangMahjongGameMode::HandleTableAction(AGuiyangMahjongPlayerController* Controller, const FMahjongActionRequest& Request)
+{
+    AGuiyangMahjongPlayerState* Player = nullptr;
+    if (!ResolvePlayer(Controller, Player) || !TableEngine || Player->SeatIndex == INDEX_NONE)
+    {
+        if (Controller) Controller->Client_ShowErrorMessage(TEXT("牌桌尚未开始"));
+        return;
+    }
+    const FMahjongActionResult Result = Request.Type == EMahjongActionType::Play
+        ? TableEngine->SubmitPlayTile(Player->SeatIndex, Request)
+        : TableEngine->SubmitReaction(Player->SeatIndex, Request);
+    if (!Result.bSuccess)
+    {
+        Controller->Client_ShowErrorMessage(Result.Message);
+        return;
+    }
+    PublishTableSnapshots();
+}
+
+void AGuiyangMahjongGameMode::HandleLegacyPlayTile(AGuiyangMahjongPlayerController* Controller, const FMahjongTile& Tile, const int32 ClientSequence)
+{
+    if (!TableEngine) return;
+    FMahjongActionRequest Request;
+    Request.Type = EMahjongActionType::Play;
+    Request.RoundId = TableEngine->GetPublicState().RoundId;
+    Request.TurnId = TableEngine->GetPublicState().TurnId;
+    Request.TargetTileId = Tile.UniqueId;
+    Request.ClientSequence = ClientSequence;
+    HandleTableAction(Controller, Request);
+}
+
+void AGuiyangMahjongGameMode::PublishTableSnapshots()
+{
+    if (!TableEngine) return;
+    if (AGuiyangMahjongGameState* MahjongState = GetGameState<AGuiyangMahjongGameState>())
+        MahjongState->SetPublicTableStateAuthority(TableEngine->GetPublicState());
+    for (TActorIterator<AGuiyangMahjongPlayerController> It(GetWorld()); It; ++It)
+    {
+        AGuiyangMahjongPlayerController* Controller = *It;
+        const AGuiyangMahjongPlayerState* Player = Controller->GetPlayerState<AGuiyangMahjongPlayerState>();
+        if (!Player || Player->SeatIndex == INDEX_NONE) continue;
+        FMahjongPrivatePlayerState PrivateState;
+        if (TableEngine->GetPrivateState(Player->SeatIndex, PrivateState)) Controller->Client_UpdatePrivateHand(PrivateState);
+        Controller->Client_ShowAvailableActions(TableEngine->GetAvailableActions(Player->SeatIndex));
+    }
 }
 
 FString AGuiyangMahjongGameMode::ErrorToMessage(const EMahjongRoomError Error)
