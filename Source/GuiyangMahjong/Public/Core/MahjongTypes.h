@@ -211,6 +211,7 @@ struct GUIYANGMAHJONG_API FMahjongRuleConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableQiangGangHu = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableYiPaoDuoXiang = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableQiDui = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bDrawGameDealerContinues = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 BaseScore = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 JiScore = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 BasicJiValue = 1;

@@ -127,6 +127,8 @@ void AGuiyangMahjongPlayerController::Server_RequestJoinRoomByCode_Implementatio
 
 void AGuiyangMahjongPlayerController::Server_RequestNextRound_Implementation()
 {
+    if (AGuiyangMahjongGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGuiyangMahjongGameMode>() : nullptr)
+        Mode->HandleNextRound(this);
     UE_LOG(LogMahjongServer, Log, TEXT("收到下一局请求：控制器=%s"), *GetName());
 }
 

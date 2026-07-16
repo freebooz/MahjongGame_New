@@ -89,6 +89,7 @@ struct GUIYANGMAHJONG_API FMahjongRoomInfo
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FString OwnerPlayerId;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 RoundCount = 4;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 CurrentRound = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 DealerSeat = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 BaseScore = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bPublicRoom = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bPasswordProtected = false;

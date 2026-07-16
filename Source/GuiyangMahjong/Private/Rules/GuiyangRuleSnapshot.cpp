@@ -60,7 +60,8 @@ FString UGuiyangRuleSnapshotLibrary::BuildCanonicalDefinition(const FMahjongRule
         TEXT("RuleId=%s|RuleVersion=%d|TileSet=%d|ChongFengJi=%d|ZeRenJi=%d|WuGuJi=%d|")
         TEXT("WuGuChongFeng=%d|WuGuZeRen=%d|JiScope=%d|BasicJiValue=%d|FlippedJiValue=%d|")
         TEXT("WuGuJiValue=%d|ChongFengJiValue=%d|WuGuChongFengJiValue=%d|ZeRenJiValue=%d|WuGuZeRenJiValue=%d|")
-        TEXT("QiangGangHu=%d|YiPaoDuoXiang=%d|QiDui=%d|BaseScore=%d|JiScore=%d|GangScore=%d|")
+        TEXT("QiangGangHu=%d|YiPaoDuoXiang=%d|QiDui=%d|DrawDealerContinues=%d|")
+        TEXT("BaseScore=%d|JiScore=%d|GangScore=%d|")
         TEXT("ZiMoMultiplier=%d|DianPaoMultiplier=%d|ReconnectTimeoutSeconds=%d"),
         *Config.RuleId.ToString(), Config.RuleVersion, static_cast<int32>(Config.TileSetMode),
         Config.bEnableChongFengJi ? 1 : 0, Config.bEnableZeRenJi ? 1 : 0,
@@ -70,6 +71,7 @@ FString UGuiyangRuleSnapshotLibrary::BuildCanonicalDefinition(const FMahjongRule
         Config.ChongFengJiValue, Config.WuGuChongFengJiValue, Config.ZeRenJiValue,
         Config.WuGuZeRenJiValue, Config.bEnableQiangGangHu ? 1 : 0,
         Config.bEnableYiPaoDuoXiang ? 1 : 0, Config.bEnableQiDui ? 1 : 0,
+        Config.bDrawGameDealerContinues ? 1 : 0,
         Config.BaseScore, Config.JiScore, Config.GangScore, Config.ZiMoMultiplier,
         Config.DianPaoMultiplier, Config.ReconnectTimeoutSeconds);
 }

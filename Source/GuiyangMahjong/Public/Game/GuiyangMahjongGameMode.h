@@ -20,6 +20,7 @@ public:
     void HandleCreateRoom(class AGuiyangMahjongPlayerController* Controller, const FMahjongCreateRoomRequest& Request);
     void HandleJoinRoom(class AGuiyangMahjongPlayerController* Controller, const FMahjongJoinRoomRequest& Request);
     void HandleToggleReady(class AGuiyangMahjongPlayerController* Controller);
+    void HandleNextRound(class AGuiyangMahjongPlayerController* Controller);
     void HandleLeaveRoom(class AGuiyangMahjongPlayerController* Controller);
     void HandleTableAction(class AGuiyangMahjongPlayerController* Controller, const FMahjongActionRequest& Request);
     void HandleLegacyPlayTile(class AGuiyangMahjongPlayerController* Controller, const FMahjongTile& Tile, int32 ClientSequence);
@@ -28,9 +29,12 @@ private:
     UPROPERTY(Transient) TObjectPtr<class UGuiyangRoomManager> RoomManager;
     UPROPERTY(Transient) TObjectPtr<class UMahjongTableEngine> TableEngine;
     int32 LastPublishedSettlementSequence = INDEX_NONE;
+    int32 LastFinalizedSettlementSequence = INDEX_NONE;
+    FString ActiveRoomCode;
     bool ResolvePlayer(class AGuiyangMahjongPlayerController* Controller, class AGuiyangMahjongPlayerState*& OutPlayerState) const;
     void PublishRoomState(const FMahjongRoomState& State);
     void TryStartTable(const FMahjongRoomState& StartingRoomState);
     void PublishTableSnapshots();
+    void FinalizeRoundIfNeeded();
     static FString ErrorToMessage(EMahjongRoomError Error);
 };

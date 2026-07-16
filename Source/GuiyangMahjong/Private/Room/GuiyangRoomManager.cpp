@@ -275,6 +275,104 @@ bool UGuiyangRoomManager::BeginPlaying(const FString& RoomCode, FMahjongRoomStat
     return true;
 }
 
+bool UGuiyangRoomManager::FinishRound(const FString& RoomCode, const FMahjongSettlementResult& Settlement,
+    FMahjongRoomState& OutState, EMahjongRoomError& OutError)
+{
+    OutError = EMahjongRoomError::None;
+    FRoomRecord* Record = Rooms.Find(RoomCode);
+    if (!Record)
+    {
+        OutError = EMahjongRoomError::RoomNotFound;
+        return false;
+    }
+    if (Record->PublicState.Lifecycle != EMahjongRoomLifecycle::Playing || Settlement.PlayerResults.Num() != 4)
+    {
+        OutError = EMahjongRoomError::InvalidRequest;
+        return false;
+    }
+
+    TSet<int32> UpdatedSeats;
+    int32 TotalDelta = 0;
+    for (const FMahjongPlayerScoreResult& Result : Settlement.PlayerResults)
+    {
+        if (!Record->PublicState.Seats.IsValidIndex(Result.SeatIndex) || UpdatedSeats.Contains(Result.SeatIndex))
+        {
+            OutError = EMahjongRoomError::InvalidRequest;
+            return false;
+        }
+        UpdatedSeats.Add(Result.SeatIndex);
+        TotalDelta += Result.TotalDelta;
+    }
+    if (TotalDelta != 0)
+    {
+        OutError = EMahjongRoomError::InvalidRequest;
+        return false;
+    }
+
+    for (const FMahjongPlayerScoreResult& Result : Settlement.PlayerResults)
+        Record->PublicState.Seats[Result.SeatIndex].Score += Result.TotalDelta;
+
+    if (Settlement.bDrawGame)
+    {
+        if (!Record->PublicState.RuleSnapshot.Config.bDrawGameDealerContinues)
+            Record->PublicState.RoomInfo.DealerSeat = (Record->PublicState.RoomInfo.DealerSeat + 1) % 4;
+    }
+    else if (Record->PublicState.Seats.IsValidIndex(Settlement.WinnerSeat))
+    {
+        Record->PublicState.RoomInfo.DealerSeat = Settlement.WinnerSeat;
+    }
+
+    for (FMahjongSeatInfo& Seat : Record->PublicState.Seats) Seat.bReady = false;
+    Record->PublicState.bGameStarting = false;
+    Record->PublicState.Lifecycle = Record->PublicState.RoomInfo.CurrentRound >= Record->PublicState.RoomInfo.RoundCount
+        ? EMahjongRoomLifecycle::Settlement : EMahjongRoomLifecycle::WaitingNextRound;
+    ++Record->PublicState.StateSequence;
+    OutState = Record->PublicState;
+    UE_LOG(LogMahjongServer, Log, TEXT("单局分数已回写：Room=%s，Round=%d/%d，Dealer=%d，Lifecycle=%d"),
+        *RoomCode, OutState.RoomInfo.CurrentRound, OutState.RoomInfo.RoundCount,
+        OutState.RoomInfo.DealerSeat, static_cast<int32>(OutState.Lifecycle));
+    return true;
+}
+
+bool UGuiyangRoomManager::RequestNextRound(const FString& PlayerId, FMahjongRoomState& OutState,
+    EMahjongRoomError& OutError)
+{
+    OutError = EMahjongRoomError::None;
+    const FString* RoomCode = PlayerRoomCodes.Find(PlayerId);
+    FRoomRecord* Record = RoomCode ? Rooms.Find(*RoomCode) : nullptr;
+    if (!Record)
+    {
+        OutError = EMahjongRoomError::NotInRoom;
+        return false;
+    }
+    if (Record->PublicState.Lifecycle != EMahjongRoomLifecycle::WaitingNextRound)
+    {
+        OutError = EMahjongRoomError::InvalidRequest;
+        return false;
+    }
+    FMahjongSeatInfo* Seat = FindSeat(Record->PublicState, PlayerId);
+    if (!Seat)
+    {
+        OutError = EMahjongRoomError::NotInRoom;
+        return false;
+    }
+    Seat->bReady = true;
+
+    const bool bAllReady = Record->PublicState.Seats.Num() == 4
+        && Record->PublicState.Seats.ContainsByPredicate([](const FMahjongSeatInfo& Item)
+        {
+            return !Item.bOccupied || !Item.bReady;
+        }) == false;
+    if (bAllReady)
+    {
+        Record->PublicState.Lifecycle = EMahjongRoomLifecycle::Starting;
+        Record->PublicState.bGameStarting = true;
+    }
+    ++Record->PublicState.StateSequence;
+    OutState = Record->PublicState;
+    return true;
+}
+
 bool UGuiyangRoomManager::GetPlayerRoomCode(const FString& PlayerId, FString& OutRoomCode) const
 {
     const FString* RoomCode = PlayerRoomCodes.Find(PlayerId);

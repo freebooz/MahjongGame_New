@@ -19,6 +19,9 @@ public:
     bool ToggleReady(const FString& PlayerId, FMahjongRoomState& OutState, EMahjongRoomError& OutError);
     bool LeaveRoom(const FString& PlayerId, FMahjongRoomState& OutState, EMahjongRoomError& OutError);
     bool BeginPlaying(const FString& RoomCode, FMahjongRoomState& OutState, EMahjongRoomError& OutError);
+    bool FinishRound(const FString& RoomCode, const FMahjongSettlementResult& Settlement,
+        FMahjongRoomState& OutState, EMahjongRoomError& OutError);
+    bool RequestNextRound(const FString& PlayerId, FMahjongRoomState& OutState, EMahjongRoomError& OutError);
     bool GetRoomState(const FString& RoomCode, FMahjongRoomState& OutState) const;
     bool GetPlayerRoomCode(const FString& PlayerId, FString& OutRoomCode) const;
     int32 GetRoomCount() const { return Rooms.Num(); }

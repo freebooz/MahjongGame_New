@@ -185,6 +185,71 @@ bool FMahjongRoomReadyTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongMultiRoundRoomTest, "GuiyangMahjong.Room.MultiRoundLifecycle", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongMultiRoundRoomTest::RunTest(const FString& Parameters)
+{
+    UGuiyangRoomManager* Manager = NewObject<UGuiyangRoomManager>();
+    FMahjongCreateRoomRequest Create;
+    Create.RoundCount = 2;
+    FMahjongRoomState State;
+    EMahjongRoomError Error = EMahjongRoomError::None;
+    TestTrue(TEXT("Multi-round room is created"), Manager->CreateRoom(TEXT("round-p0"), TEXT("P0"), Create, State, Error));
+    const FString RoomCode = State.RoomInfo.RoomId;
+    TestEqual(TEXT("Owner is first dealer"), State.RoomInfo.DealerSeat, 0);
+    for (int32 Seat = 1; Seat < 4; ++Seat)
+    {
+        FMahjongJoinRoomRequest Join;
+        Join.RoomCode = RoomCode;
+        TestTrue(TEXT("Player joins multi-round room"), Manager->JoinRoom(
+            FString::Printf(TEXT("round-p%d"), Seat), FString::Printf(TEXT("P%d"), Seat), Join, State, Error));
+    }
+    for (int32 Seat = 0; Seat < 4; ++Seat)
+        TestTrue(TEXT("Player readies for first round"), Manager->ToggleReady(FString::Printf(TEXT("round-p%d"), Seat), State, Error));
+    TestEqual(TEXT("Four ready players start first round"), State.Lifecycle, EMahjongRoomLifecycle::Starting);
+    TestTrue(TEXT("Room enters first playing round"), Manager->BeginPlaying(RoomCode, State, Error));
+    TestEqual(TEXT("Current round increments to one"), State.RoomInfo.CurrentRound, 1);
+
+    FMahjongSettlementResult Settlement;
+    Settlement.WinnerSeat = 2;
+    Settlement.WinningSeats = { 2 };
+    Settlement.PlayerResults.SetNum(4);
+    const int32 Deltas[] = { -2, -2, 6, -2 };
+    for (int32 Seat = 0; Seat < 4; ++Seat)
+    {
+        Settlement.PlayerResults[Seat].SeatIndex = Seat;
+        Settlement.PlayerResults[Seat].TotalDelta = Deltas[Seat];
+    }
+    FMahjongSettlementResult InvalidSettlement = Settlement;
+    InvalidSettlement.PlayerResults[0].TotalDelta = 10;
+    TestFalse(TEXT("Non-zero-sum settlement is rejected"), Manager->FinishRound(RoomCode, InvalidSettlement, State, Error));
+    TestTrue(TEXT("First round settlement is committed"), Manager->FinishRound(RoomCode, Settlement, State, Error));
+    TestEqual(TEXT("Non-final round waits for next-round confirmation"), State.Lifecycle, EMahjongRoomLifecycle::WaitingNextRound);
+    TestEqual(TEXT("Winner becomes next dealer"), State.RoomInfo.DealerSeat, 2);
+    TestEqual(TEXT("Winner accumulated score is stored"), State.Seats[2].Score, 6);
+    TestEqual(TEXT("Loser accumulated score is stored"), State.Seats[0].Score, -2);
+    TestFalse(TEXT("Same round cannot be settled twice"), Manager->FinishRound(RoomCode, Settlement, State, Error));
+
+    for (int32 Seat = 0; Seat < 4; ++Seat)
+    {
+        TestTrue(TEXT("Player confirms next round"), Manager->RequestNextRound(
+            FString::Printf(TEXT("round-p%d"), Seat), State, Error));
+    }
+    TestEqual(TEXT("Four confirmations enter starting"), State.Lifecycle, EMahjongRoomLifecycle::Starting);
+    TestTrue(TEXT("Room enters second playing round"), Manager->BeginPlaying(RoomCode, State, Error));
+    TestEqual(TEXT("Current round increments to two"), State.RoomInfo.CurrentRound, 2);
+
+    FMahjongSettlementResult DrawSettlement;
+    DrawSettlement.bDrawGame = true;
+    DrawSettlement.PlayerResults.SetNum(4);
+    for (int32 Seat = 0; Seat < 4; ++Seat) DrawSettlement.PlayerResults[Seat].SeatIndex = Seat;
+    TestTrue(TEXT("Final draw settlement is committed"), Manager->FinishRound(RoomCode, DrawSettlement, State, Error));
+    TestEqual(TEXT("Configured rounds end in final settlement"), State.Lifecycle, EMahjongRoomLifecycle::Settlement);
+    TestEqual(TEXT("Draw keeps dealer by default"), State.RoomInfo.DealerSeat, 2);
+    TestEqual(TEXT("Accumulated score survives final round"), State.Seats[2].Score, 6);
+    TestFalse(TEXT("Finished room rejects another round"), Manager->RequestNextRound(TEXT("round-p0"), State, Error));
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongAuthoritativeTurnTest, "GuiyangMahjong.Table.AuthoritativeTurnAndReplayGuard", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FMahjongAuthoritativeTurnTest::RunTest(const FString& Parameters)
 {
@@ -261,6 +326,11 @@ bool FMahjongAuthoritativeTurnTest::RunTest(const FString& Parameters)
     const int32 SequenceBefore = Advanced.ServerActionSequence;
     TestFalse(TEXT("伪造不属于手牌的牌 ID 必须被拒绝"), First->SubmitPlayTile(1, Forged).bSuccess);
     TestEqual(TEXT("拒绝请求不得推进服务端动作序号"), First->GetPublicState().ServerActionSequence, SequenceBefore);
+    const int32 PreviousRoundId = First->GetPublicState().RoundId;
+    TestTrue(TEXT("Same engine starts next round"), First->StartRound(Rules, Seats, 1, 20260717, Error));
+    TestEqual(TEXT("Round id increases across rounds"), First->GetPublicState().RoundId, PreviousRoundId + 1);
+    Forged.ClientSequence = 99;
+    TestFalse(TEXT("Request from previous round is rejected"), First->SubmitPlayTile(1, Forged).bSuccess);
     return true;
 }
 

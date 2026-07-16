@@ -116,24 +116,50 @@ void AGuiyangMahjongGameMode::PublishRoomState(const FMahjongRoomState& State)
 
 void AGuiyangMahjongGameMode::TryStartTable(const FMahjongRoomState& StartingRoomState)
 {
-    if (TableEngine || !RoomManager) return;
-    TableEngine = NewObject<UMahjongTableEngine>(this);
+    if (!RoomManager || (TableEngine && TableEngine->GetPublicState().Phase != EMahjongTablePhase::Settlement)) return;
+    UMahjongTableEngine* RoundEngine = TableEngine ? TableEngine.Get() : NewObject<UMahjongTableEngine>(this);
     FString Error;
     const int32 Seed = static_cast<int32>(FPlatformTime::Cycles64());
-    if (!TableEngine->StartRound(StartingRoomState.RuleSnapshot, StartingRoomState.Seats, 0, Seed, Error))
+    if (!RoundEngine->StartRound(StartingRoomState.RuleSnapshot, StartingRoomState.Seats,
+        StartingRoomState.RoomInfo.DealerSeat, Seed, Error))
     {
-        TableEngine = nullptr;
+        if (!TableEngine) RoundEngine = nullptr;
         return;
     }
     FMahjongRoomState PlayingState;
     EMahjongRoomError RoomError;
     if (!RoomManager->BeginPlaying(StartingRoomState.RoomInfo.RoomId, PlayingState, RoomError))
     {
-        TableEngine = nullptr;
         return;
     }
+    TableEngine = RoundEngine;
+    ActiveRoomCode = StartingRoomState.RoomInfo.RoomId;
+    LastPublishedSettlementSequence = INDEX_NONE;
+    LastFinalizedSettlementSequence = INDEX_NONE;
     PublishRoomState(PlayingState);
     PublishTableSnapshots();
+}
+
+void AGuiyangMahjongGameMode::HandleNextRound(AGuiyangMahjongPlayerController* Controller)
+{
+    AGuiyangMahjongPlayerState* Player = nullptr;
+    if (!ResolvePlayer(Controller, Player)) return;
+    FMahjongRoomState State;
+    EMahjongRoomError Error;
+    if (!RoomManager->RequestNextRound(Player->MahjongPlayerId, State, Error))
+    {
+        Controller->Client_ShowErrorMessage(ErrorToMessage(Error));
+        return;
+    }
+    if (const FMahjongSeatInfo* Seat = State.Seats.FindByPredicate([Player](const FMahjongSeatInfo& Item)
+    {
+        return Item.PlayerId == Player->MahjongPlayerId;
+    }))
+    {
+        Player->EnterRoomServer(State.RoomInfo.RoomId, Seat->SeatIndex, Seat->bReady);
+    }
+    PublishRoomState(State);
+    if (State.Lifecycle == EMahjongRoomLifecycle::Starting) TryStartTable(State);
 }
 
 void AGuiyangMahjongGameMode::HandleTableAction(AGuiyangMahjongPlayerController* Controller, const FMahjongActionRequest& Request)
@@ -157,6 +183,7 @@ void AGuiyangMahjongGameMode::HandleTableAction(AGuiyangMahjongPlayerController*
         return;
     }
     PublishTableSnapshots();
+    FinalizeRoundIfNeeded();
 }
 
 void AGuiyangMahjongGameMode::HandleLegacyPlayTile(AGuiyangMahjongPlayerController* Controller, const FMahjongTile& Tile, const int32 ClientSequence)
@@ -190,6 +217,27 @@ void AGuiyangMahjongGameMode::PublishTableSnapshots()
         if (bPublishSettlement) Controller->Client_ShowSettlement(Settlement);
     }
     if (bPublishSettlement) LastPublishedSettlementSequence = TableEngine->GetPublicState().StateSequence;
+}
+
+void AGuiyangMahjongGameMode::FinalizeRoundIfNeeded()
+{
+    if (!TableEngine || !RoomManager || ActiveRoomCode.IsEmpty()) return;
+    const int32 SettlementSequence = TableEngine->GetPublicState().StateSequence;
+    if (TableEngine->GetPublicState().Phase != EMahjongTablePhase::Settlement
+        || SettlementSequence == LastFinalizedSettlementSequence) return;
+
+    FMahjongSettlementResult Settlement;
+    if (!TableEngine->GetSettlementResult(Settlement)) return;
+    FMahjongRoomState State;
+    EMahjongRoomError Error;
+    if (!RoomManager->FinishRound(ActiveRoomCode, Settlement, State, Error)) return;
+    LastFinalizedSettlementSequence = SettlementSequence;
+    for (TActorIterator<AGuiyangMahjongPlayerController> It(GetWorld()); It; ++It)
+    {
+        if (AGuiyangMahjongPlayerState* Player = It->GetPlayerState<AGuiyangMahjongPlayerState>())
+            Player->EnterRoomServer(State.RoomInfo.RoomId, Player->SeatIndex, false);
+    }
+    PublishRoomState(State);
 }
 
 FString AGuiyangMahjongGameMode::ErrorToMessage(const EMahjongRoomError Error)
