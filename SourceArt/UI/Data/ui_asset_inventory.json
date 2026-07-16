@@ -1,0 +1,5105 @@
+{
+  "design_tokens": {
+    "PrimaryGreen": "#176B5B",
+    "DeepTableGreen": "#073F36",
+    "JadeGreen": "#42A58C",
+    "WarmGold": "#D9A441",
+    "DarkGold": "#8C6422",
+    "CreamWhite": "#F4EEDC",
+    "InkBlack": "#18201F",
+    "WarningRed": "#B8463A",
+    "InfoBlue": "#397DA5",
+    "DisabledGray": "#6A706D"
+  },
+  "backgrounds": [
+    {
+      "name": "T_BG_GameTable_GreenFelt",
+      "size": [
+        2560,
+        1440
+      ],
+      "streaming": true
+    },
+    {
+      "name": "T_BG_Loading_GuiyangLandscape",
+      "size": [
+        2560,
+        1440
+      ],
+      "streaming": true
+    },
+    {
+      "name": "T_BG_Lobby_JiaxiuTower",
+      "size": [
+        2560,
+        1440
+      ],
+      "streaming": true
+    },
+    {
+      "name": "T_BG_Login_Guiyang",
+      "size": [
+        2560,
+        1440
+      ],
+      "streaming": true
+    },
+    {
+      "name": "T_BG_Room_GuiyangNight",
+      "size": [
+        2560,
+        1440
+      ],
+      "streaming": true
+    },
+    {
+      "name": "T_BG_Rules_GuiyangCulture",
+      "size": [
+        2560,
+        1440
+      ],
+      "streaming": true
+    },
+    {
+      "name": "T_BG_Settings_GuiyangPattern",
+      "size": [
+        2560,
+        1440
+      ],
+      "streaming": true
+    },
+    {
+      "name": "T_BG_Settlement_GuiyangRiver",
+      "size": [
+        2560,
+        1440
+      ],
+      "streaming": true
+    }
+  ],
+  "panels": [
+    {
+      "name": "T_Panel_Main_GreenGold_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 40,
+      "margin_normalized": 0.1562,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_Dialog_CreamGold_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 44,
+      "margin_normalized": 0.1719,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_Dialog_DarkGreen_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 44,
+      "margin_normalized": 0.1719,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_PlayerInfo_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 36,
+      "margin_normalized": 0.1406,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_RoomRule_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 34,
+      "margin_normalized": 0.1328,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_Toast_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 30,
+      "margin_normalized": 0.1172,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_ScoreRow_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 28,
+      "margin_normalized": 0.1094,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_InputBox_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 28,
+      "margin_normalized": 0.1094,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_Tab_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 28,
+      "margin_normalized": 0.1094,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_Notice_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 30,
+      "margin_normalized": 0.1172,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Panel_NetworkStatus_9Slice",
+      "size": [
+        256,
+        256
+      ],
+      "margin_px": 26,
+      "margin_normalized": 0.1016,
+      "draw_as": "Box"
+    }
+  ],
+  "buttons": [
+    {
+      "name": "T_Btn_PrimaryGold_Normal",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PrimaryGold_Hovered",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PrimaryGold_Pressed",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PrimaryGold_Disabled",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PrimaryGreen_Normal",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PrimaryGreen_Hovered",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PrimaryGreen_Pressed",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PrimaryGreen_Disabled",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_SecondaryBlue_Normal",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_SecondaryBlue_Hovered",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_SecondaryBlue_Pressed",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_SecondaryBlue_Disabled",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_DangerRed_Normal",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_DangerRed_Hovered",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_DangerRed_Pressed",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_DangerRed_Disabled",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_NeutralDark_Normal",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_NeutralDark_Hovered",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_NeutralDark_Pressed",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_NeutralDark_Disabled",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_TransparentIcon_Normal",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_TransparentIcon_Hovered",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_TransparentIcon_Pressed",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_TransparentIcon_Disabled",
+      "size": [
+        320,
+        112
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_RoundIcon_Normal",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_RoundIcon_Hovered",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_RoundIcon_Pressed",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_RoundIcon_Disabled",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_MahjongAction_Normal",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_MahjongAction_Hovered",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_MahjongAction_Pressed",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_MahjongAction_Disabled",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 28,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Peng_Normal",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Peng_Hovered",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Peng_Pressed",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Peng_Disabled",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Gang_Normal",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Gang_Hovered",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Gang_Pressed",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Gang_Disabled",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Hu_Normal",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Hu_Hovered",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Hu_Pressed",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Hu_Disabled",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Pass_Normal",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Pass_Hovered",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Pass_Pressed",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_Pass_Disabled",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PlayTile_Normal",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PlayTile_Hovered",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PlayTile_Pressed",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    },
+    {
+      "name": "T_Btn_PlayTile_Disabled",
+      "size": [
+        192,
+        192
+      ],
+      "margin_px": 30,
+      "draw_as": "Box"
+    }
+  ],
+  "controls": [
+    "T_Checkbox_Checked",
+    "T_Checkbox_Disabled",
+    "T_Checkbox_Unchecked",
+    "T_Input_Disabled_9Slice",
+    "T_Input_Focused_9Slice",
+    "T_Input_Normal_9Slice",
+    "T_Slider_Background",
+    "T_Slider_Fill",
+    "T_Slider_Thumb",
+    "T_Toggle_Off",
+    "T_Toggle_On"
+  ],
+  "avatars": [
+    "T_AvatarFrame_CurrentTurn",
+    "T_AvatarFrame_Host",
+    "T_AvatarFrame_Normal",
+    "T_AvatarFrame_Offline",
+    "T_AvatarFrame_Self",
+    "T_Seat_Disconnected",
+    "T_Seat_Empty",
+    "T_Seat_NotReady",
+    "T_Seat_Ready"
+  ],
+  "icons": [
+    "Icon_LoginWechat",
+    "Icon_LoginGuest",
+    "Icon_QuickStart",
+    "Icon_CreateRoom",
+    "Icon_JoinRoom",
+    "Icon_Lock",
+    "Icon_Unlock",
+    "Icon_Setting",
+    "Icon_Rules",
+    "Icon_Back",
+    "Icon_Close",
+    "Icon_Refresh",
+    "Icon_Wifi",
+    "Icon_Warning",
+    "Icon_Ready",
+    "Icon_Host",
+    "Icon_Microphone",
+    "Icon_Coin",
+    "Icon_RoomCard",
+    "Icon_Chicken",
+    "Icon_BlackEight",
+    "Icon_InternalExternalChicken",
+    "Icon_Dou",
+    "Icon_Fan"
+  ],
+  "tiles": [
+    "T_Tile_Wan_01",
+    "T_Tile_Tong_01",
+    "T_Tile_Tiao_01",
+    "T_Tile_Wan_02",
+    "T_Tile_Tong_02",
+    "T_Tile_Tiao_02",
+    "T_Tile_Wan_03",
+    "T_Tile_Tong_03",
+    "T_Tile_Tiao_03",
+    "T_Tile_Wan_04",
+    "T_Tile_Tong_04",
+    "T_Tile_Tiao_04",
+    "T_Tile_Wan_05",
+    "T_Tile_Tong_05",
+    "T_Tile_Tiao_05",
+    "T_Tile_Wan_06",
+    "T_Tile_Tong_06",
+    "T_Tile_Tiao_06",
+    "T_Tile_Wan_07",
+    "T_Tile_Tong_07",
+    "T_Tile_Tiao_07",
+    "T_Tile_Wan_08",
+    "T_Tile_Tong_08",
+    "T_Tile_Tiao_08",
+    "T_Tile_Wan_09",
+    "T_Tile_Tong_09",
+    "T_Tile_Tiao_09",
+    "T_Tile_Back",
+    "T_Tile_FrontBlank",
+    "T_Tile_SelectedGlow",
+    "T_Tile_DisabledMask"
+  ],
+  "quality": [
+    {
+      "path": "SourceArt/UI/Avatars/T_AvatarFrame_CurrentTurn.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          217
+        ],
+        [
+          0,
+          164
+        ],
+        [
+          0,
+          65
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1513,
+      "sha256": "20feb4ec7a5a5cf4f25d42c3ebac888f1673f24b94a8f9072d9132cb49881322"
+    },
+    {
+      "path": "SourceArt/UI/Avatars/T_AvatarFrame_Host.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          217
+        ],
+        [
+          0,
+          164
+        ],
+        [
+          0,
+          65
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1838,
+      "sha256": "fd82c3a108f9d108ec9eccdb22f65110ba85b0f410cae0edc943a4aa6d733837"
+    },
+    {
+      "path": "SourceArt/UI/Avatars/T_AvatarFrame_Normal.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          66
+        ],
+        [
+          0,
+          165
+        ],
+        [
+          0,
+          140
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1552,
+      "sha256": "164288260a1d7c6ac8cde51efa3a07b9943714b72f66fb22c0328bc9080fa4df"
+    },
+    {
+      "path": "SourceArt/UI/Avatars/T_AvatarFrame_Offline.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          106
+        ],
+        [
+          0,
+          112
+        ],
+        [
+          0,
+          109
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1573,
+      "sha256": "bd8efd46480c8cc5caec7fe5319fdc704b1a57a6bc32720657dc92507641c0d9"
+    },
+    {
+      "path": "SourceArt/UI/Avatars/T_AvatarFrame_Self.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1553,
+      "sha256": "9d55c47250b9ed70b858e2827af299d43bbcba0fb2493021dd69218fc9d04ce8"
+    },
+    {
+      "path": "SourceArt/UI/Avatars/T_Seat_Disconnected.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          184
+        ],
+        [
+          0,
+          70
+        ],
+        [
+          0,
+          58
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1102,
+      "sha256": "f7e16bb74d01914466caa2c5a245be750f2a45f31443e95e29cd85344adb78d8"
+    },
+    {
+      "path": "SourceArt/UI/Avatars/T_Seat_Empty.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          106
+        ],
+        [
+          0,
+          112
+        ],
+        [
+          0,
+          109
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1103,
+      "sha256": "8482de46d99509aabe421ba842634279c6b48f677e5d869e2ed430bac476e423"
+    },
+    {
+      "path": "SourceArt/UI/Avatars/T_Seat_NotReady.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          217
+        ],
+        [
+          0,
+          164
+        ],
+        [
+          0,
+          65
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1101,
+      "sha256": "0830bf6f2cfd09db7b1440798afd8a97ef802989cf8610eb331cbe7e4e567c1e"
+    },
+    {
+      "path": "SourceArt/UI/Avatars/T_Seat_Ready.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          66
+        ],
+        [
+          0,
+          165
+        ],
+        [
+          0,
+          140
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1102,
+      "sha256": "81906d3d3a39b165a9a1fdffa126579ec867dc4874cfedc319a04c9b93bea036"
+    },
+    {
+      "path": "SourceArt/UI/Backgrounds/T_BG_GameTable_GreenFelt.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "transparent_corners": false,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3260920,
+      "sha256": "e6e55e3d333b78b2af1e0d08ebcf421282945f3015b924cd07546906484fe832"
+    },
+    {
+      "path": "SourceArt/UI/Backgrounds/T_BG_Loading_GuiyangLandscape.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "transparent_corners": false,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          23,
+          251
+        ],
+        [
+          24,
+          251
+        ]
+      ],
+      "bytes": 3550594,
+      "sha256": "8833865b3181451b2106016a78b10468f78eafa7268f16789bcc72bfe011b526"
+    },
+    {
+      "path": "SourceArt/UI/Backgrounds/T_BG_Lobby_JiaxiuTower.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "transparent_corners": false,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3294248,
+      "sha256": "884ed22f61a1d02b11f8c7f39e35c2b709d56eacd5249aa02fd2f4b5b4efe172"
+    },
+    {
+      "path": "SourceArt/UI/Backgrounds/T_BG_Login_Guiyang.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "transparent_corners": false,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          3,
+          248
+        ],
+        [
+          4,
+          223
+        ]
+      ],
+      "bytes": 2856043,
+      "sha256": "78b95ac3ea01b8415e53d5a47498cd71f4014eb1b2ddefcbe8f6fbd63f0beca5"
+    },
+    {
+      "path": "SourceArt/UI/Backgrounds/T_BG_Room_GuiyangNight.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "transparent_corners": false,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3105362,
+      "sha256": "8e6ce0021a642997caff9edf4709161136b8ac5d2dfac1f720548f45680d4127"
+    },
+    {
+      "path": "SourceArt/UI/Backgrounds/T_BG_Rules_GuiyangCulture.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "transparent_corners": false,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          5,
+          255
+        ],
+        [
+          26,
+          255
+        ]
+      ],
+      "bytes": 3200036,
+      "sha256": "cf06f3abcfe6c58903b864ea596a36fde297ca8eb8fef6ae5cbfa4a8c339254b"
+    },
+    {
+      "path": "SourceArt/UI/Backgrounds/T_BG_Settings_GuiyangPattern.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "transparent_corners": false,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          6,
+          218
+        ],
+        [
+          9,
+          154
+        ]
+      ],
+      "bytes": 2547939,
+      "sha256": "3a3b254620527a91502f49c4260e3c7f6c4d393acd112f0a11fc5fe346aa5060"
+    },
+    {
+      "path": "SourceArt/UI/Backgrounds/T_BG_Settlement_GuiyangRiver.png",
+      "size": [
+        2560,
+        1440
+      ],
+      "mode": "RGB",
+      "alpha": false,
+      "transparent_corners": false,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          1,
+          255
+        ],
+        [
+          1,
+          241
+        ]
+      ],
+      "bytes": 3294246,
+      "sha256": "a41ff64f70fea0f3a1ee0d09923842612ad70e2fc5f368050b5b151357f2d800"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_DangerRed_Disabled.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 854,
+      "sha256": "fb06430446f2cf723cb230e09c85c134bfee2728fa7f762e969d1ce17ea0800e"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_DangerRed_Hovered.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 871,
+      "sha256": "e30ffc1cb3816b49cca0daf6a75f47ba863d884975f76411580a34cadfc484a8"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_DangerRed_Normal.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 850,
+      "sha256": "134355c417c2b01d637cd7c958e5a54ea96fc9ea86f2cf9085593261e93dccf7"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_DangerRed_Pressed.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 850,
+      "sha256": "af6ddb9dcaa3a564819efb22aee3fd3bc726edc451fdab4a0d1bbc628b850b1f"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Gang_Disabled.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 1161,
+      "sha256": "40b3c79ea4c112f84186ef93f4aa295b2e2d94265bf8499ffe2e62253f9e12dd"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Gang_Hovered.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1199,
+      "sha256": "be052c4b57cdfd0887c7b55227e8af5d2244c7d7b47a3fa063c1ef582343e359"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Gang_Normal.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1158,
+      "sha256": "deb3a4f9002ddde8f391ba07ee1a0c6a0c37296a3fa32f52a2691087152c5bef"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Gang_Pressed.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1158,
+      "sha256": "cd36b024a817d051f0f30e75fdc7ec953e217cfc871f57cbc6d1fb280fd52ef8"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Hu_Disabled.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 1161,
+      "sha256": "40b3c79ea4c112f84186ef93f4aa295b2e2d94265bf8499ffe2e62253f9e12dd"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Hu_Hovered.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1198,
+      "sha256": "790b5a793cd850fc035e4d2dc1ca0f5ef8df1cf8edf97fbb56c182b704913506"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Hu_Normal.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1157,
+      "sha256": "1201913b16fefc04786c5362b52a357f084c0ce5154a2dc657556ec3718ad8e5"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Hu_Pressed.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1157,
+      "sha256": "8b0468d3ecd31aea5f443fe476fca8ed854b0abc3232fe69c51a1d5eb9083e33"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_MahjongAction_Disabled.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 1161,
+      "sha256": "40b3c79ea4c112f84186ef93f4aa295b2e2d94265bf8499ffe2e62253f9e12dd"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_MahjongAction_Hovered.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1195,
+      "sha256": "b04fe763c67962dfea33e216ec74bd79c42af3c0ea3fe095083f81b416a00861"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_MahjongAction_Normal.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1159,
+      "sha256": "0914cf302935ae9c15bc00d808a7ae379ac21d7c5994ca73787d9baeb2b58f63"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_MahjongAction_Pressed.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1160,
+      "sha256": "ecff35fd31a59bfe72b188d672dae3207e83a2fe0e03a15fccd3797bb6f2bcea"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_NeutralDark_Disabled.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 854,
+      "sha256": "fb06430446f2cf723cb230e09c85c134bfee2728fa7f762e969d1ce17ea0800e"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_NeutralDark_Hovered.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 883,
+      "sha256": "17484e4ea5e21461946b57cb1930bce3b797d6fe82314f7041bb490fe93526f0"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_NeutralDark_Normal.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 872,
+      "sha256": "e167f21aa697c99b7050721578572e64dcd7fe4ca194b48f297c3976120a159c"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_NeutralDark_Pressed.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 872,
+      "sha256": "a422ad7f14be2d92135623577df8bffd0e1cdd3a1c4129b0c401c462dbe97de1"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Pass_Disabled.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 1161,
+      "sha256": "40b3c79ea4c112f84186ef93f4aa295b2e2d94265bf8499ffe2e62253f9e12dd"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Pass_Hovered.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1187,
+      "sha256": "98f78f42c7ecf0b3d209b07c894a30eb973735e1f457609c6984018c213d0fd0"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Pass_Normal.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1159,
+      "sha256": "9400bc00b45ac361a7f591431440864de0f33a5444b7f4cc796e43676aa71802"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Pass_Pressed.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1160,
+      "sha256": "00817e05159b85d2fbd8e8d2ad05268d0c8ea9a0c5898604d0d00be0b065062d"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Peng_Disabled.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 1161,
+      "sha256": "40b3c79ea4c112f84186ef93f4aa295b2e2d94265bf8499ffe2e62253f9e12dd"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Peng_Hovered.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1196,
+      "sha256": "e1c6283ee3ac1fc75bc3bd384815458b52d4be38152d7e97172beafe14a45225"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Peng_Normal.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1160,
+      "sha256": "980d2886734996cd1a6858f110bf362a371c5fea2b4d9e63be7c638b777da2a6"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_Peng_Pressed.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1160,
+      "sha256": "a609066068ba2427287814f380a5700346418715f80599854c10e697004c7b52"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PlayTile_Disabled.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 1161,
+      "sha256": "40b3c79ea4c112f84186ef93f4aa295b2e2d94265bf8499ffe2e62253f9e12dd"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PlayTile_Hovered.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1193,
+      "sha256": "234436910f44ee35e58b3461ca769399452d020562a7d5831f9d0bdcf65459f0"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PlayTile_Normal.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1163,
+      "sha256": "7a865431d15d58fa35eac83af15cf9c75ae5bdab2afd3732d081c6537889acfe"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PlayTile_Pressed.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1163,
+      "sha256": "c5dd9d3004bc4030c2c0f85934a4cb92a3d2c60dbab0a5d1527d42c99cd15bd3"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PrimaryGold_Disabled.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 854,
+      "sha256": "fb06430446f2cf723cb230e09c85c134bfee2728fa7f762e969d1ce17ea0800e"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PrimaryGold_Hovered.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 885,
+      "sha256": "c5f70bc2f6548da237b835ab2077889d3e97ba723b89cc68d272c4e7e687fdbc"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PrimaryGold_Normal.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 858,
+      "sha256": "3047ed1fe37248a639510c85e20ebe8e7cca4f64a0657c6f05c19721c2ac2052"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PrimaryGold_Pressed.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 858,
+      "sha256": "722073c41d8c5f9de464dc732ca5960ddb3d0bd6b98b28adcc0e7461cca1d045"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PrimaryGreen_Disabled.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 854,
+      "sha256": "fb06430446f2cf723cb230e09c85c134bfee2728fa7f762e969d1ce17ea0800e"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PrimaryGreen_Hovered.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 873,
+      "sha256": "3972b6ed08647aad288ee1176af8bb79b6f78974768f6f371946016b74840b15"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PrimaryGreen_Normal.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 855,
+      "sha256": "c02073f7c9af1cd64736f54855ebd59a8d8f55a57595a90ac6681cb730852ebd"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_PrimaryGreen_Pressed.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 855,
+      "sha256": "89ad1753146ad67f3624da41b08ec1b5a94231cde2107e91616fe17757d61312"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_RoundIcon_Disabled.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 1161,
+      "sha256": "40b3c79ea4c112f84186ef93f4aa295b2e2d94265bf8499ffe2e62253f9e12dd"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_RoundIcon_Hovered.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1195,
+      "sha256": "b04fe763c67962dfea33e216ec74bd79c42af3c0ea3fe095083f81b416a00861"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_RoundIcon_Normal.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1159,
+      "sha256": "0914cf302935ae9c15bc00d808a7ae379ac21d7c5994ca73787d9baeb2b58f63"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_RoundIcon_Pressed.png",
+      "size": [
+        192,
+        192
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1160,
+      "sha256": "ecff35fd31a59bfe72b188d672dae3207e83a2fe0e03a15fccd3797bb6f2bcea"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_SecondaryBlue_Disabled.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 854,
+      "sha256": "fb06430446f2cf723cb230e09c85c134bfee2728fa7f762e969d1ce17ea0800e"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_SecondaryBlue_Hovered.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 875,
+      "sha256": "ad51300289236c1bca93438ec9a3d16030b8b6bf7a5e39d37606c4f949a841b3"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_SecondaryBlue_Normal.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 838,
+      "sha256": "7e6be790e105db6d84e00663f0fe0a59a80c7e6486746e05cc37e49cfceec5f3"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_SecondaryBlue_Pressed.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 837,
+      "sha256": "4da0fd21e43e01b4eb926aad8be21400405370a06a1f1c0c2c248ff069f81b39"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_TransparentIcon_Disabled.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          210
+        ]
+      ],
+      "bytes": 854,
+      "sha256": "fb06430446f2cf723cb230e09c85c134bfee2728fa7f762e969d1ce17ea0800e"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_TransparentIcon_Hovered.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 862,
+      "sha256": "0946f5dd0fb17819da4dedc0f1ee0e1d70adaa5d2db45b13dd988b15104209cc"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_TransparentIcon_Normal.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 839,
+      "sha256": "753e5b990d0036635ea771529aa25753d40ffcf87da794b8d7560801b7d9ae90"
+    },
+    {
+      "path": "SourceArt/UI/Buttons/T_Btn_TransparentIcon_Pressed.png",
+      "size": [
+        320,
+        112
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 838,
+      "sha256": "4461db94ee16c857131eaa12f78d7d0d7d50f74f173563b3ed4b3c834f3211e4"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Checkbox_Checked.png",
+      "size": [
+        64,
+        64
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 441,
+      "sha256": "fe688d2b9e1ad5336951e786a71c26357275224017678a66fffc7082d32d7eb4"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Checkbox_Disabled.png",
+      "size": [
+        64,
+        64
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          154
+        ],
+        [
+          0,
+          158
+        ],
+        [
+          0,
+          156
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 274,
+      "sha256": "6240fb75854542046516e16ced9d6c2a232b7984bd417e77e28205a221490998"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Checkbox_Unchecked.png",
+      "size": [
+        64,
+        64
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 274,
+      "sha256": "6f046444cb064c7c04fd9d0aa5ad26826e5d291659fa10c08538a930b870a01b"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Input_Disabled_9Slice.png",
+      "size": [
+        256,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2299,
+      "sha256": "c8db1a60ed5b3b4fe14da8aadbb895415ec855009cd6dbbe6f47a3c9dc149e49"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Input_Focused_9Slice.png",
+      "size": [
+        256,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2294,
+      "sha256": "f6689afb22f618d1111589b42c6855939d499505a840b8bb752485a9b87e2674"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Input_Normal_9Slice.png",
+      "size": [
+        256,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2299,
+      "sha256": "c5c26d2be7aea5ac8a7dfe7a3aba238986bb5dadced8e6c5c6e79e0b2288cb48"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Slider_Background.png",
+      "size": [
+        256,
+        32
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          140
+        ],
+        [
+          0,
+          100
+        ],
+        [
+          0,
+          34
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 224,
+      "sha256": "d28c182258e45b678e94406abaf27168ea32e92ef795bca4897fd39903a98779"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Slider_Fill.png",
+      "size": [
+        256,
+        32
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          66
+        ],
+        [
+          0,
+          165
+        ],
+        [
+          0,
+          140
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 196,
+      "sha256": "44caee274493327232a3e3fa2450ce2f68f988379ddc168ba83fcde45c61e911"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Slider_Thumb.png",
+      "size": [
+        64,
+        64
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 383,
+      "sha256": "33f0d98211f0a07b761806ff1ccee47322b7b7d4167da8e09efc8475aea47ef7"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Toggle_Off.png",
+      "size": [
+        128,
+        64
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 503,
+      "sha256": "e72fbd8a835784c2fb7edcb16879d87e8e7adb7f7f26833eff4ee4855f4aaf91"
+    },
+    {
+      "path": "SourceArt/UI/Controls/T_Toggle_On.png",
+      "size": [
+        128,
+        64
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 506,
+      "sha256": "1cc09ec5ec7edd31341d4060039799ef14514df2e1fb6bc0ad3beb0e1f3c938a"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Back.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1055,
+      "sha256": "66c9d0a54699aa1de898e56ac409def4cfd21a03d9e26c84c5ffb0a5d2e85e83"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_BlackEight.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1294,
+      "sha256": "ebf580b11e13427def568850e3e99f47c1d9e07aaf039076cafe61721edc716d"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Chicken.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1261,
+      "sha256": "bdbf3f0af9d991c94896d2e5f6abe4c90d9fda890c9e05e99628beaafa11a925"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Close.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1170,
+      "sha256": "c76ca976d90eaf07e3054c6374febe2e182929488f9033b3b8a31e4b53721206"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Coin.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1291,
+      "sha256": "bdff76fc6c95616bf683b442fdd11d8a1040b78e37d41a50155b39ba84ffc5fc"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_CreateRoom.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1019,
+      "sha256": "bb1d063566a3897261fb64f0f590cfeae9028c6816cec96fa9746c773c44e2d9"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Dou.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1291,
+      "sha256": "bdff76fc6c95616bf683b442fdd11d8a1040b78e37d41a50155b39ba84ffc5fc"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Fan.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1353,
+      "sha256": "c0aa37bd4b609552d89ce5e29548dfa2c804879dc69a66db72f6a54f12f547bc"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Host.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1219,
+      "sha256": "18de9ff826a0c96c6ef59e8acb25fcadc4efdecce2d98904c90918779bbcc368"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_InternalExternalChicken.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1261,
+      "sha256": "bdbf3f0af9d991c94896d2e5f6abe4c90d9fda890c9e05e99628beaafa11a925"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_JoinRoom.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1019,
+      "sha256": "bb1d063566a3897261fb64f0f590cfeae9028c6816cec96fa9746c773c44e2d9"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Lock.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1002,
+      "sha256": "3b6b63d16bd3e7d873c3cb957e68b95d55e7f45ca98e459157a53865ec3dc9da"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_LoginGuest.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1048,
+      "sha256": "acfe0d9986eb9c763a2df74a6718b071700c5d8030d11724ebb1f1fa1da95950"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_LoginWechat.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1121,
+      "sha256": "94722cd77c5de263f2534c556e0af6e6bc368c9734c18ea96db5cf1497d17e65"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Microphone.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1096,
+      "sha256": "9449a7c934af58922386c9a168f3c5ec1c3ac2841276a44347fa831f089c29fe"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_QuickStart.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1019,
+      "sha256": "bb1d063566a3897261fb64f0f590cfeae9028c6816cec96fa9746c773c44e2d9"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Ready.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1077,
+      "sha256": "688a05a20ee41266f4ec0c6fbabde64fb04162af0d6251bcda11ee8973a74c8d"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Refresh.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1140,
+      "sha256": "db7d25c70299011461a9b2139d8fc3eb53d1551977c46d2855be978efee22727"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_RoomCard.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1182,
+      "sha256": "7d382b8bd07efee6400ca5a9ec4f1e8f375a706ea5d3a3e0cb0eef839bf790e0"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Rules.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1019,
+      "sha256": "bb1d063566a3897261fb64f0f590cfeae9028c6816cec96fa9746c773c44e2d9"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Setting.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1353,
+      "sha256": "c0aa37bd4b609552d89ce5e29548dfa2c804879dc69a66db72f6a54f12f547bc"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Unlock.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1003,
+      "sha256": "2253b8953f799250d462b7004b6d3d7d3e04795d6214c955d2d83da46391b0cf"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Warning.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1129,
+      "sha256": "e58f1a0cd65864b2d1e5c186d82759d69838f3898d31de5c1327760cfc812611"
+    },
+    {
+      "path": "SourceArt/UI/Icons/Icon_Wifi.png",
+      "size": [
+        128,
+        128
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1151,
+      "sha256": "fe8b6d49690538ee9d14fe5e430dc5cf23014cd421dabd3775c455e1be58e64a"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_Dialog_CreamGold_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3595,
+      "sha256": "4c8f09ebdfafe4e849df09e0628d3500aa2043b8f2db4cabf03b0e367c6efef6"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_Dialog_DarkGreen_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          217
+        ],
+        [
+          0,
+          164
+        ],
+        [
+          0,
+          65
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3584,
+      "sha256": "2cb2c6b3d04adb7f7251e504c29fcdf51c943e8625a42258cb106df9d4df8035"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_InputBox_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2635,
+      "sha256": "26c9699418901bd19c5fce23cae1734708057db6579e4d319d1b47b17e2e6631"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_Main_GreenGold_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          217
+        ],
+        [
+          0,
+          164
+        ],
+        [
+          0,
+          73
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3282,
+      "sha256": "a6aff43525d977f747cf931980e5e6ca37f2e9efcdd09526adbb0dadee1d9ee4"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_NetworkStatus_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          66
+        ],
+        [
+          0,
+          165
+        ],
+        [
+          0,
+          140
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2568,
+      "sha256": "c5367202143d745fd008e546ff352e987ca0a0491693a5ad052fb391c18b6b07"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_Notice_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          57
+        ],
+        [
+          0,
+          125
+        ],
+        [
+          0,
+          165
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2683,
+      "sha256": "a12b0c6be6a331b2a2b5e44bce33e7296e7c8bfb99c4f6fa81d818f7d8481ec2"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_PlayerInfo_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          66
+        ],
+        [
+          0,
+          165
+        ],
+        [
+          0,
+          140
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3115,
+      "sha256": "dbf3ab3d55b2aab3386db9468eb1c5c38ea221ea8d1e6e309ab6e992ea25060a"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_RoomRule_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          244
+        ],
+        [
+          0,
+          238
+        ],
+        [
+          0,
+          220
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2884,
+      "sha256": "3eb93711974dccc156cacf63c63fe653cedec8e8929d1449f95b14b7260333bc"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_ScoreRow_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          217
+        ],
+        [
+          0,
+          164
+        ],
+        [
+          0,
+          91
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2635,
+      "sha256": "311de4590a17217a7fdbc03e3fcaec4e27cd3bdc5d0fefe7453d28878e7f7ab2"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_Tab_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          217
+        ],
+        [
+          0,
+          164
+        ],
+        [
+          0,
+          91
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2635,
+      "sha256": "311de4590a17217a7fdbc03e3fcaec4e27cd3bdc5d0fefe7453d28878e7f7ab2"
+    },
+    {
+      "path": "SourceArt/UI/Panels/T_Panel_Toast_9Slice.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          217
+        ],
+        [
+          0,
+          164
+        ],
+        [
+          0,
+          65
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2683,
+      "sha256": "fefb386336ae5bf974b65fe3e6e97acec8941ab93845e4a99e8877025358857d"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Back.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2221,
+      "sha256": "e3f9d0492b4940ee00b4290bdc9bd75a3008d89f70d54c93dbf1a699df1bf450"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_DisabledMask.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": false,
+      "extrema": [
+        [
+          24,
+          24
+        ],
+        [
+          32,
+          32
+        ],
+        [
+          31,
+          31
+        ],
+        [
+          150,
+          150
+        ]
+      ],
+      "bytes": 880,
+      "sha256": "d6acbfa129ac7d856972249831c255adda3d9f207c2d2fe94592cd34a904c395"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_FrontBlank.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1422,
+      "sha256": "729a5fd6b32b52267244ec6a024e1b5d3c9009867d462929d766615f91966a25"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_SelectedGlow.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          154
+        ],
+        [
+          0,
+          117
+        ],
+        [
+          0,
+          46
+        ],
+        [
+          0,
+          163
+        ]
+      ],
+      "bytes": 13391,
+      "sha256": "a507dc5c362f4a5869c3994a11290d5115a0e77f7183d6650826e55fb51b67c7"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tiao_01.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1531,
+      "sha256": "7f997f52678d41d20316a2584e023af97137a2b7b5be8644d97c908b0cfa8d38"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tiao_02.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1618,
+      "sha256": "db2dd9f5ea9c8d955168ff46db296e2fbccc871524075deb8ff0824f93691d20"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tiao_03.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1656,
+      "sha256": "1c77d81d3f582806c005a3cf75f882c895083a1c35aee55650771101577bd009"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tiao_04.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1747,
+      "sha256": "03372484f08881b013f8a4741bca5aa246787751fbd6e08afa6d316da941c512"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tiao_05.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1823,
+      "sha256": "dbdabb75e9406f74b95b1d82b9ee610771021c74dd574161cb6b4d2f914f3e2f"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tiao_06.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1863,
+      "sha256": "88c481129069b7a8ea07db50f0f1026095f7e071ca902e2a268d1da54bb2a9c8"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tiao_07.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1944,
+      "sha256": "c2c894b36436ee360b372238ab1c903061b0cb6395fd8dd7cf523d4ed9fb4559"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tiao_08.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2020,
+      "sha256": "d936c2c7b949a85e0fe57e550df0864de03b4fc6c9fc20d2fb3d6b3dce8b3af2"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tiao_09.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2061,
+      "sha256": "f60b3a78dd717f902e863aa671a458a445f7c1488b4d62118251fac0c1747c05"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tong_01.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1674,
+      "sha256": "e70780d26e3f83c0530213bcbbe0884e1cd64b786f79767fec07ccc34d7a6abe"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tong_02.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 1918,
+      "sha256": "c42d6259f5b772f9e9b587759f01e8f892fffe11af82db48f34fa81aac67c842"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tong_03.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2172,
+      "sha256": "48010a91f3710ff905934b87c26fc8b4f94a7f5e93b3c99c889333ffcfcbdcbf"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tong_04.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2414,
+      "sha256": "b4841e9a38ff3203d29ba8e8a939d5ea7c695d0116b966e6da40851791d3ffdc"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tong_05.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2649,
+      "sha256": "abc90e919ae2b69a5f22ba3fb11cc36cbc1bdbf43f8ca940a97879e8358ea0dc"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tong_06.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 2794,
+      "sha256": "72afd99cba3a8c1648bff982d3242a8bd3b10f7bcb88b94212d8ca1f7b43b7b8"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tong_07.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3026,
+      "sha256": "6f6d93176bc63b623404c61a781163252361b58366e031e33959f7568ccb9a44"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tong_08.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3256,
+      "sha256": "97dc1b3d558c252d9a75d5a8b55e1b4d49c8e2d41c4b39f6bca2a1c4be7f91b7"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Tong_09.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3389,
+      "sha256": "ce51306f65cdc2a8b335bd317161fbb977800c81b3298b2900f45858e1e84bda"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Wan_01.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3083,
+      "sha256": "60d8e7685fa954b79c30409c6223b08910025dba7d710f0a1d67654586bbc315"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Wan_02.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3157,
+      "sha256": "966d1ba19d805f8232d93aca0d3b854c29e96f98f283329fbdb55e5fd13c9b8e"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Wan_03.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3202,
+      "sha256": "916c91f2399984139e63694732fab4df9eb4df94ea794799df5981632f34fe74"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Wan_04.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3882,
+      "sha256": "a8dc1a7e2de8bb865d9bb86074fdba42c17810678d0adadfaf8fdd887b942476"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Wan_05.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 3567,
+      "sha256": "84cd09883bffdf1c7d23056e20e7251ef683388ee2141e1284db0c6063b7e66a"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Wan_06.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 5058,
+      "sha256": "567d0c85e7a9d9a5036c9556846e00662ed24c6fdd7ddcf015ebd4795f34b747"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Wan_07.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 4211,
+      "sha256": "dbb1ba995103b70fcf6e14f92ef0d6813786ff4adf8ff8c05f721c0aa6746408"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Wan_08.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 5039,
+      "sha256": "ea54c59b4422ba03a2a4c5a6cbd4c36847e15e724634aa41b4a98528989346e4"
+    },
+    {
+      "path": "SourceArt/UI/Tiles/T_Tile_Wan_09.png",
+      "size": [
+        256,
+        352
+      ],
+      "mode": "RGBA",
+      "alpha": true,
+      "transparent_corners": true,
+      "extrema": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          255
+        ]
+      ],
+      "bytes": 4447,
+      "sha256": "f42c05c0a302bb0e6e7ea7c6f9072f67dd7da43d326f7367151b20800bcbd65f"
+    }
+  ],
+  "counts": {
+    "backgrounds": 8,
+    "panels": 11,
+    "buttons": 52,
+    "controls": 11,
+    "avatars": 9,
+    "icons": 24,
+    "tiles": 31,
+    "quality": 146
+  }
+}

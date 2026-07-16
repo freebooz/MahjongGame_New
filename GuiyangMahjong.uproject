@@ -1,0 +1,29 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "{BD6CAD1D-4F80-0F31-80D7-C9BB4901F400}",
+  "Category": "Games",
+  "Description": "UE 5.8 贵阳捉鸡麻将服务端权威多人联机项目",
+  "Modules": [
+    {
+      "Name": "GuiyangMahjong",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "GuiyangMahjongEditorTools",
+      "Type": "Editor",
+      "LoadingPhase": "PostEngineInit"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "PythonScriptPlugin",
+      "Enabled": true
+    },
+    {
+      "Name": "EditorScriptingUtilities",
+      "Enabled": true
+    }
+  ],
+  "TargetPlatforms": ["Windows", "Android"]
+}

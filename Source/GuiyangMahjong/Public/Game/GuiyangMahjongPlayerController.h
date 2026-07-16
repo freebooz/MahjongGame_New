@@ -1,0 +1,59 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "GameFramework/PlayerController.h"
+#include "Core/MahjongTypes.h"
+#include "Network/MahjongNetworkTypes.h"
+#include "GuiyangMahjongPlayerController.generated.h"
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongPrivateHandUpdated, const FMahjongPrivatePlayerState&, State);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongAvailableActionsUpdated, const TArray<FMahjongAction>&, Actions);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongSettlementShown, const FMahjongSettlementResult&, Result);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongErrorShown, const FString&, Message);
+
+class UMobileRootHUDWidget;
+
+/**
+ * 客户端输入与 UI 生命周期入口。UI 只能调用本类请求函数，所有牌局修改均由 Server RPC 校验后执行。
+ */
+UCLASS()
+class GUIYANGMAHJONG_API AGuiyangMahjongPlayerController : public APlayerController
+{
+    GENERATED_BODY()
+public:
+    UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongPrivateHandUpdated OnPrivateHandUpdated;
+    UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongAvailableActionsUpdated OnAvailableActionsUpdated;
+    UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongSettlementShown OnSettlementShown;
+    UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongErrorShown OnErrorShown;
+
+    /** 校验地址后执行 ClientTravel；不直接修改房间或牌局状态。 */
+    UFUNCTION(BlueprintCallable, Category="麻将|网络") void ConnectToServer(const FString& ServerIP, int32 Port, const FString& PlayerName);
+    UFUNCTION(BlueprintCallable, Category="麻将|网络") void RetryLastConnection();
+
+    UFUNCTION(Server, Reliable) void Server_RequestCreateRoom();
+    UFUNCTION(Server, Reliable) void Server_RequestCreateRoomWithConfig(const FMahjongCreateRoomRequest& Request);
+    UFUNCTION(Server, Reliable) void Server_RequestJoinRoom(const FString& PlayerName);
+    UFUNCTION(Server, Reliable) void Server_RequestJoinRoomByCode(const FMahjongJoinRoomRequest& Request);
+    UFUNCTION(Server, Reliable) void Server_RequestReady();
+    UFUNCTION(Server, Reliable) void Server_RequestLeaveRoom();
+    UFUNCTION(Server, Reliable) void Server_RequestNextRound();
+    UFUNCTION(Server, Reliable) void Server_RequestPlayTile(FMahjongTile Tile);
+    UFUNCTION(Server, Reliable) void Server_RequestAction(FMahjongActionRequest Request);
+
+    UFUNCTION(Client, Reliable) void Client_UpdatePrivateHand(const FMahjongPrivatePlayerState& PrivateState);
+    UFUNCTION(Client, Reliable) void Client_ShowAvailableActions(const TArray<FMahjongAction>& Actions);
+    UFUNCTION(Client, Reliable) void Client_ShowSettlement(const FMahjongSettlementResult& Result);
+    UFUNCTION(Client, Reliable) void Client_ShowErrorMessage(const FString& Message);
+
+    UFUNCTION(BlueprintPure, Category="麻将|网络") const FString& GetPendingPlayerName() const { return PendingPlayerName; }
+
+protected:
+    virtual void BeginPlay() override;
+
+private:
+    UPROPERTY(Transient) TObjectPtr<UMobileRootHUDWidget> RootHUDInstance;
+    UPROPERTY() FString PendingPlayerName;
+    UPROPERTY() FString LastServerIP;
+    int32 LastServerPort = 7777;
+    int32 LastClientActionSequence = -1;
+};

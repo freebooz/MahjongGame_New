@@ -1,0 +1,22 @@
+# Unreal Engine 生成目录
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+
+# IDE 与本机缓存
+.vs/
+.idea/
+.vscode/
+*.VC.db
+*.sln
+*.suo
+*.opensdf
+*.sdf
+
+# 本机打包和临时导出
+Build/Receipts/
+Build/Windows/FileOpenOrder/
+*.log
+*.tmp
+*.bak

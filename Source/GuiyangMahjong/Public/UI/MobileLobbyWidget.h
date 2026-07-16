@@ -1,0 +1,29 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
+#include "MobileLobbyWidget.generated.h"
+
+class UButton; class UTextBlock;
+
+/** 大厅页 C++ 基类。只发起房间请求，不保存或修改权威房间状态。 */
+UCLASS(Abstract, BlueprintType)
+class GUIYANGMAHJONG_API UMobileLobbyWidget : public UUserWidget
+{
+    GENERATED_BODY()
+protected:
+    virtual void NativeConstruct() override;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_QuickStart;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_CreateRoom;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_JoinRoom;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_Setting;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_PlayerName;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_PlayerId;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_OnlineCount;
+    UFUNCTION() void HandleQuickStart();
+    UFUNCTION() void HandleCreateRoom();
+    UFUNCTION() void HandleJoinRoom();
+    UFUNCTION() void HandleSetting();
+public:
+    UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshPlayerInfo(const FString& PlayerName, const FString& PlayerId, int32 OnlineCount);
+};
