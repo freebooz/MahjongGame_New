@@ -353,6 +353,8 @@ bool FMahjongSelfDrawTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("Settlement marks self draw"), Settlement.bSelfDraw);
     TestEqual(TEXT("Dealer is self draw winner"), Settlement.WinnerSeat, 0);
     TestTrue(TEXT("Self draw winner gains base score"), Settlement.PlayerResults[0].BaseScoreDelta > 0);
+    TestTrue(TEXT("Winning settlement flips a ji tile"), Settlement.FlippedJiTile.IsValid());
+    TestEqual(TEXT("Settlement contains four ji counts"), Settlement.PlayerJiCounts.Num(), 4);
     return true;
 }
 
@@ -392,6 +394,129 @@ bool FMahjongConcealedGangTest::RunTest(const FString& Parameters)
         [](const FMahjongTile& Tile) { return Tile.IsValid(); }));
     TestEqual(TEXT("Replacement draw consumes one wall tile"), Engine->GetPublicState().RemainingTileCount, 54);
     TestEqual(TEXT("Four tiles become meld and one replacement remains"), Engine->GetPublicState().Seats[0].HandTileCount, 11);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongSupplementalGangTest, "GuiyangMahjong.Table.AuthoritativeSupplementalGang", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongSupplementalGangTest::RunTest(const FString& Parameters)
+{
+    TArray<FMahjongSeatInfo> Seats;
+    Seats.SetNum(4);
+    for (int32 Seat = 0; Seat < 4; ++Seat)
+    {
+        Seats[Seat].SeatIndex = Seat;
+        Seats[Seat].PlayerId = FString::Printf(TEXT("bu-gang-p%d"), Seat);
+        Seats[Seat].bOccupied = true;
+    }
+    FMahjongRuleConfig Config;
+    Config.bEnableQiangGangHu = false;
+    UMahjongTableEngine* Engine = NewObject<UMahjongTableEngine>();
+    FString Error;
+    TestTrue(TEXT("Supplemental gang table starts"), Engine->StartRound(
+        UGuiyangRuleSnapshotLibrary::CreateSnapshot(Config), Seats, 0, 103, Error));
+
+    FMahjongHand GangHand = MahjongTest::MakeHand({0,1,2,3,4,5,6,7,8,9,10});
+    FMahjongMeld Peng;
+    Peng.Type = EMahjongMeldType::Peng;
+    Peng.FromSeat = 3;
+    Peng.Tiles = { MahjongTest::MakeTile(0, 200), MahjongTest::MakeTile(0, 201), MahjongTest::MakeTile(0, 202) };
+    GangHand.Melds.Add(Peng);
+    TestTrue(TEXT("Inject supplemental gang hand"), Engine->SetHandForServerTest(0, GangHand));
+    const FMahjongAction* Candidate = Engine->GetAvailableActions(0).FindByPredicate(
+        [](const FMahjongAction& Action) { return Action.Type == EMahjongActionType::BuGang; });
+    TestNotNull(TEXT("Server offers supplemental gang"), Candidate);
+    if (!Candidate) return false;
+
+    FMahjongActionRequest Request;
+    Request.Type = EMahjongActionType::BuGang;
+    Request.RoundId = Engine->GetPublicState().RoundId;
+    Request.TurnId = Engine->GetPublicState().TurnId;
+    Request.TargetTileId = Candidate->TargetTile.UniqueId;
+    Request.ClientSequence = 1;
+    TestTrue(TEXT("Server accepts supplemental gang"), Engine->SubmitTurnAction(0, Request).bSuccess);
+    TestEqual(TEXT("Supplemental gang draws replacement"), Engine->GetPublicState().RemainingTileCount, 54);
+    TestEqual(TEXT("Supplemental gang remains player turn"), Engine->GetPublicState().Phase, EMahjongTablePhase::PlayerTurn);
+    FMahjongPrivatePlayerState PrivateState;
+    Engine->GetPrivateState(0, PrivateState);
+    TestEqual(TEXT("Private peng upgrades to supplemental gang"), PrivateState.Hand.Melds[0].Type, EMahjongMeldType::BuGang);
+    TestEqual(TEXT("Public peng upgrades to supplemental gang"), Engine->GetPublicState().PublicMelds[0].Type, EMahjongMeldType::BuGang);
+    TestEqual(TEXT("Public meld records owner seat"), Engine->GetPublicState().PublicMelds[0].OwnerSeat, 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongQiangGangHuTest, "GuiyangMahjong.Table.QiangGangHu", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongQiangGangHuTest::RunTest(const FString& Parameters)
+{
+    TArray<FMahjongSeatInfo> Seats;
+    Seats.SetNum(4);
+    for (int32 Seat = 0; Seat < 4; ++Seat)
+    {
+        Seats[Seat].SeatIndex = Seat;
+        Seats[Seat].PlayerId = FString::Printf(TEXT("qiang-gang-p%d"), Seat);
+        Seats[Seat].bOccupied = true;
+    }
+    UMahjongTableEngine* Engine = NewObject<UMahjongTableEngine>();
+    FString Error;
+    TestTrue(TEXT("Qiang gang table starts"), Engine->StartRound(
+        UGuiyangRuleSnapshotLibrary::CreateSnapshot(FMahjongRuleConfig()), Seats, 0, 104, Error));
+
+    FMahjongHand GangHand = MahjongTest::MakeHand({0,1,2,3,4,5,6,7,8,9,10});
+    FMahjongMeld Peng;
+    Peng.Type = EMahjongMeldType::Peng;
+    Peng.FromSeat = 3;
+    Peng.Tiles = { MahjongTest::MakeTile(0, 210), MahjongTest::MakeTile(0, 211), MahjongTest::MakeTile(0, 212) };
+    GangHand.Melds.Add(Peng);
+    const FMahjongHand WaitingHu = MahjongTest::MakeHand({1,2, 3,4,5, 9,10,11, 18,18,18, 13,13});
+    const FMahjongHand NoHu = MahjongTest::MakeHand({6,8,10,12,14,16,18,20,22,24,26,5,7});
+    Engine->SetHandForServerTest(0, GangHand);
+    Engine->SetHandForServerTest(1, WaitingHu);
+    Engine->SetHandForServerTest(2, NoHu);
+    Engine->SetHandForServerTest(3, NoHu);
+    const FMahjongAction* Candidate = Engine->GetAvailableActions(0).FindByPredicate(
+        [](const FMahjongAction& Action) { return Action.Type == EMahjongActionType::BuGang; });
+    TestNotNull(TEXT("Server offers robbable supplemental gang"), Candidate);
+    if (!Candidate) return false;
+
+    FMahjongActionRequest GangRequest;
+    GangRequest.Type = EMahjongActionType::BuGang;
+    GangRequest.RoundId = Engine->GetPublicState().RoundId;
+    GangRequest.TurnId = Engine->GetPublicState().TurnId;
+    GangRequest.TargetTileId = Candidate->TargetTile.UniqueId;
+    GangRequest.ClientSequence = 1;
+    TestTrue(TEXT("Supplemental gang declaration enters response"), Engine->SubmitTurnAction(0, GangRequest).bSuccess);
+    TestEqual(TEXT("Qiang gang opens reaction window"), Engine->GetPublicState().Phase, EMahjongTablePhase::WaitingForAction);
+    TestTrue(TEXT("Waiting player receives hu action"), Engine->GetAvailableActions(1).ContainsByPredicate(
+        [](const FMahjongAction& Action) { return Action.Type == EMahjongActionType::Hu; }));
+
+    for (int32 Seat = 2; Seat < 4; ++Seat)
+    {
+        if (Engine->GetAvailableActions(Seat).IsEmpty()) continue;
+        FMahjongActionRequest Pass;
+        Pass.Type = EMahjongActionType::Pass;
+        Pass.RoundId = Engine->GetPublicState().RoundId;
+        Pass.TurnId = Engine->GetPublicState().TurnId;
+        Pass.ClientSequence = 1;
+        Engine->SubmitReaction(Seat, Pass);
+    }
+    FMahjongActionRequest Hu;
+    Hu.Type = EMahjongActionType::Hu;
+    Hu.RoundId = Engine->GetPublicState().RoundId;
+    Hu.TurnId = Engine->GetPublicState().TurnId;
+    Hu.ClientSequence = 1;
+    TestTrue(TEXT("Server accepts qiang gang hu"), Engine->SubmitReaction(1, Hu).bSuccess);
+    TestEqual(TEXT("Qiang gang hu enters settlement"), Engine->GetPublicState().Phase, EMahjongTablePhase::Settlement);
+    FMahjongSettlementResult Settlement;
+    Engine->GetSettlementResult(Settlement);
+    TestEqual(TEXT("Gang declarer is loser"), Settlement.LoserSeat, 0);
+    TestEqual(TEXT("Robbing player is winner"), Settlement.WinnerSeat, 1);
+    TestTrue(TEXT("Server flips ji tile at settlement"), Settlement.FlippedJiTile.IsValid());
+    TestEqual(TEXT("Public flip matches settlement"), Engine->GetPublicState().FlippedJiTile.UniqueId, Settlement.FlippedJiTile.UniqueId);
+    TestEqual(TEXT("Settlement publishes four ji counts"), Settlement.PlayerJiCounts.Num(), 4);
+    FMahjongPrivatePlayerState GangPrivate;
+    Engine->GetPrivateState(0, GangPrivate);
+    TestEqual(TEXT("Robbed meld remains peng"), GangPrivate.Hand.Melds[0].Type, EMahjongMeldType::Peng);
+    TestFalse(TEXT("Robbed tile leaves declarer hand"), GangPrivate.Hand.Tiles.ContainsByPredicate(
+        [](const FMahjongTile& Tile) { return Tile.UniqueId == 0; }));
     return true;
 }
 

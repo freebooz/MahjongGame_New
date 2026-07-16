@@ -53,6 +53,10 @@ bool UMahjongTableEngine::StartRound(const FGuiyangRuleSnapshot& RuleSnapshot, c
     }
     LastDiscardSeat = INDEX_NONE;
     LastDrawnTile = Hands[DealerSeat].Tiles.IsEmpty() ? FMahjongTile() : Hands[DealerSeat].Tiles.Last();
+    bQiangGangWindow = false;
+    PendingBuGangSeat = INDEX_NONE;
+    PendingBuGangTileId = INDEX_NONE;
+    PendingBuGangTile = FMahjongTile();
     SettlementResult = FMahjongSettlementResult();
     AvailableActionsBySeat.Reset();
     SubmittedReactions.Reset();
@@ -88,6 +92,12 @@ FMahjongActionResult UMahjongTableEngine::SubmitTurnAction(const int32 SeatIndex
         SettleWin({ SeatIndex }, INDEX_NONE, true, LastDrawnTile);
         return Result;
     }
+    if (Request.Type == EMahjongActionType::BuGang)
+    {
+        Result.Message = TEXT("Supplemental gang declared");
+        BeginBuGang(SeatIndex, Candidate->TargetTile);
+        return Result;
+    }
     if (Request.Type != EMahjongActionType::AnGang) return Fail(TEXT("Unsupported turn action"));
 
     const int32 RuleIndex = Candidate->TargetTile.GetRuleIndex();
@@ -97,11 +107,13 @@ FMahjongActionResult UMahjongTableEngine::SubmitTurnAction(const int32 SeatIndex
 
     FMahjongMeld Meld;
     Meld.Type = EMahjongMeldType::AnGang;
+    Meld.OwnerSeat = SeatIndex;
     Meld.FromSeat = SeatIndex;
     Meld.Tiles = Removed;
     Hands[SeatIndex].Melds.Add(Meld);
     FMahjongMeld PublicMeld;
     PublicMeld.Type = EMahjongMeldType::AnGang;
+    PublicMeld.OwnerSeat = SeatIndex;
     PublicMeld.FromSeat = SeatIndex;
     PublicMeld.Tiles.SetNum(4); // Invalid tiles are intentional public back-face placeholders.
     PublicState.PublicMelds.Add(PublicMeld);
@@ -177,6 +189,7 @@ FMahjongActionResult UMahjongTableEngine::SubmitReaction(const int32 SeatIndex, 
         || Available.ContainsByPredicate([&Request](const FMahjongAction& Action) { return Action.Type == Request.Type; });
     if (!bAllowed) return Fail(TEXT("请求动作不在服务端候选列表中"));
 
+    const FMahjongTile ReactionTile = bQiangGangWindow ? PendingBuGangTile : PublicState.LastDiscard;
     LastClientSequences[SeatIndex] = Request.ClientSequence;
     SubmittedReactions.Add(SeatIndex, Request);
     ++PublicState.ServerActionSequence;
@@ -187,7 +200,7 @@ FMahjongActionResult UMahjongTableEngine::SubmitReaction(const int32 SeatIndex, 
     Result.Message = TEXT("响应已记录");
     Result.Action.Type = Request.Type;
     Result.Action.SourceSeat = SeatIndex;
-    Result.Action.TargetTile = PublicState.LastDiscard;
+    Result.Action.TargetTile = ReactionTile;
     return Result;
 }
 
@@ -220,7 +233,23 @@ bool UMahjongTableEngine::SetHandForServerTest(const int32 SeatIndex, const FMah
 {
     if (!Hands.IsValidIndex(SeatIndex)) return false;
     Hands[SeatIndex] = Hand;
+    for (FMahjongMeld& Meld : Hands[SeatIndex].Melds) Meld.OwnerSeat = SeatIndex;
     Hands[SeatIndex].Sort();
+    PublicState.PublicMelds.Reset();
+    for (int32 OwnerSeat = 0; OwnerSeat < Hands.Num(); ++OwnerSeat)
+    {
+        for (const FMahjongMeld& PrivateMeld : Hands[OwnerSeat].Melds)
+        {
+            FMahjongMeld PublicMeld = PrivateMeld;
+            PublicMeld.OwnerSeat = OwnerSeat;
+            if (PublicMeld.Type == EMahjongMeldType::AnGang)
+            {
+                PublicMeld.Tiles.Reset();
+                PublicMeld.Tiles.SetNum(4);
+            }
+            PublicState.PublicMelds.Add(MoveTemp(PublicMeld));
+        }
+    }
     RefreshSeatCounts();
     if (PublicState.Phase == EMahjongTablePhase::PlayerTurn && PublicState.CurrentTurnSeat == SeatIndex)
         RebuildTurnActions();
@@ -240,6 +269,7 @@ bool UMahjongTableEngine::ValidateRequestCommon(const int32 SeatIndex, const FMa
 
 void UMahjongTableEngine::OpenReactionWindow(const FMahjongTile& Discard, const int32 DiscardSeat)
 {
+    bQiangGangWindow = false;
     AvailableActionsBySeat.Reset();
     SubmittedReactions.Reset();
     for (int32 Seat = 0; Seat < Hands.Num(); ++Seat)
@@ -260,12 +290,139 @@ void UMahjongTableEngine::OpenReactionWindow(const FMahjongTile& Discard, const 
     else PublicState.Phase = EMahjongTablePhase::WaitingForAction;
 }
 
+void UMahjongTableEngine::BeginBuGang(const int32 SeatIndex, const FMahjongTile& Tile)
+{
+    bQiangGangWindow = true;
+    PendingBuGangSeat = SeatIndex;
+    PendingBuGangTileId = Tile.UniqueId;
+    PendingBuGangTile = Tile;
+    AvailableActionsBySeat.Reset();
+    SubmittedReactions.Reset();
+    ++PublicState.ServerActionSequence;
+
+    if (LockedRules.Config.bEnableQiangGangHu)
+    {
+        for (int32 Seat = 0; Seat < Hands.Num(); ++Seat)
+        {
+            if (Seat == SeatIndex) continue;
+            FMahjongHand HuHand = Hands[Seat];
+            HuHand.Tiles.Add(Tile);
+            if (!UMahjongHuChecker::CanHu(HuHand, LockedRules.Config.bEnableQiDui)) continue;
+            FMahjongAction Action;
+            Action.Type = EMahjongActionType::Hu;
+            Action.SourceSeat = Seat;
+            Action.TargetSeat = SeatIndex;
+            Action.TargetTile = Tile;
+            AvailableActionsBySeat.Add(Seat, { Action });
+        }
+    }
+
+    if (AvailableActionsBySeat.IsEmpty()) CompleteBuGang();
+    else
+    {
+        PublicState.Phase = EMahjongTablePhase::WaitingForAction;
+        ++PublicState.StateSequence;
+    }
+}
+
+void UMahjongTableEngine::CompleteBuGang()
+{
+    if (!Hands.IsValidIndex(PendingBuGangSeat)) return;
+    FMahjongHand& Hand = Hands[PendingBuGangSeat];
+    const int32 TileIndex = Hand.Tiles.IndexOfByPredicate([this](const FMahjongTile& Tile)
+    {
+        return Tile.UniqueId == PendingBuGangTileId;
+    });
+    const int32 RuleIndex = PendingBuGangTile.GetRuleIndex();
+    const int32 MeldIndex = Hand.Melds.IndexOfByPredicate([RuleIndex](const FMahjongMeld& Meld)
+    {
+        return Meld.Type == EMahjongMeldType::Peng && !Meld.Tiles.IsEmpty()
+            && Meld.Tiles[0].GetRuleIndex() == RuleIndex;
+    });
+    if (!Hand.Tiles.IsValidIndex(TileIndex) || !Hand.Melds.IsValidIndex(MeldIndex))
+    {
+        SettleDrawGame();
+        return;
+    }
+
+    const int32 GangSeat = PendingBuGangSeat;
+    const FMahjongTile AddedTile = Hand.Tiles[TileIndex];
+    Hand.Tiles.RemoveAt(TileIndex);
+    Hand.Melds[MeldIndex].Type = EMahjongMeldType::BuGang;
+    Hand.Melds[MeldIndex].Tiles.Add(AddedTile);
+    if (FMahjongMeld* PublicMeld = PublicState.PublicMelds.FindByPredicate([RuleIndex, GangSeat](const FMahjongMeld& Meld)
+    {
+        return Meld.Type == EMahjongMeldType::Peng && Meld.OwnerSeat == GangSeat
+            && !Meld.Tiles.IsEmpty() && Meld.Tiles[0].GetRuleIndex() == RuleIndex;
+    }))
+    {
+        PublicMeld->Type = EMahjongMeldType::BuGang;
+        PublicMeld->Tiles.Add(AddedTile);
+    }
+
+    bQiangGangWindow = false;
+    PendingBuGangSeat = INDEX_NONE;
+    PendingBuGangTileId = INDEX_NONE;
+    PendingBuGangTile = FMahjongTile();
+    AvailableActionsBySeat.Reset();
+    SubmittedReactions.Reset();
+    ApplyGangScore(GangSeat);
+    PublicState.CurrentTurnSeat = GangSeat;
+    ++PublicState.TurnId;
+
+    FMahjongTile Replacement;
+    if (!DeckManager->DrawTile(Replacement)) SettleDrawGame();
+    else
+    {
+        Hand.Tiles.Add(Replacement);
+        Hand.Sort();
+        LastDrawnTile = Replacement;
+        PublicState.Phase = EMahjongTablePhase::PlayerTurn;
+        PublicState.RemainingTileCount = DeckManager->GetRemainingCount();
+        ++PublicState.StateSequence;
+        RefreshSeatCounts();
+        RebuildTurnActions();
+    }
+}
+
+void UMahjongTableEngine::ResolveQiangGangReactions(const TArray<int32>& HuSeats)
+{
+    if (HuSeats.IsEmpty())
+    {
+        CompleteBuGang();
+        return;
+    }
+
+    TArray<int32> Winners = HuSeats;
+    Winners.Sort([this](const int32 Left, const int32 Right)
+    {
+        return (Left - PendingBuGangSeat + 4) % 4 < (Right - PendingBuGangSeat + 4) % 4;
+    });
+    if (!LockedRules.Config.bEnableYiPaoDuoXiang) Winners.SetNum(1);
+
+    const int32 GangSeat = PendingBuGangSeat;
+    const FMahjongTile RobbedTile = PendingBuGangTile;
+    FMahjongHand& GangHand = Hands[GangSeat];
+    GangHand.Tiles.RemoveAll([this](const FMahjongTile& Tile) { return Tile.UniqueId == PendingBuGangTileId; });
+    bQiangGangWindow = false;
+    PendingBuGangSeat = INDEX_NONE;
+    PendingBuGangTileId = INDEX_NONE;
+    PendingBuGangTile = FMahjongTile();
+    SettleWin(Winners, GangSeat, false, RobbedTile);
+    RefreshSeatCounts();
+}
+
 void UMahjongTableEngine::ResolveSubmittedReactions()
 {
     TArray<int32> HuSeats;
     for (const TPair<int32, FMahjongActionRequest>& Pair : SubmittedReactions)
     {
         if (Pair.Value.Type == EMahjongActionType::Hu) HuSeats.Add(Pair.Key);
+    }
+    if (bQiangGangWindow)
+    {
+        ResolveQiangGangReactions(HuSeats);
+        return;
     }
     if (!HuSeats.IsEmpty())
     {
@@ -326,6 +483,7 @@ void UMahjongTableEngine::ApplyClaim(const int32 SeatIndex, const EMahjongAction
     }
     FMahjongMeld Meld;
     Meld.Type = Type == EMahjongActionType::MingGang ? EMahjongMeldType::MingGang : EMahjongMeldType::Peng;
+    Meld.OwnerSeat = SeatIndex;
     Meld.FromSeat = LastDiscardSeat;
     Meld.Tiles = MoveTemp(Removed);
     Meld.Tiles.Add(PublicState.LastDiscard);
@@ -405,15 +563,35 @@ void UMahjongTableEngine::RebuildTurnActions()
         Action.TargetTile = *Tile;
         Actions.Add(Action);
     }
+    for (const int32 RuleIndex : UMahjongGangChecker::FindBuGangRuleIndices(Hands[SeatIndex]))
+    {
+        const FMahjongTile* Tile = Hands[SeatIndex].Tiles.FindByPredicate(
+            [RuleIndex](const FMahjongTile& Item) { return Item.GetRuleIndex() == RuleIndex; });
+        if (!Tile) continue;
+        FMahjongAction Action;
+        Action.Type = EMahjongActionType::BuGang;
+        Action.SourceSeat = SeatIndex;
+        Action.TargetTile = *Tile;
+        Actions.Add(Action);
+    }
     if (!Actions.IsEmpty()) AvailableActionsBySeat.Add(SeatIndex, MoveTemp(Actions));
 }
 
 void UMahjongTableEngine::SettleWin(const TArray<int32>& WinningSeats, const int32 LoserSeat,
     const bool bSelfDraw, const FMahjongTile& WinningTile)
 {
+    FMahjongTile FlippedJiTile;
+    if (DeckManager && DeckManager->DrawTile(FlippedJiTile))
+    {
+        PublicState.FlippedJiTile = FlippedJiTile;
+        PublicState.RemainingTileCount = DeckManager->GetRemainingCount();
+    }
+    const TArray<int32> JiCounts = CountJiForSettlement(FlippedJiTile, WinningSeats, bSelfDraw, WinningTile);
     SettlementResult = UMahjongScoreCalculator::CalculateWins(WinningSeats, LoserSeat, bSelfDraw,
-        CountBasicJi(), GangDeltas, CurrentScores, LockedRules.Config);
+        JiCounts, GangDeltas, CurrentScores, LockedRules.Config);
     SettlementResult.WinningTile = WinningTile;
+    SettlementResult.FlippedJiTile = FlippedJiTile;
+    SettlementResult.PlayerJiCounts = JiCounts;
     PublicState.WinningSeats = WinningSeats;
     PublicState.CurrentTurnSeat = WinningSeats.IsEmpty() ? INDEX_NONE : WinningSeats[0];
     PublicState.Phase = EMahjongTablePhase::Settlement;
@@ -457,12 +635,17 @@ void UMahjongTableEngine::ApplyGangScore(const int32 GangSeat)
     }
 }
 
-TArray<int32> UMahjongTableEngine::CountBasicJi() const
+TArray<int32> UMahjongTableEngine::CountJiForSettlement(const FMahjongTile& FlippedJiTile,
+    const TArray<int32>& WinningSeats, const bool bSelfDraw, const FMahjongTile& WinningTile) const
 {
     TArray<int32> Counts;
     Counts.Reserve(Hands.Num());
-    const FMahjongTile NoFlippedJi;
-    for (const FMahjongHand& Hand : Hands) Counts.Add(UGuiyangJiCalculator::CountJi(Hand, NoFlippedJi));
+    for (int32 Seat = 0; Seat < Hands.Num(); ++Seat)
+    {
+        FMahjongHand ScoringHand = Hands[Seat];
+        if (!bSelfDraw && WinningSeats.Contains(Seat)) ScoringHand.Tiles.Add(WinningTile);
+        Counts.Add(UGuiyangJiCalculator::CountJi(ScoringHand, FlippedJiTile));
+    }
     return Counts;
 }
 

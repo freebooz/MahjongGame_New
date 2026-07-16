@@ -40,9 +40,16 @@ private:
     TArray<int32> GangDeltas;
     int32 LastDiscardSeat = INDEX_NONE;
     FMahjongTile LastDrawnTile;
+    bool bQiangGangWindow = false;
+    int32 PendingBuGangSeat = INDEX_NONE;
+    int32 PendingBuGangTileId = INDEX_NONE;
+    FMahjongTile PendingBuGangTile;
 
     bool ValidateRequestCommon(int32 SeatIndex, const FMahjongActionRequest& Request, FString& OutError);
     void OpenReactionWindow(const FMahjongTile& Discard, int32 DiscardSeat);
+    void BeginBuGang(int32 SeatIndex, const FMahjongTile& Tile);
+    void CompleteBuGang();
+    void ResolveQiangGangReactions(const TArray<int32>& HuSeats);
     void ResolveSubmittedReactions();
     void ResolveHuReactions(const TArray<int32>& HuSeats);
     void ApplyClaim(int32 SeatIndex, EMahjongActionType Type);
@@ -51,7 +58,8 @@ private:
     void SettleWin(const TArray<int32>& WinningSeats, int32 LoserSeat, bool bSelfDraw, const FMahjongTile& WinningTile);
     void SettleDrawGame();
     void ApplyGangScore(int32 GangSeat);
-    TArray<int32> CountBasicJi() const;
+    TArray<int32> CountJiForSettlement(const FMahjongTile& FlippedJiTile, const TArray<int32>& WinningSeats,
+        bool bSelfDraw, const FMahjongTile& WinningTile) const;
     void RefreshSeatCounts();
     FMahjongAction BuildReactionAction(int32 SeatIndex, EMahjongActionType Type, const FMahjongTile& Discard) const;
     int32 FindBestReactionSeat() const;

@@ -79,6 +79,7 @@ struct GUIYANGMAHJONG_API FMahjongMeld
     GENERATED_BODY()
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EMahjongMeldType Type = EMahjongMeldType::Peng;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongTile> Tiles;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 OwnerSeat = INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 FromSeat = INDEX_NONE;
 };
 
@@ -157,6 +158,8 @@ struct GUIYANGMAHJONG_API FMahjongSettlementResult
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<int32> WinningSeats;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 LoserSeat = INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongTile WinningTile;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongTile FlippedJiTile;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<int32> PlayerJiCounts;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongTile> JiTiles;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongPlayerScoreResult> PlayerResults;
     FString ToDebugString() const;
