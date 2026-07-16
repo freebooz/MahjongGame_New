@@ -73,6 +73,48 @@ bool UGuiyangRoomManager::CreateRoom(const FString& PlayerId, const FString& Dis
     return true;
 }
 
+bool UGuiyangRoomManager::QuickStart(const FString& PlayerId, const FString& DisplayName,
+    FMahjongRoomState& OutState, EMahjongRoomError& OutError)
+{
+    OutError = EMahjongRoomError::None;
+    if (!ValidateIdentity(PlayerId, DisplayName))
+    {
+        OutError = EMahjongRoomError::InvalidRequest;
+        return false;
+    }
+    if (PlayerRoomCodes.Contains(PlayerId))
+    {
+        OutError = EMahjongRoomError::AlreadyInRoom;
+        return false;
+    }
+
+    TArray<FString> CandidateRoomCodes;
+    Rooms.GetKeys(CandidateRoomCodes);
+    CandidateRoomCodes.Sort();
+    for (const FString& RoomCode : CandidateRoomCodes)
+    {
+        const FRoomRecord* Record = Rooms.Find(RoomCode);
+        if (!Record || !Record->PublicState.RoomInfo.bPublicRoom
+            || Record->PublicState.RoomInfo.bPasswordProtected
+            || (Record->PublicState.Lifecycle != EMahjongRoomLifecycle::WaitingForPlayers
+                && Record->PublicState.Lifecycle != EMahjongRoomLifecycle::ReadyCheck)
+            || !Record->PublicState.Seats.ContainsByPredicate(
+                [](const FMahjongSeatInfo& Seat) { return !Seat.bOccupied; }))
+        {
+            continue;
+        }
+
+        FMahjongJoinRoomRequest JoinRequest;
+        JoinRequest.RoomCode = RoomCode;
+        return JoinRoom(PlayerId, DisplayName, JoinRequest, OutState, OutError);
+    }
+
+    FMahjongCreateRoomRequest CreateRequest;
+    CreateRequest.bPublicRoom = true;
+    CreateRequest.bEnablePassword = false;
+    return CreateRoom(PlayerId, DisplayName, CreateRequest, OutState, OutError);
+}
+
 bool UGuiyangRoomManager::JoinRoom(const FString& PlayerId, const FString& DisplayName,
     const FMahjongJoinRoomRequest& Request, FMahjongRoomState& OutState, EMahjongRoomError& OutError)
 {

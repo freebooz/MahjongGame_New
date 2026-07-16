@@ -34,8 +34,10 @@ public:
     /** 校验地址后执行 ClientTravel；不直接修改房间或牌局状态。 */
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void ConnectToServer(const FString& ServerIP, int32 Port, const FString& PlayerName);
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void RetryLastConnection();
+    UFUNCTION(BlueprintCallable, Category="麻将|牌桌") void RequestTableAction(EMahjongActionType Type, int32 TargetTileId);
 
     UFUNCTION(Server, Reliable) void Server_RequestCreateRoom();
+    UFUNCTION(Server, Reliable) void Server_RequestQuickStart();
     UFUNCTION(Server, Reliable) void Server_AuthenticateSession(const FString& PlayerId, const FString& DisplayName,
         EGuiyangLoginProvider Provider, const FString& SessionToken);
     UFUNCTION(Server, Reliable) void Server_RequestCreateRoomWithConfig(const FMahjongCreateRoomRequest& Request);

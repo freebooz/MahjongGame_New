@@ -137,6 +137,25 @@ void AGuiyangMahjongGameMode::HandleCreateRoom(AGuiyangMahjongPlayerController* 
     PublishRoomState(State);
 }
 
+void AGuiyangMahjongGameMode::HandleQuickStart(AGuiyangMahjongPlayerController* Controller)
+{
+    AGuiyangMahjongPlayerState* Player = nullptr;
+    if (!ResolvePlayer(Controller, Player)) return;
+    FMahjongRoomState State;
+    EMahjongRoomError Error;
+    if (!RoomManager->QuickStart(Player->MahjongPlayerId, Player->DisplayName, State, Error))
+    {
+        Controller->Client_ShowErrorMessage(ErrorToMessage(Error));
+        return;
+    }
+    const FMahjongSeatInfo* Seat = State.Seats.FindByPredicate([Player](const FMahjongSeatInfo& Item)
+    {
+        return Item.PlayerId == Player->MahjongPlayerId;
+    });
+    Player->EnterRoomServer(State.RoomInfo.RoomId, Seat ? Seat->SeatIndex : INDEX_NONE);
+    PublishRoomState(State);
+}
+
 void AGuiyangMahjongGameMode::HandleJoinRoom(AGuiyangMahjongPlayerController* Controller, const FMahjongJoinRoomRequest& Request)
 {
     AGuiyangMahjongPlayerState* Player = nullptr;

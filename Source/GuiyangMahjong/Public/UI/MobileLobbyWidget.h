@@ -5,6 +5,8 @@
 #include "MobileLobbyWidget.generated.h"
 
 class UButton; class UTextBlock;
+class UMobileCreateRoomDialogWidget;
+class UMobileJoinRoomDialogWidget;
 
 /** 大厅页 C++ 基类。只发起房间请求，不保存或修改权威房间状态。 */
 UCLASS(Abstract, BlueprintType)
@@ -20,6 +22,8 @@ protected:
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_PlayerName;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_PlayerId;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_OnlineCount;
+    UPROPERTY(Transient) TObjectPtr<UMobileCreateRoomDialogWidget> CreateRoomDialogInstance;
+    UPROPERTY(Transient) TObjectPtr<UMobileJoinRoomDialogWidget> JoinRoomDialogInstance;
     UFUNCTION() void HandleQuickStart();
     UFUNCTION() void HandleCreateRoom();
     UFUNCTION() void HandleJoinRoom();

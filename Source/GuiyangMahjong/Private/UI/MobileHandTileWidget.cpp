@@ -27,5 +27,8 @@ void UMobileHandTileWidget::HandleTileClicked()
         UE_LOG(LogMahjongUI, Log, TEXT("选中手牌：%s"), *TileData.ToDebugString());
         return;
     }
-    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer())) PC->Server_RequestPlayTile(TileData);
+    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
+    {
+        PC->RequestTableAction(EMahjongActionType::Play, TileData.UniqueId);
+    }
 }

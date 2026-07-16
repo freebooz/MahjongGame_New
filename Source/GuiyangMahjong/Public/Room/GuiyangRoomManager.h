@@ -14,6 +14,8 @@ class GUIYANGMAHJONG_API UGuiyangRoomManager : public UObject
 public:
     bool CreateRoom(const FString& PlayerId, const FString& DisplayName, const FMahjongCreateRoomRequest& Request,
         FMahjongRoomState& OutState, EMahjongRoomError& OutError);
+    bool QuickStart(const FString& PlayerId, const FString& DisplayName,
+        FMahjongRoomState& OutState, EMahjongRoomError& OutError);
     bool JoinRoom(const FString& PlayerId, const FString& DisplayName, const FMahjongJoinRoomRequest& Request,
         FMahjongRoomState& OutState, EMahjongRoomError& OutError);
     bool ToggleReady(const FString& PlayerId, FMahjongRoomState& OutState, EMahjongRoomError& OutError);

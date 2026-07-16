@@ -21,7 +21,6 @@ protected:
     UFUNCTION() void HandleHu(); UFUNCTION() void HandleGang(); UFUNCTION() void HandlePeng(); UFUNCTION() void HandlePass();
     void SendAction(EMahjongActionType Type);
     TArray<FMahjongAction> CurrentActions;
-    int32 ClientSequence = 0;
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowActions(const TArray<FMahjongAction>& Actions);
 };

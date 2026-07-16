@@ -3,6 +3,8 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "GuiyangMahjong.h"
+#include "UI/MobileCreateRoomDialogWidget.h"
+#include "UI/MobileJoinRoomDialogWidget.h"
 
 void UMobileLobbyWidget::NativeConstruct()
 {
@@ -16,14 +18,34 @@ void UMobileLobbyWidget::NativeConstruct()
 
 void UMobileLobbyWidget::HandleCreateRoom()
 {
-    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
-        PC->Server_RequestCreateRoom();
+    if (!CreateRoomDialogInstance || !CreateRoomDialogInstance->IsInViewport())
+    {
+        UClass* DialogClass = LoadClass<UMobileCreateRoomDialogWidget>(nullptr,
+            TEXT("/Game/UI/Dialogs/WBP_CreateRoomDialog.WBP_CreateRoomDialog_C"));
+        if (!DialogClass)
+        {
+            UE_LOG(LogMahjongUI, Error, TEXT("无法加载创建房间弹窗"));
+            return;
+        }
+        CreateRoomDialogInstance = CreateWidget<UMobileCreateRoomDialogWidget>(GetOwningPlayer(), DialogClass);
+        CreateRoomDialogInstance->AddToViewport(200);
+    }
 }
 
 void UMobileLobbyWidget::HandleJoinRoom()
 {
-    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
-        PC->Server_RequestJoinRoom(PC->GetPendingPlayerName());
+    if (!JoinRoomDialogInstance || !JoinRoomDialogInstance->IsInViewport())
+    {
+        UClass* DialogClass = LoadClass<UMobileJoinRoomDialogWidget>(nullptr,
+            TEXT("/Game/UI/Dialogs/WBP_JoinRoomDialog.WBP_JoinRoomDialog_C"));
+        if (!DialogClass)
+        {
+            UE_LOG(LogMahjongUI, Error, TEXT("无法加载加入房间弹窗"));
+            return;
+        }
+        JoinRoomDialogInstance = CreateWidget<UMobileJoinRoomDialogWidget>(GetOwningPlayer(), DialogClass);
+        JoinRoomDialogInstance->AddToViewport(200);
+    }
 }
 
 void UMobileLobbyWidget::HandleSetting()
@@ -34,7 +56,7 @@ void UMobileLobbyWidget::HandleSetting()
 void UMobileLobbyWidget::HandleQuickStart()
 {
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
-        PC->Server_RequestJoinRoom(PC->GetPendingPlayerName());
+        PC->Server_RequestQuickStart();
 }
 
 void UMobileLobbyWidget::RefreshPlayerInfo(const FString& PlayerName, const FString& PlayerId, const int32 OnlineCount)

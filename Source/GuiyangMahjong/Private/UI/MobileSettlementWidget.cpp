@@ -55,4 +55,11 @@ void UMobileSettlementWidget::HandleNextRound()
 {
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer())) PC->Server_RequestNextRound();
 }
-void UMobileSettlementWidget::HandleBackLobby(){ RemoveFromParent(); }
+void UMobileSettlementWidget::HandleBackLobby()
+{
+    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
+    {
+        PC->Server_RequestLeaveRoom();
+    }
+    RemoveFromParent();
+}

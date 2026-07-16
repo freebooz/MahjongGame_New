@@ -160,6 +160,33 @@ bool FMahjongPasswordRoomTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongQuickStartRoomTest, "GuiyangMahjong.Room.QuickStartMatchmaking", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongQuickStartRoomTest::RunTest(const FString& Parameters)
+{
+    UGuiyangRoomManager* Manager = NewObject<UGuiyangRoomManager>();
+    FMahjongRoomState State;
+    EMahjongRoomError Error = EMahjongRoomError::None;
+    TestTrue(TEXT("首名快速开始玩家创建公开房"), Manager->QuickStart(TEXT("quick-p0"), TEXT("玩家0"), State, Error));
+    const FString FirstRoomCode = State.RoomInfo.RoomId;
+    TestEqual(TEXT("首个快速房仅有一名玩家"), State.Seats.FilterByPredicate(
+        [](const FMahjongSeatInfo& Seat) { return Seat.bOccupied; }).Num(), 1);
+
+    for (int32 Index = 1; Index < 4; ++Index)
+    {
+        TestTrue(TEXT("后续快速开始玩家加入现有公开房"), Manager->QuickStart(
+            FString::Printf(TEXT("quick-p%d"), Index), FString::Printf(TEXT("玩家%d"), Index), State, Error));
+        TestEqual(TEXT("快速开始必须复用同一房间"), State.RoomInfo.RoomId, FirstRoomCode);
+    }
+    TestEqual(TEXT("四名玩家匹配后房间已满"), State.Seats.FilterByPredicate(
+        [](const FMahjongSeatInfo& Seat) { return Seat.bOccupied; }).Num(), 4);
+
+    TestTrue(TEXT("满房后新玩家快速开始会创建新房"), Manager->QuickStart(
+        TEXT("quick-p4"), TEXT("玩家4"), State, Error));
+    TestNotEqual(TEXT("新快速房房间号不同"), State.RoomInfo.RoomId, FirstRoomCode);
+    TestEqual(TEXT("快速匹配创建两个房间"), Manager->GetRoomCount(), 2);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongRoomReadyTest, "GuiyangMahjong.Room.FourPlayersReady", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FMahjongRoomReadyTest::RunTest(const FString& Parameters)
 {

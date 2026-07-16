@@ -2,6 +2,7 @@
 #include "GuiyangMahjong.h"
 #include "UI/MobileRootHUDWidget.h"
 #include "Game/GuiyangMahjongGameMode.h"
+#include "Game/GuiyangMahjongGameState.h"
 #include "Auth/GuiyangLoginSubsystem.h"
 #include "History/GuiyangMatchHistorySubsystem.h"
 #include "HAL/FileManager.h"
@@ -99,10 +100,40 @@ void AGuiyangMahjongPlayerController::RetryLastConnection()
     ConnectToServer(LastServerIP, LastServerPort, PendingPlayerName);
 }
 
+void AGuiyangMahjongPlayerController::RequestTableAction(const EMahjongActionType Type, const int32 TargetTileId)
+{
+    if (Type == EMahjongActionType::Draw)
+    {
+        OnErrorShown.Broadcast(TEXT("摸牌只能由服务端发起"));
+        return;
+    }
+    const AGuiyangMahjongGameState* GS = GetWorld() ? GetWorld()->GetGameState<AGuiyangMahjongGameState>() : nullptr;
+    if (!GS || GS->PublicTableState.RoundId <= 0 || GS->PublicTableState.TurnId <= 0)
+    {
+        OnErrorShown.Broadcast(TEXT("牌局状态尚未同步，请稍后重试"));
+        return;
+    }
+    FMahjongActionRequest Request;
+    Request.Type = Type;
+    Request.RoundId = GS->PublicTableState.RoundId;
+    Request.TurnId = GS->PublicTableState.TurnId;
+    Request.TargetTileId = TargetTileId;
+    Request.ClientSequence = ++LastClientActionSequence;
+    Server_RequestAction(Request);
+}
+
 void AGuiyangMahjongPlayerController::Server_RequestCreateRoom_Implementation()
 {
     Server_RequestCreateRoomWithConfig_Implementation(FMahjongCreateRoomRequest());
     UE_LOG(LogMahjongServer, Log, TEXT("收到创建房间请求：控制器=%s"), *GetName());
+}
+
+void AGuiyangMahjongPlayerController::Server_RequestQuickStart_Implementation()
+{
+    if (AGuiyangMahjongGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGuiyangMahjongGameMode>() : nullptr)
+    {
+        Mode->HandleQuickStart(this);
+    }
 }
 
 void AGuiyangMahjongPlayerController::Server_RequestCreateRoomWithConfig_Implementation(const FMahjongCreateRoomRequest& Request)
@@ -115,14 +146,10 @@ void AGuiyangMahjongPlayerController::Server_RequestCreateRoomWithConfig_Impleme
 
 void AGuiyangMahjongPlayerController::Server_RequestJoinRoom_Implementation(const FString& PlayerName)
 {
-    const FString CleanName = PlayerName.TrimStartAndEnd();
-    if (CleanName.IsEmpty() || CleanName.Len() > 24)
+    if (AGuiyangMahjongGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGuiyangMahjongGameMode>() : nullptr)
     {
-        UE_LOG(LogMahjongNet, Warning, TEXT("RPC拒绝：加入房间昵称非法"));
-        Client_ShowErrorMessage(TEXT("昵称不能为空且不能超过24个字符"));
-        return;
+        Mode->HandleQuickStart(this);
     }
-    UE_LOG(LogMahjongServer, Log, TEXT("收到加入房间请求：玩家=%s"), *CleanName);
 }
 
 void AGuiyangMahjongPlayerController::Server_RequestReady_Implementation()
@@ -172,6 +199,7 @@ void AGuiyangMahjongPlayerController::Server_RequestAction_Implementation(const 
 {
     if (AGuiyangMahjongGameMode* Mode = GetWorld() ? GetWorld()->GetAuthGameMode<AGuiyangMahjongGameMode>() : nullptr)
     {
+        LastClientActionSequence = FMath::Max(LastClientActionSequence, Request.ClientSequence);
         Mode->HandleTableAction(this, Request);
         return;
     }
@@ -187,6 +215,7 @@ void AGuiyangMahjongPlayerController::Server_RequestAction_Implementation(const 
 
 void AGuiyangMahjongPlayerController::Client_UpdatePrivateHand_Implementation(const FMahjongPrivatePlayerState& PrivateState)
 {
+    LastClientActionSequence = FMath::Max(LastClientActionSequence, PrivateState.LastAcceptedClientSequence);
     UE_LOG(LogMahjongNet, Log, TEXT("收到私有手牌：座位=%d，牌数=%d，序号=%d"), PrivateState.SeatIndex, PrivateState.Hand.Tiles.Num(), PrivateState.StateSequence);
     OnPrivateHandUpdated.Broadcast(PrivateState);
 }

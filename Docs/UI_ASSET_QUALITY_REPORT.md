@@ -14,9 +14,9 @@
 - AI 背景的“无随机文字/符号”目前由提示约束与人工目视检查保证，后续截图回归仍需检查。
 - 图标是程序化 MVP 版本；正式品牌精修可替换同名源图，不修改 UMG 或注册表。
 - Unreal 导入已实际执行：146 Texture、6 DataAsset、9 Material、5 Material Instance；回读 146/146、0 导入设置错误。
-- 现有 13 个 P0 Widget 已重建并编译保存：13/13。
+- 现有 15 个 P0 Widget 已重建并编译保存：15/15。
 - 运行截图捕获产出黑图，视觉验收仍为失败，不计入通过数量。
-- `GuiyangMahjong` 自动化回归：10/10 Success。
+- `GuiyangMahjong` 自动化回归：27/27 Success。
 
 ## 体积
 

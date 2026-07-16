@@ -19,6 +19,7 @@ public:
     virtual void Logout(AController* Exiting) override;
 
     void HandleCreateRoom(class AGuiyangMahjongPlayerController* Controller, const FMahjongCreateRoomRequest& Request);
+    void HandleQuickStart(class AGuiyangMahjongPlayerController* Controller);
     void HandleAuthenticateSession(class AGuiyangMahjongPlayerController* Controller, const FString& PlayerId,
         const FString& DisplayName, EGuiyangLoginProvider Provider, const FString& SessionToken);
     void HandleJoinRoom(class AGuiyangMahjongPlayerController* Controller, const FMahjongJoinRoomRequest& Request);

@@ -32,11 +32,11 @@ void UMobileActionButtonPanel::SendAction(const EMahjongActionType Type)
         return A.Type == EMahjongActionType::MingGang || A.Type == EMahjongActionType::AnGang || A.Type == EMahjongActionType::BuGang;
     });
     if (!Offered && Type != EMahjongActionType::Pass) return;
-    FMahjongActionRequest Request;
-    Request.Type = Offered ? Offered->Type : EMahjongActionType::Pass;
-    Request.TargetTileId = Offered ? Offered->TargetTile.UniqueId : INDEX_NONE;
-    Request.ClientSequence = ++ClientSequence;
-    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer())) PC->Server_RequestAction(Request);
+    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
+    {
+        PC->RequestTableAction(Offered ? Offered->Type : EMahjongActionType::Pass,
+            Offered ? Offered->TargetTile.UniqueId : INDEX_NONE);
+    }
     ShowActions({});
 }
 

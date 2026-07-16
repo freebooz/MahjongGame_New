@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Auth/GuiyangLoginTypes.h"
+#include "Network/MahjongNetworkTypes.h"
 #include "MobileRootHUDWidget.generated.h"
 
 class UMobileErrorToastWidget;
@@ -22,15 +23,22 @@ protected:
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UOverlay> PopupLayer;
     UPROPERTY(Transient) TObjectPtr<UUserWidget> CurrentScreen;
     UPROPERTY(Transient) TObjectPtr<UMobileErrorToastWidget> ErrorToastInstance;
+    FString CurrentScreenClassPath;
 
     UFUNCTION() void HandleLoginStateChanged(EGuiyangLoginState State, const FGuiyangLoginProfile& Profile);
     UFUNCTION() void HandleLoginFailed(const FString& ChineseReason);
+    UFUNCTION() void HandleRoomStateUpdated(const FMahjongRoomState& State);
+    UFUNCTION() void HandleReconnectRestored(const FMahjongReconnectSnapshot& Snapshot);
 
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowLogin();
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowLobby();
+    UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowRoom(const FMahjongRoomState& State, int32 LocalSeat);
+    UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowGameHUD();
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowChineseError(const FString& ChineseReason);
 
 private:
-    void ShowScreenByClassPath(const TCHAR* ClassPath);
+    UUserWidget* ShowScreenByClassPath(const TCHAR* ClassPath);
+    void RouteFromRoomState(const FMahjongRoomState& State);
+    int32 FindLocalSeat(const FMahjongRoomState& State) const;
 };

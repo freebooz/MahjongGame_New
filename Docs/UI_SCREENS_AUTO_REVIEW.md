@@ -4,8 +4,8 @@
 |---|---|---|---|---|---|
 | Login | 黑图失败 | 黑图失败 | 未跑 | 未跑 | RootHUD/Login 已创建，截图捕获阻塞 |
 | Lobby | 待跑 | 待跑 | 待跑 | 待跑 | 等待导入/地图 |
-| CreateRoomDialog | 待跑 | 待跑 | 待跑 | 待跑 | Widget 尚缺 |
-| JoinRoomDialog | 待跑 | 待跑 | 待跑 | 待跑 | Widget 尚缺 |
+| CreateRoomDialog | 待跑 | 待跑 | 待跑 | 待跑 | Widget 已生成并完成 C++ 绑定，待截图 |
+| JoinRoomDialog | 待跑 | 待跑 | 待跑 | 待跑 | Widget 已生成并完成 C++ 绑定，待截图 |
 | Room | 待跑 | 待跑 | 待跑 | 待跑 | 等待导入/地图 |
 | RuleConfig | 待跑 | 待跑 | 待跑 | 待跑 | Widget 尚缺 |
 | GameHUD | 待跑 | 待跑 | 待跑 | 待跑 | 等待导入/地图 |
