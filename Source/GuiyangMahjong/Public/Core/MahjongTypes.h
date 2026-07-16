@@ -212,6 +212,7 @@ struct GUIYANGMAHJONG_API FMahjongRuleConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableYiPaoDuoXiang = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableQiDui = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bDrawGameDealerContinues = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bEnableTimeoutAutoPlay = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 BaseScore = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 JiScore = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 BasicJiValue = 1;
@@ -226,4 +227,6 @@ struct GUIYANGMAHJONG_API FMahjongRuleConfig
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ZiMoMultiplier = 2;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 DianPaoMultiplier = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ReconnectTimeoutSeconds = 120;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 TurnTimeoutSeconds = 15;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ReactionTimeoutSeconds = 8;
 };

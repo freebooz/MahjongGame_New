@@ -136,6 +136,9 @@ void AGuiyangMahjongGameMode::TryStartTable(const FMahjongRoomState& StartingRoo
     ActiveRoomCode = StartingRoomState.RoomInfo.RoomId;
     LastPublishedSettlementSequence = INDEX_NONE;
     LastFinalizedSettlementSequence = INDEX_NONE;
+    ArmedTimeoutRoundId = INDEX_NONE;
+    ArmedTimeoutTurnId = INDEX_NONE;
+    ArmedTimeoutPhase = EMahjongTablePhase::WaitingForPlayers;
     PublishRoomState(PlayingState);
     PublishTableSnapshots();
 }
@@ -201,6 +204,7 @@ void AGuiyangMahjongGameMode::HandleLegacyPlayTile(AGuiyangMahjongPlayerControll
 void AGuiyangMahjongGameMode::PublishTableSnapshots()
 {
     if (!TableEngine) return;
+    RefreshActionTimeoutTimer();
     if (AGuiyangMahjongGameState* MahjongState = GetGameState<AGuiyangMahjongGameState>())
         MahjongState->SetPublicTableStateAuthority(TableEngine->GetPublicState());
     FMahjongSettlementResult Settlement;
@@ -217,6 +221,47 @@ void AGuiyangMahjongGameMode::PublishTableSnapshots()
         if (bPublishSettlement) Controller->Client_ShowSettlement(Settlement);
     }
     if (bPublishSettlement) LastPublishedSettlementSequence = TableEngine->GetPublicState().StateSequence;
+}
+
+void AGuiyangMahjongGameMode::RefreshActionTimeoutTimer()
+{
+    if (!TableEngine || !GetWorld()) return;
+    const FMahjongPublicTableState& State = TableEngine->GetPublicState();
+    const bool bActionPhase = State.Phase == EMahjongTablePhase::PlayerTurn
+        || State.Phase == EMahjongTablePhase::WaitingForAction;
+    if (!bActionPhase || !TableEngine->GetLockedRuleSnapshot().Config.bEnableTimeoutAutoPlay)
+    {
+        GetWorldTimerManager().ClearTimer(ActionTimeoutHandle);
+        ArmedTimeoutRoundId = INDEX_NONE;
+        ArmedTimeoutTurnId = INDEX_NONE;
+        ArmedTimeoutPhase = EMahjongTablePhase::WaitingForPlayers;
+        TableEngine->SetActionDeadlineForServer(0.0, 0);
+        return;
+    }
+    if (ArmedTimeoutRoundId == State.RoundId && ArmedTimeoutTurnId == State.TurnId
+        && ArmedTimeoutPhase == State.Phase && GetWorldTimerManager().IsTimerActive(ActionTimeoutHandle)) return;
+
+    GetWorldTimerManager().ClearTimer(ActionTimeoutHandle);
+    ArmedTimeoutRoundId = State.RoundId;
+    ArmedTimeoutTurnId = State.TurnId;
+    ArmedTimeoutPhase = State.Phase;
+    const int32 TimeoutSeconds = State.Phase == EMahjongTablePhase::PlayerTurn
+        ? TableEngine->GetLockedRuleSnapshot().Config.TurnTimeoutSeconds
+        : TableEngine->GetLockedRuleSnapshot().Config.ReactionTimeoutSeconds;
+    TableEngine->SetActionDeadlineForServer(GetWorld()->GetTimeSeconds() + TimeoutSeconds, TimeoutSeconds);
+    FTimerDelegate Delegate;
+    Delegate.BindUObject(this, &ThisClass::HandleActionTimeout, State.RoundId, State.TurnId, State.Phase);
+    GetWorldTimerManager().SetTimer(ActionTimeoutHandle, Delegate, TimeoutSeconds, false);
+}
+
+void AGuiyangMahjongGameMode::HandleActionTimeout(const int32 ExpectedRoundId, const int32 ExpectedTurnId,
+    const EMahjongTablePhase ExpectedPhase)
+{
+    if (!TableEngine) return;
+    const FMahjongActionResult Result = TableEngine->ResolveActionTimeout(ExpectedRoundId, ExpectedTurnId, ExpectedPhase);
+    if (!Result.bSuccess) return;
+    PublishTableSnapshots();
+    FinalizeRoundIfNeeded();
 }
 
 void AGuiyangMahjongGameMode::FinalizeRoundIfNeeded()

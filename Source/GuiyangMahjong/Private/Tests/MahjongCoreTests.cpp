@@ -334,6 +334,54 @@ bool FMahjongAuthoritativeTurnTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongActionTimeoutTest, "GuiyangMahjong.Table.AuthoritativeActionTimeout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongActionTimeoutTest::RunTest(const FString& Parameters)
+{
+    TArray<FMahjongSeatInfo> Seats;
+    Seats.SetNum(4);
+    for (int32 Seat = 0; Seat < 4; ++Seat)
+    {
+        Seats[Seat].SeatIndex = Seat;
+        Seats[Seat].PlayerId = FString::Printf(TEXT("timeout-p%d"), Seat);
+        Seats[Seat].bOccupied = true;
+    }
+    const FGuiyangRuleSnapshot Rules = UGuiyangRuleSnapshotLibrary::CreateSnapshot(FMahjongRuleConfig());
+    FString Error;
+    UMahjongTableEngine* TurnEngine = NewObject<UMahjongTableEngine>();
+    TestTrue(TEXT("Turn-timeout table starts"), TurnEngine->StartRound(Rules, Seats, 0, 106, Error));
+    const FMahjongPublicTableState Initial = TurnEngine->GetPublicState();
+    TestFalse(TEXT("Stale timeout token is rejected"), TurnEngine->ResolveActionTimeout(
+        Initial.RoundId + 1, Initial.TurnId, Initial.Phase).bSuccess);
+    TestEqual(TEXT("Stale timeout does not discard"), TurnEngine->GetPublicState().Discards.Num(), 0);
+    TestTrue(TEXT("Current turn timeout auto-plays"), TurnEngine->ResolveActionTimeout(
+        Initial.RoundId, Initial.TurnId, Initial.Phase).bSuccess);
+    TestEqual(TEXT("Turn timeout creates exactly one discard"), TurnEngine->GetPublicState().Discards.Num(), 1);
+
+    UMahjongTableEngine* ReactionEngine = NewObject<UMahjongTableEngine>();
+    TestTrue(TEXT("Reaction-timeout table starts"), ReactionEngine->StartRound(Rules, Seats, 0, 107, Error));
+    ReactionEngine->SetHandForServerTest(0, MahjongTest::MakeHand({0,1,2,3,4,5,6,7,8,9,10,11,12,13}));
+    ReactionEngine->SetHandForServerTest(1, MahjongTest::MakeHand({0,0,3,4,5,6,7,8,9,10,11,12,13}));
+    const FMahjongHand NoHu = MahjongTest::MakeHand({6,8,10,12,14,16,18,20,22,24,26,5,7});
+    ReactionEngine->SetHandForServerTest(2, NoHu);
+    ReactionEngine->SetHandForServerTest(3, NoHu);
+    FMahjongActionRequest Play;
+    Play.Type = EMahjongActionType::Play;
+    Play.RoundId = ReactionEngine->GetPublicState().RoundId;
+    Play.TurnId = ReactionEngine->GetPublicState().TurnId;
+    Play.TargetTileId = 0;
+    Play.ClientSequence = 1;
+    TestTrue(TEXT("Discard opens reaction timeout window"), ReactionEngine->SubmitPlayTile(0, Play).bSuccess);
+    const FMahjongPublicTableState Waiting = ReactionEngine->GetPublicState();
+    TestEqual(TEXT("Peng candidate keeps reaction window open"), Waiting.Phase, EMahjongTablePhase::WaitingForAction);
+    TestTrue(TEXT("Reaction timeout auto-passes pending seats"), ReactionEngine->ResolveActionTimeout(
+        Waiting.RoundId, Waiting.TurnId, Waiting.Phase).bSuccess);
+    TestEqual(TEXT("Auto-pass advances to next player"), ReactionEngine->GetPublicState().CurrentTurnSeat, 1);
+    TestEqual(TEXT("Auto-pass does not claim discard"), ReactionEngine->GetPublicState().Discards[0].bClaimed, false);
+    TestFalse(TEXT("Expired reaction timeout cannot fire twice"), ReactionEngine->ResolveActionTimeout(
+        Waiting.RoundId, Waiting.TurnId, Waiting.Phase).bSuccess);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongReactionPriorityTest, "GuiyangMahjong.Table.ReactionPriorityAndMultiHu", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FMahjongReactionPriorityTest::RunTest(const FString& Parameters)
 {

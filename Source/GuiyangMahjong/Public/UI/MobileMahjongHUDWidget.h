@@ -18,6 +18,7 @@ class GUIYANGMAHJONG_API UMobileMahjongHUDWidget : public UUserWidget
 protected:
     virtual void NativeConstruct() override;
     virtual void NativeDestruct() override;
+    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_RoomId;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_RemainingTileCount;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_CurrentPhase;

@@ -207,6 +207,77 @@ FMahjongActionResult UMahjongTableEngine::SubmitReaction(const int32 SeatIndex, 
     return Result;
 }
 
+FMahjongActionResult UMahjongTableEngine::ResolveActionTimeout(const int32 ExpectedRoundId,
+    const int32 ExpectedTurnId, const EMahjongTablePhase ExpectedPhase)
+{
+    if (PublicState.RoundId != ExpectedRoundId || PublicState.TurnId != ExpectedTurnId
+        || PublicState.Phase != ExpectedPhase)
+        return Fail(TEXT("Timeout token is stale"));
+    if (!LockedRules.Config.bEnableTimeoutAutoPlay)
+        return Fail(TEXT("Timeout auto play is disabled by the locked rules"));
+
+    if (PublicState.Phase == EMahjongTablePhase::PlayerTurn)
+    {
+        const int32 SeatIndex = PublicState.CurrentTurnSeat;
+        if (!Hands.IsValidIndex(SeatIndex) || Hands[SeatIndex].Tiles.IsEmpty())
+            return Fail(TEXT("Current player has no tile available for auto play"));
+        const FMahjongTile* AutoTile = Hands[SeatIndex].Tiles.FindByPredicate([this](const FMahjongTile& Tile)
+        {
+            return LastDrawnTile.IsValid() && Tile.UniqueId == LastDrawnTile.UniqueId;
+        });
+        if (!AutoTile) AutoTile = &Hands[SeatIndex].Tiles.Last();
+
+        FMahjongActionRequest Request;
+        Request.Type = EMahjongActionType::Play;
+        Request.RoundId = PublicState.RoundId;
+        Request.TurnId = PublicState.TurnId;
+        Request.TargetTileId = AutoTile->UniqueId;
+        Request.ClientSequence = LastClientSequences[SeatIndex] + 1;
+        FMahjongActionResult Result = SubmitPlayTile(SeatIndex, Request);
+        if (Result.bSuccess) Result.Message = TEXT("Turn timeout auto-played one tile");
+        return Result;
+    }
+
+    if (PublicState.Phase == EMahjongTablePhase::WaitingForAction)
+    {
+        const TArray<int32> CandidateSeats = [&]()
+        {
+            TArray<int32> Seats;
+            AvailableActionsBySeat.GetKeys(Seats);
+            return Seats;
+        }();
+        int32 AutoPassCount = 0;
+        for (const int32 SeatIndex : CandidateSeats)
+        {
+            if (SubmittedReactions.Contains(SeatIndex)) continue;
+            FMahjongActionRequest Pass;
+            Pass.Type = EMahjongActionType::Pass;
+            Pass.RoundId = PublicState.RoundId;
+            Pass.TurnId = PublicState.TurnId;
+            Pass.ClientSequence = LastClientSequences[SeatIndex] + 1;
+            LastClientSequences[SeatIndex] = Pass.ClientSequence;
+            SubmittedReactions.Add(SeatIndex, Pass);
+            ++PublicState.ServerActionSequence;
+            ++AutoPassCount;
+        }
+        if (AutoPassCount == 0) return Fail(TEXT("Reaction timeout had no pending responders"));
+        ResolveSubmittedReactions();
+
+        FMahjongActionResult Result;
+        Result.bSuccess = true;
+        Result.Message = FString::Printf(TEXT("Reaction timeout auto-passed %d seats"), AutoPassCount);
+        Result.Action.Type = EMahjongActionType::Pass;
+        return Result;
+    }
+    return Fail(TEXT("Current phase has no action timeout"));
+}
+
+void UMahjongTableEngine::SetActionDeadlineForServer(const double DeadlineServerTimeSeconds, const int32 TimeoutSeconds)
+{
+    PublicState.ActionDeadlineServerTimeSeconds = FMath::Max(0.0, DeadlineServerTimeSeconds);
+    PublicState.ActionTimeoutSeconds = FMath::Max(0, TimeoutSeconds);
+}
+
 bool UMahjongTableEngine::GetPrivateState(const int32 SeatIndex, FMahjongPrivatePlayerState& OutState) const
 {
     if (!Hands.IsValidIndex(SeatIndex)) return false;

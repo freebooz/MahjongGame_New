@@ -45,6 +45,20 @@ void UMobileMahjongHUDWidget::NativeDestruct()
     Super::NativeDestruct();
 }
 
+void UMobileMahjongHUDWidget::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
+{
+    Super::NativeTick(MyGeometry, InDeltaTime);
+    const AGuiyangMahjongGameState* GS = GetWorld() ? GetWorld()->GetGameState<AGuiyangMahjongGameState>() : nullptr;
+    if (!GS || GS->PublicTableState.ActionDeadlineServerTimeSeconds <= 0.0)
+    {
+        Txt_Countdown->SetText(FText::FromString(TEXT("--")));
+        return;
+    }
+    const int32 RemainingSeconds = FMath::Max(0, FMath::CeilToInt(
+        GS->PublicTableState.ActionDeadlineServerTimeSeconds - GS->GetServerWorldTimeSeconds()));
+    Txt_Countdown->SetText(FText::AsNumber(RemainingSeconds));
+}
+
 void UMobileMahjongHUDWidget::RefreshTableState(const FMahjongPublicTableState& State)
 {
     Txt_RemainingTileCount->SetText(FText::FromString(FString::Printf(TEXT("剩余：%d"), State.RemainingTileCount)));

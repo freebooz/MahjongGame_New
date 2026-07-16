@@ -31,10 +31,16 @@ private:
     int32 LastPublishedSettlementSequence = INDEX_NONE;
     int32 LastFinalizedSettlementSequence = INDEX_NONE;
     FString ActiveRoomCode;
+    FTimerHandle ActionTimeoutHandle;
+    int32 ArmedTimeoutRoundId = INDEX_NONE;
+    int32 ArmedTimeoutTurnId = INDEX_NONE;
+    EMahjongTablePhase ArmedTimeoutPhase = EMahjongTablePhase::WaitingForPlayers;
     bool ResolvePlayer(class AGuiyangMahjongPlayerController* Controller, class AGuiyangMahjongPlayerState*& OutPlayerState) const;
     void PublishRoomState(const FMahjongRoomState& State);
     void TryStartTable(const FMahjongRoomState& StartingRoomState);
     void PublishTableSnapshots();
     void FinalizeRoundIfNeeded();
+    void RefreshActionTimeoutTimer();
+    void HandleActionTimeout(int32 ExpectedRoundId, int32 ExpectedTurnId, EMahjongTablePhase ExpectedPhase);
     static FString ErrorToMessage(EMahjongRoomError Error);
 };

@@ -118,6 +118,8 @@ struct GUIYANGMAHJONG_API FMahjongPublicTableState
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EMahjongTablePhase Phase = EMahjongTablePhase::WaitingForPlayers;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 CurrentTurnSeat = INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 RemainingTileCount = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 ActionTimeoutSeconds = 0;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) double ActionDeadlineServerTimeSeconds = 0.0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongSeatInfo> Seats;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongDiscardRecord> Discards;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongMeld> PublicMelds;

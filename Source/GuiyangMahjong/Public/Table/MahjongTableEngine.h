@@ -17,6 +17,9 @@ public:
     FMahjongActionResult SubmitPlayTile(int32 SeatIndex, const FMahjongActionRequest& Request);
     FMahjongActionResult SubmitTurnAction(int32 SeatIndex, const FMahjongActionRequest& Request);
     FMahjongActionResult SubmitReaction(int32 SeatIndex, const FMahjongActionRequest& Request);
+    FMahjongActionResult ResolveActionTimeout(int32 ExpectedRoundId, int32 ExpectedTurnId,
+        EMahjongTablePhase ExpectedPhase);
+    void SetActionDeadlineForServer(double DeadlineServerTimeSeconds, int32 TimeoutSeconds);
 
     const FMahjongPublicTableState& GetPublicState() const { return PublicState; }
     bool GetPrivateState(int32 SeatIndex, FMahjongPrivatePlayerState& OutState) const;

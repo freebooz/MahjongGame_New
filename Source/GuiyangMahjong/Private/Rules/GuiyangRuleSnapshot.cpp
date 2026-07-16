@@ -50,6 +50,8 @@ FMahjongRuleConfig UGuiyangRuleSnapshotLibrary::NormalizeConfig(const FMahjongRu
     Result.ZiMoMultiplier = FMath::Clamp(Result.ZiMoMultiplier, 1, 16);
     Result.DianPaoMultiplier = FMath::Clamp(Result.DianPaoMultiplier, 1, 16);
     Result.ReconnectTimeoutSeconds = FMath::Clamp(Result.ReconnectTimeoutSeconds, 15, 600);
+    Result.TurnTimeoutSeconds = FMath::Clamp(Result.TurnTimeoutSeconds, 3, 120);
+    Result.ReactionTimeoutSeconds = FMath::Clamp(Result.ReactionTimeoutSeconds, 3, 60);
     return Result;
 }
 
@@ -62,6 +64,7 @@ FString UGuiyangRuleSnapshotLibrary::BuildCanonicalDefinition(const FMahjongRule
         TEXT("WuGuJiValue=%d|ChongFengJiValue=%d|WuGuChongFengJiValue=%d|ZeRenJiValue=%d|WuGuZeRenJiValue=%d|")
         TEXT("QiangGangHu=%d|YiPaoDuoXiang=%d|QiDui=%d|DrawDealerContinues=%d|")
         TEXT("BaseScore=%d|JiScore=%d|GangScore=%d|")
+        TEXT("TimeoutAutoPlay=%d|TurnTimeout=%d|ReactionTimeout=%d|")
         TEXT("ZiMoMultiplier=%d|DianPaoMultiplier=%d|ReconnectTimeoutSeconds=%d"),
         *Config.RuleId.ToString(), Config.RuleVersion, static_cast<int32>(Config.TileSetMode),
         Config.bEnableChongFengJi ? 1 : 0, Config.bEnableZeRenJi ? 1 : 0,
@@ -72,7 +75,9 @@ FString UGuiyangRuleSnapshotLibrary::BuildCanonicalDefinition(const FMahjongRule
         Config.WuGuZeRenJiValue, Config.bEnableQiangGangHu ? 1 : 0,
         Config.bEnableYiPaoDuoXiang ? 1 : 0, Config.bEnableQiDui ? 1 : 0,
         Config.bDrawGameDealerContinues ? 1 : 0,
-        Config.BaseScore, Config.JiScore, Config.GangScore, Config.ZiMoMultiplier,
+        Config.BaseScore, Config.JiScore, Config.GangScore,
+        Config.bEnableTimeoutAutoPlay ? 1 : 0, Config.TurnTimeoutSeconds, Config.ReactionTimeoutSeconds,
+        Config.ZiMoMultiplier,
         Config.DianPaoMultiplier, Config.ReconnectTimeoutSeconds);
 }
 
