@@ -27,6 +27,7 @@ public:
 private:
     UPROPERTY(Transient) TObjectPtr<class UGuiyangRoomManager> RoomManager;
     UPROPERTY(Transient) TObjectPtr<class UMahjongTableEngine> TableEngine;
+    int32 LastPublishedSettlementSequence = INDEX_NONE;
     bool ResolvePlayer(class AGuiyangMahjongPlayerController* Controller, class AGuiyangMahjongPlayerState*& OutPlayerState) const;
     void PublishRoomState(const FMahjongRoomState& State);
     void TryStartTable(const FMahjongRoomState& StartingRoomState);

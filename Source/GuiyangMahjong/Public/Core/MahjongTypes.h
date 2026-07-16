@@ -154,6 +154,7 @@ struct GUIYANGMAHJONG_API FMahjongSettlementResult
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bDrawGame = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bSelfDraw = false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 WinnerSeat = INDEX_NONE;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<int32> WinningSeats;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 LoserSeat = INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FMahjongTile WinningTile;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) TArray<FMahjongTile> JiTiles;

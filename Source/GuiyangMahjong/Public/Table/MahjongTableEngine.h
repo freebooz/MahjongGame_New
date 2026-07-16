@@ -15,12 +15,14 @@ public:
     bool StartRound(const FGuiyangRuleSnapshot& RuleSnapshot, const TArray<FMahjongSeatInfo>& Seats,
         int32 DealerSeat, int32 ShuffleSeed, FString& OutError);
     FMahjongActionResult SubmitPlayTile(int32 SeatIndex, const FMahjongActionRequest& Request);
+    FMahjongActionResult SubmitTurnAction(int32 SeatIndex, const FMahjongActionRequest& Request);
     FMahjongActionResult SubmitReaction(int32 SeatIndex, const FMahjongActionRequest& Request);
 
     const FMahjongPublicTableState& GetPublicState() const { return PublicState; }
     bool GetPrivateState(int32 SeatIndex, FMahjongPrivatePlayerState& OutState) const;
     TArray<FMahjongAction> GetAvailableActions(int32 SeatIndex) const;
     const FGuiyangRuleSnapshot& GetLockedRuleSnapshot() const { return LockedRules; }
+    bool GetSettlementResult(FMahjongSettlementResult& OutResult) const;
 #if WITH_DEV_AUTOMATION_TESTS
     bool SetHandForServerTest(int32 SeatIndex, const FMahjongHand& Hand);
 #endif
@@ -30,10 +32,14 @@ private:
     UPROPERTY() FGuiyangRuleSnapshot LockedRules;
     UPROPERTY() FMahjongPublicTableState PublicState;
     UPROPERTY() TArray<FMahjongHand> Hands;
+    UPROPERTY() FMahjongSettlementResult SettlementResult;
     TMap<int32, TArray<FMahjongAction>> AvailableActionsBySeat;
     TMap<int32, FMahjongActionRequest> SubmittedReactions;
     TArray<int32> LastClientSequences;
+    TArray<int32> CurrentScores;
+    TArray<int32> GangDeltas;
     int32 LastDiscardSeat = INDEX_NONE;
+    FMahjongTile LastDrawnTile;
 
     bool ValidateRequestCommon(int32 SeatIndex, const FMahjongActionRequest& Request, FString& OutError);
     void OpenReactionWindow(const FMahjongTile& Discard, int32 DiscardSeat);
@@ -41,6 +47,11 @@ private:
     void ResolveHuReactions(const TArray<int32>& HuSeats);
     void ApplyClaim(int32 SeatIndex, EMahjongActionType Type);
     void AdvanceTurnAndDraw();
+    void RebuildTurnActions();
+    void SettleWin(const TArray<int32>& WinningSeats, int32 LoserSeat, bool bSelfDraw, const FMahjongTile& WinningTile);
+    void SettleDrawGame();
+    void ApplyGangScore(int32 GangSeat);
+    TArray<int32> CountBasicJi() const;
     void RefreshSeatCounts();
     FMahjongAction BuildReactionAction(int32 SeatIndex, EMahjongActionType Type, const FMahjongTile& Discard) const;
     int32 FindBestReactionSeat() const;

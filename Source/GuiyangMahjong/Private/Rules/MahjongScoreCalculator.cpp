@@ -1,32 +1,44 @@
 #include "Rules/MahjongScoreCalculator.h"
 #include "GuiyangMahjong.h"
 
-FMahjongSettlementResult UMahjongScoreCalculator::CalculateWin(const int32 WinnerSeat, const int32 LoserSeat, const bool bSelfDraw,
-    const TArray<int32>& JiCounts, const TArray<int32>& GangDeltas, const TArray<int32>& CurrentScores, const FMahjongRuleConfig& Config)
+FMahjongSettlementResult UMahjongScoreCalculator::CalculateWin(const int32 WinnerSeat, const int32 LoserSeat,
+    const bool bSelfDraw, const TArray<int32>& JiCounts, const TArray<int32>& GangDeltas,
+    const TArray<int32>& CurrentScores, const FMahjongRuleConfig& Config)
+{
+    return CalculateWins({ WinnerSeat }, LoserSeat, bSelfDraw, JiCounts, GangDeltas, CurrentScores, Config);
+}
+
+FMahjongSettlementResult UMahjongScoreCalculator::CalculateWins(const TArray<int32>& WinningSeats,
+    const int32 LoserSeat, const bool bSelfDraw, const TArray<int32>& JiCounts,
+    const TArray<int32>& GangDeltas, const TArray<int32>& CurrentScores, const FMahjongRuleConfig& Config)
 {
     FMahjongSettlementResult Result;
-    Result.WinnerSeat = WinnerSeat;
+    Result.WinningSeats = WinningSeats;
+    Result.WinnerSeat = WinningSeats.IsEmpty() ? INDEX_NONE : WinningSeats[0];
     Result.LoserSeat = bSelfDraw ? INDEX_NONE : LoserSeat;
     Result.bSelfDraw = bSelfDraw;
     Result.PlayerResults.SetNum(4);
 
-    if (WinnerSeat < 0 || WinnerSeat >= 4 || (!bSelfDraw && (LoserSeat < 0 || LoserSeat >= 4 || LoserSeat == WinnerSeat)))
+    const bool bInvalidWinner = WinningSeats.IsEmpty() || WinningSeats.ContainsByPredicate(
+        [](const int32 Seat) { return Seat < 0 || Seat >= 4; });
+    if (bInvalidWinner || (bSelfDraw && WinningSeats.Num() != 1)
+        || (!bSelfDraw && (LoserSeat < 0 || LoserSeat >= 4 || WinningSeats.Contains(LoserSeat))))
     {
         Result.bDrawGame = true;
-        UE_LOG(LogMahjongScore, Warning, TEXT("结算拒绝：赢家或放炮座位非法，赢家=%d，放炮=%d"), WinnerSeat, LoserSeat);
+        UE_LOG(LogMahjongScore, Warning, TEXT("Settlement rejected: invalid winners or loser"));
         return Result;
     }
 
     for (int32 Seat = 0; Seat < 4; ++Seat)
     {
         Result.PlayerResults[Seat].SeatIndex = Seat;
-        Result.PlayerResults[Seat].JiScoreDelta = 0;
         Result.PlayerResults[Seat].GangScoreDelta = GangDeltas.IsValidIndex(Seat) ? GangDeltas[Seat] : 0;
     }
 
     const int32 Unit = Config.BaseScore * (bSelfDraw ? Config.ZiMoMultiplier : Config.DianPaoMultiplier);
     if (bSelfDraw)
     {
+        const int32 WinnerSeat = WinningSeats[0];
         for (int32 Seat = 0; Seat < 4; ++Seat)
         {
             if (Seat == WinnerSeat) continue;
@@ -36,11 +48,13 @@ FMahjongSettlementResult UMahjongScoreCalculator::CalculateWin(const int32 Winne
     }
     else
     {
-        Result.PlayerResults[LoserSeat].BaseScoreDelta -= Unit * 3;
-        Result.PlayerResults[WinnerSeat].BaseScoreDelta += Unit * 3;
+        for (const int32 WinnerSeat : WinningSeats)
+        {
+            Result.PlayerResults[LoserSeat].BaseScoreDelta -= Unit * 3;
+            Result.PlayerResults[WinnerSeat].BaseScoreDelta += Unit * 3;
+        }
     }
 
-    // 鸡分采用玩家间差额结算：每位玩家相对其余三家的鸡数差形成严格零和结果。
     for (int32 A = 0; A < 4; ++A)
     {
         for (int32 B = A + 1; B < 4; ++B)
@@ -59,6 +73,6 @@ FMahjongSettlementResult UMahjongScoreCalculator::CalculateWin(const int32 Winne
         Player.TotalDelta = Player.BaseScoreDelta + Player.JiScoreDelta + Player.GangScoreDelta;
         Player.TotalScore = (CurrentScores.IsValidIndex(Seat) ? CurrentScores[Seat] : 0) + Player.TotalDelta;
     }
-    UE_LOG(LogMahjongScore, Log, TEXT("单局结算完成：%s"), *Result.ToDebugString());
+    UE_LOG(LogMahjongScore, Log, TEXT("Round settlement completed: %s"), *Result.ToDebugString());
     return Result;
 }

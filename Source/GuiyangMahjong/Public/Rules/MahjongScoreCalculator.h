@@ -11,6 +11,9 @@ class GUIYANGMAHJONG_API UMahjongScoreCalculator : public UObject
 {
     GENERATED_BODY()
 public:
+    static FMahjongSettlementResult CalculateWins(const TArray<int32>& WinningSeats, int32 LoserSeat, bool bSelfDraw,
+        const TArray<int32>& JiCounts, const TArray<int32>& GangDeltas, const TArray<int32>& CurrentScores,
+        const FMahjongRuleConfig& Config);
     static FMahjongSettlementResult CalculateWin(int32 WinnerSeat, int32 LoserSeat, bool bSelfDraw,
         const TArray<int32>& JiCounts, const TArray<int32>& GangDeltas, const TArray<int32>& CurrentScores,
         const FMahjongRuleConfig& Config);

@@ -320,6 +320,81 @@ bool FMahjongReactionPriorityTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongSelfDrawTest, "GuiyangMahjong.Table.AuthoritativeSelfDraw", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongSelfDrawTest::RunTest(const FString& Parameters)
+{
+    TArray<FMahjongSeatInfo> Seats;
+    Seats.SetNum(4);
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        Seats[Index].SeatIndex = Index;
+        Seats[Index].PlayerId = FString::Printf(TEXT("self-draw-p%d"), Index);
+        Seats[Index].bOccupied = true;
+        Seats[Index].Score = 100;
+    }
+    UMahjongTableEngine* Engine = NewObject<UMahjongTableEngine>();
+    FString Error;
+    TestTrue(TEXT("Self draw table starts"), Engine->StartRound(
+        UGuiyangRuleSnapshotLibrary::CreateSnapshot(FMahjongRuleConfig()), Seats, 0, 101, Error));
+    const FMahjongHand WinningHand = MahjongTest::MakeHand({0,1,2, 9,10,11, 18,18,18, 3,4,5, 13,13});
+    TestTrue(TEXT("Inject winning hand"), Engine->SetHandForServerTest(0, WinningHand));
+    TestTrue(TEXT("Server offers self draw"), Engine->GetAvailableActions(0).ContainsByPredicate(
+        [](const FMahjongAction& Action) { return Action.Type == EMahjongActionType::Hu; }));
+
+    FMahjongActionRequest Request;
+    Request.Type = EMahjongActionType::Hu;
+    Request.RoundId = Engine->GetPublicState().RoundId;
+    Request.TurnId = Engine->GetPublicState().TurnId;
+    Request.ClientSequence = 1;
+    TestTrue(TEXT("Server accepts valid self draw"), Engine->SubmitTurnAction(0, Request).bSuccess);
+    TestEqual(TEXT("Self draw enters settlement"), Engine->GetPublicState().Phase, EMahjongTablePhase::Settlement);
+    FMahjongSettlementResult Settlement;
+    TestTrue(TEXT("Self draw settlement is readable"), Engine->GetSettlementResult(Settlement));
+    TestTrue(TEXT("Settlement marks self draw"), Settlement.bSelfDraw);
+    TestEqual(TEXT("Dealer is self draw winner"), Settlement.WinnerSeat, 0);
+    TestTrue(TEXT("Self draw winner gains base score"), Settlement.PlayerResults[0].BaseScoreDelta > 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongConcealedGangTest, "GuiyangMahjong.Table.AuthoritativeConcealedGang", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongConcealedGangTest::RunTest(const FString& Parameters)
+{
+    TArray<FMahjongSeatInfo> Seats;
+    Seats.SetNum(4);
+    for (int32 Index = 0; Index < 4; ++Index)
+    {
+        Seats[Index].SeatIndex = Index;
+        Seats[Index].PlayerId = FString::Printf(TEXT("gang-p%d"), Index);
+        Seats[Index].bOccupied = true;
+    }
+    UMahjongTableEngine* Engine = NewObject<UMahjongTableEngine>();
+    FString Error;
+    TestTrue(TEXT("Concealed gang table starts"), Engine->StartRound(
+        UGuiyangRuleSnapshotLibrary::CreateSnapshot(FMahjongRuleConfig()), Seats, 0, 102, Error));
+    TestTrue(TEXT("Inject concealed gang hand"), Engine->SetHandForServerTest(
+        0, MahjongTest::MakeHand({4,4,4,4, 0,1,2, 9,10,11, 18,19,20, 13})));
+    const TArray<FMahjongAction> Actions = Engine->GetAvailableActions(0);
+    const FMahjongAction* Gang = Actions.FindByPredicate(
+        [](const FMahjongAction& Action) { return Action.Type == EMahjongActionType::AnGang; });
+    TestNotNull(TEXT("Server offers concealed gang"), Gang);
+    if (!Gang) return false;
+
+    FMahjongActionRequest Request;
+    Request.Type = EMahjongActionType::AnGang;
+    Request.RoundId = Engine->GetPublicState().RoundId;
+    Request.TurnId = Engine->GetPublicState().TurnId;
+    Request.TargetTileId = Gang->TargetTile.UniqueId;
+    Request.ClientSequence = 1;
+    TestTrue(TEXT("Server accepts concealed gang"), Engine->SubmitTurnAction(0, Request).bSuccess);
+    TestEqual(TEXT("Replacement tile keeps player turn"), Engine->GetPublicState().Phase, EMahjongTablePhase::PlayerTurn);
+    TestEqual(TEXT("Concealed gang is in public meld list"), Engine->GetPublicState().PublicMelds.Num(), 1);
+    TestFalse(TEXT("Public concealed gang hides every tile face"), Engine->GetPublicState().PublicMelds[0].Tiles.ContainsByPredicate(
+        [](const FMahjongTile& Tile) { return Tile.IsValid(); }));
+    TestEqual(TEXT("Replacement draw consumes one wall tile"), Engine->GetPublicState().RemainingTileCount, 54);
+    TestEqual(TEXT("Four tiles become meld and one replacement remains"), Engine->GetPublicState().Seats[0].HandTileCount, 11);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongHuTest, "GuiyangMahjong.Rules.StandardHu", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FMahjongHuTest::RunTest(const FString& Parameters)
 {
@@ -375,6 +450,23 @@ bool FMahjongScoreTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("四名玩家总分变化必须为零"), TotalDelta, 0);
     TestTrue(TEXT("赢家基础分必须增加"), Result.PlayerResults[1].BaseScoreDelta > 0);
     TestTrue(TEXT("放炮玩家基础分必须减少"), Result.PlayerResults[3].BaseScoreDelta < 0);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongMultiScoreTest, "GuiyangMahjong.Rules.MultiWinScoreZeroSum", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongMultiScoreTest::RunTest(const FString& Parameters)
+{
+    const TArray<int32> JiCounts = {1, 2, 0, 3};
+    const TArray<int32> GangDeltas = {0, 0, 0, 0};
+    const TArray<int32> Scores = {100, 100, 100, 100};
+    const FMahjongSettlementResult Result = UMahjongScoreCalculator::CalculateWins(
+        {1, 2}, 3, false, JiCounts, GangDeltas, Scores, FMahjongRuleConfig());
+    int32 TotalDelta = 0;
+    for (const FMahjongPlayerScoreResult& Player : Result.PlayerResults) TotalDelta += Player.TotalDelta;
+    TestEqual(TEXT("Multi-win settlement remains zero sum"), TotalDelta, 0);
+    TestEqual(TEXT("Multi-win settlement keeps both winners"), Result.WinningSeats.Num(), 2);
+    TestTrue(TEXT("First winner gains base score"), Result.PlayerResults[1].BaseScoreDelta > 0);
+    TestTrue(TEXT("Second winner gains base score"), Result.PlayerResults[2].BaseScoreDelta > 0);
     return true;
 }
 

@@ -144,9 +144,13 @@ void AGuiyangMahjongGameMode::HandleTableAction(AGuiyangMahjongPlayerController*
         if (Controller) Controller->Client_ShowErrorMessage(TEXT("牌桌尚未开始"));
         return;
     }
-    const FMahjongActionResult Result = Request.Type == EMahjongActionType::Play
-        ? TableEngine->SubmitPlayTile(Player->SeatIndex, Request)
-        : TableEngine->SubmitReaction(Player->SeatIndex, Request);
+    FMahjongActionResult Result;
+    if (Request.Type == EMahjongActionType::Play)
+        Result = TableEngine->SubmitPlayTile(Player->SeatIndex, Request);
+    else if (TableEngine->GetPublicState().Phase == EMahjongTablePhase::PlayerTurn)
+        Result = TableEngine->SubmitTurnAction(Player->SeatIndex, Request);
+    else
+        Result = TableEngine->SubmitReaction(Player->SeatIndex, Request);
     if (!Result.bSuccess)
     {
         Controller->Client_ShowErrorMessage(Result.Message);
@@ -172,6 +176,9 @@ void AGuiyangMahjongGameMode::PublishTableSnapshots()
     if (!TableEngine) return;
     if (AGuiyangMahjongGameState* MahjongState = GetGameState<AGuiyangMahjongGameState>())
         MahjongState->SetPublicTableStateAuthority(TableEngine->GetPublicState());
+    FMahjongSettlementResult Settlement;
+    const bool bPublishSettlement = TableEngine->GetSettlementResult(Settlement)
+        && LastPublishedSettlementSequence != TableEngine->GetPublicState().StateSequence;
     for (TActorIterator<AGuiyangMahjongPlayerController> It(GetWorld()); It; ++It)
     {
         AGuiyangMahjongPlayerController* Controller = *It;
@@ -180,7 +187,9 @@ void AGuiyangMahjongGameMode::PublishTableSnapshots()
         FMahjongPrivatePlayerState PrivateState;
         if (TableEngine->GetPrivateState(Player->SeatIndex, PrivateState)) Controller->Client_UpdatePrivateHand(PrivateState);
         Controller->Client_ShowAvailableActions(TableEngine->GetAvailableActions(Player->SeatIndex));
+        if (bPublishSettlement) Controller->Client_ShowSettlement(Settlement);
     }
+    if (bPublishSettlement) LastPublishedSettlementSequence = TableEngine->GetPublicState().StateSequence;
 }
 
 FString AGuiyangMahjongGameMode::ErrorToMessage(const EMahjongRoomError Error)
