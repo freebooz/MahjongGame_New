@@ -1,5 +1,6 @@
 #include "UI/MobileActionButtonPanel.h"
 #include "Game/GuiyangMahjongPlayerController.h"
+#include "UI/MahjongUISoundLibrary.h"
 #include "Components/Button.h"
 #include "GuiyangMahjong.h"
 
@@ -34,7 +35,14 @@ void UMobileActionButtonPanel::SendAction(const EMahjongActionType Type)
     if (!Offered && Type != EMahjongActionType::Pass) return;
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
     {
-        PC->RequestTableAction(Offered ? Offered->Type : EMahjongActionType::Pass,
+        const EMahjongActionType RequestedType = Offered ? Offered->Type : EMahjongActionType::Pass;
+        const EMahjongUISound SoundType = RequestedType == EMahjongActionType::Hu ? EMahjongUISound::Hu
+            : RequestedType == EMahjongActionType::Peng ? EMahjongUISound::Peng
+            : (RequestedType == EMahjongActionType::MingGang || RequestedType == EMahjongActionType::AnGang
+                || RequestedType == EMahjongActionType::BuGang) ? EMahjongUISound::Gang
+            : EMahjongUISound::Pass;
+        UMahjongUISoundLibrary::PlayUISound(this, SoundType);
+        PC->RequestTableAction(RequestedType,
             Offered ? Offered->TargetTile.UniqueId : INDEX_NONE);
     }
     ShowActions({});

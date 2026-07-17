@@ -21,6 +21,12 @@
 #include "UI/MobileRuleSummaryWidget.h"
 #include "UI/MahjongTileVisualLibrary.h"
 #include "UObject/UnrealType.h"
+#include "Sound/SoundBase.h"
+#if WITH_EDITOR
+#include "WidgetBlueprint.h"
+#include "Blueprint/WidgetTree.h"
+#include "Components/Button.h"
+#endif
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -1092,5 +1098,81 @@ bool FMahjongWechatAutoLoginTest::RunTest(const FString& Parameters)
     UGameplayStatics::DeleteGameInSlot(SlotName, 0);
     return true;
 }
+
+#if WITH_EDITOR
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongUISoundAssetsTest, "GuiyangMahjong.UI.SoundAssetsAndButtonBinding", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongUISoundAssetsTest::RunTest(const FString& Parameters)
+{
+    static const TCHAR* SoundPaths[] = {
+        TEXT("/Game/UI/Audio/SFX_UI_Click.SFX_UI_Click"),
+        TEXT("/Game/UI/Audio/SFX_Tile_Select.SFX_Tile_Select"),
+        TEXT("/Game/UI/Audio/SFX_Tile_Play.SFX_Tile_Play"),
+        TEXT("/Game/UI/Audio/SFX_Peng.SFX_Peng"),
+        TEXT("/Game/UI/Audio/SFX_Gang.SFX_Gang"),
+        TEXT("/Game/UI/Audio/SFX_Hu.SFX_Hu"),
+        TEXT("/Game/UI/Audio/SFX_Pass.SFX_Pass")
+    };
+    for (const TCHAR* SoundPath : SoundPaths)
+    {
+        TestNotNull(FString::Printf(TEXT("音效必须可被 UE 加载：%s"), SoundPath),
+            LoadObject<USoundBase>(nullptr, SoundPath));
+    }
+
+    UWidgetBlueprint* ActionPanel = LoadObject<UWidgetBlueprint>(nullptr,
+        TEXT("/Game/UI/Components/WBP_ActionButtonPanel.WBP_ActionButtonPanel"));
+    TestNotNull(TEXT("操作按钮面板必须存在"), ActionPanel);
+    if (ActionPanel && ActionPanel->WidgetTree)
+    {
+        TArray<UWidget*> Widgets;
+        ActionPanel->WidgetTree->GetAllWidgets(Widgets);
+        int32 ButtonCount = 0;
+        for (UWidget* Widget : Widgets)
+        {
+            if (const UButton* Button = Cast<UButton>(Widget))
+            {
+                ++ButtonCount;
+                TestNull(FString::Printf(TEXT("操作按钮 %s 不应叠加通用点击声"), *Button->GetName()),
+                    Cast<USoundBase>(Button->GetStyle().PressedSlateSound.GetResourceObject()));
+            }
+        }
+        TestEqual(TEXT("碰杠胡过面板必须包含四个按钮"), ButtonCount, 4);
+    }
+
+    UWidgetBlueprint* Login = LoadObject<UWidgetBlueprint>(nullptr,
+        TEXT("/Game/UI/Screens/WBP_Login.WBP_Login"));
+    TestNotNull(TEXT("登录界面必须存在"), Login);
+    if (Login && Login->WidgetTree)
+    {
+        TArray<UWidget*> Widgets;
+        Login->WidgetTree->GetAllWidgets(Widgets);
+        int32 ButtonCount = 0;
+        for (UWidget* Widget : Widgets)
+        {
+            if (const UButton* Button = Cast<UButton>(Widget))
+            {
+                ++ButtonCount;
+                TestNotNull(FString::Printf(TEXT("通用按钮 %s 必须绑定点击声"), *Button->GetName()),
+                    Cast<USoundBase>(Button->GetStyle().PressedSlateSound.GetResourceObject()));
+            }
+        }
+        TestTrue(TEXT("登录界面必须包含通用按钮"), ButtonCount > 0);
+    }
+
+    UWidgetBlueprint* HandTile = LoadObject<UWidgetBlueprint>(nullptr,
+        TEXT("/Game/UI/Components/WBP_HandTile.WBP_HandTile"));
+    TestNotNull(TEXT("手牌组件必须存在"), HandTile);
+    if (HandTile && HandTile->WidgetTree)
+    {
+        const UButton* TileButton = Cast<UButton>(HandTile->WidgetTree->FindWidget(TEXT("Btn_Tile")));
+        TestNotNull(TEXT("手牌点击按钮必须存在"), TileButton);
+        if (TileButton)
+        {
+            TestNull(TEXT("手牌按钮不应叠加通用点击声"),
+                Cast<USoundBase>(TileButton->GetStyle().PressedSlateSound.GetResourceObject()));
+        }
+    }
+    return true;
+}
+#endif
 
 #endif

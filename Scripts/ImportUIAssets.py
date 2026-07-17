@@ -12,6 +12,8 @@ ROOT = Path(unreal.Paths.project_dir())
 SOURCE = ROOT / "SourceArt" / "UI"
 REPORT = SOURCE / "Data" / "ui_asset_inventory.json"
 DEST_ROOT = "/Game/UI/Textures"
+AUDIO_SOURCE = SOURCE / "Audio"
+AUDIO_DEST = "/Game/UI/Audio"
 
 
 def log(message: str) -> None:
@@ -41,6 +43,19 @@ def import_texture(source: Path, destination: str):
     task = unreal.AssetImportTask()
     task.filename = str(source)
     task.destination_path = destination
+    task.destination_name = source.stem
+    task.automated = True
+    task.replace_existing = True
+    task.save = True
+    unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
+    return unreal.EditorAssetLibrary.load_asset(asset_path)
+
+
+def import_sound(source: Path):
+    asset_path = f"{AUDIO_DEST}/{source.stem}"
+    task = unreal.AssetImportTask()
+    task.filename = str(source)
+    task.destination_path = AUDIO_DEST
     task.destination_name = source.stem
     task.automated = True
     task.replace_existing = True
@@ -220,12 +235,17 @@ def main() -> None:
                 raise RuntimeError(f"failed to import {source}")
             configure_texture(texture, folder == "Backgrounds")
             imported += 1
+    imported_sounds = 0
+    for source in sorted(AUDIO_SOURCE.glob("*.wav")):
+        if not import_sound(source):
+            raise RuntimeError(f"failed to import {source}")
+        imported_sounds += 1
     populate_data_assets(inventory)
     create_materials()
     verify(inventory)
     unreal.EditorAssetLibrary.save_directory("/Game/UI", only_if_is_dirty=False, recursive=True)
     data_asset_count = 6 if hasattr(unreal, "GuiyangUIThemeDataAsset") else 0
-    log(f"completed: {imported} textures, {data_asset_count} data assets, 9 materials, 5 material instances")
+    log(f"completed: {imported} textures, {imported_sounds} sounds, {data_asset_count} data assets, 9 materials, 5 material instances")
 
 
 if __name__ == "__main__":

@@ -25,6 +25,8 @@
 #include "UObject/UnrealType.h"
 #include "UObject/SavePackage.h"
 #include "Engine/Texture2D.h"
+#include "Sound/SoundBase.h"
+#include "Sound/SlateSound.h"
 #include "UI/MobileConnectServerWidget.h"
 #include "UI/MobileLobbyWidget.h"
 #include "UI/MobileRoomWidget.h"
@@ -112,7 +114,8 @@ namespace MahjongUIBuilder
         return TEXT("PrimaryGreen");
     }
 
-    static UButton* Button(UWidgetBlueprint* BP, const FName Name, const TCHAR* Label)
+    static UButton* Button(UWidgetBlueprint* BP, const FName Name, const TCHAR* Label,
+        const bool bUseGenericClickSound = true)
     {
         UButton* Widget = BP->WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), Name);
         FButtonStyle Style;
@@ -122,6 +125,16 @@ namespace MahjongUIBuilder
         Style.SetHovered(TextureBrush(*FString::Printf(TEXT("%sHovered.T_Btn_%s_Hovered"), *Prefix, *Kind), 0.1458f));
         Style.SetPressed(TextureBrush(*FString::Printf(TEXT("%sPressed.T_Btn_%s_Pressed"), *Prefix, *Kind), 0.1458f));
         Style.SetDisabled(TextureBrush(*FString::Printf(TEXT("%sDisabled.T_Btn_%s_Disabled"), *Prefix, *Kind), 0.1458f));
+        if (bUseGenericClickSound)
+        {
+            if (USoundBase* ClickSoundAsset = LoadObject<USoundBase>(nullptr,
+                TEXT("/Game/UI/Audio/SFX_UI_Click.SFX_UI_Click")))
+            {
+                FSlateSound ClickSound;
+                ClickSound.SetResourceObject(ClickSoundAsset);
+                Style.SetPressedSound(ClickSound);
+            }
+        }
         Widget->SetStyle(Style);
         MarkVariable(BP, Widget);
         if (Label && Label[0] != TEXT('\0'))
@@ -380,7 +393,7 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
 
     // 手牌和弃牌组件先生成，供主 HUD 动态创建。
     UWidgetBlueprint* Hand = Create(TEXT("Components"), TEXT("WBP_HandTile"), UMobileHandTileWidget::StaticClass());
-    { UCanvasPanel* C = Root(Hand); UButton* B = Button(Hand, TEXT("Btn_Tile"), TEXT("")); Place(C, B, {0,0}, {92,128}); UTextBlock* T = Text(Hand, TEXT("Txt_TileName"), TEXT("一万"), 30); ReplaceButtonContent(Hand, B, T); }
+    { UCanvasPanel* C = Root(Hand); UButton* B = Button(Hand, TEXT("Btn_Tile"), TEXT(""), false); Place(C, B, {0,0}, {92,128}); UTextBlock* T = Text(Hand, TEXT("Txt_TileName"), TEXT("一万"), 30); ReplaceButtonContent(Hand, B, T); }
     Finish(Hand);
 
     UWidgetBlueprint* Discard = Create(TEXT("Components"), TEXT("WBP_DiscardTile"), UMobileDiscardTileWidget::StaticClass());
@@ -403,7 +416,7 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(Discard);
 
     UWidgetBlueprint* Action = Create(TEXT("Components"), TEXT("WBP_ActionButtonPanel"), UMobileActionButtonPanel::StaticClass());
-    { UCanvasPanel* C = Root(Action); UHorizontalBox* H = Horizontal(Action, TEXT("Panel_Actions")); Place(C,H,{0,0},{600,96}); H->AddChildToHorizontalBox(Button(Action,TEXT("Btn_Hu"),TEXT("胡"))); H->AddChildToHorizontalBox(Button(Action,TEXT("Btn_Gang"),TEXT("杠"))); H->AddChildToHorizontalBox(Button(Action,TEXT("Btn_Peng"),TEXT("碰"))); H->AddChildToHorizontalBox(Button(Action,TEXT("Btn_Pass"),TEXT("过"))); }
+    { UCanvasPanel* C = Root(Action); UHorizontalBox* H = Horizontal(Action, TEXT("Panel_Actions")); Place(C,H,{0,0},{600,96}); H->AddChildToHorizontalBox(Button(Action,TEXT("Btn_Hu"),TEXT("胡"),false)); H->AddChildToHorizontalBox(Button(Action,TEXT("Btn_Gang"),TEXT("杠"),false)); H->AddChildToHorizontalBox(Button(Action,TEXT("Btn_Peng"),TEXT("碰"),false)); H->AddChildToHorizontalBox(Button(Action,TEXT("Btn_Pass"),TEXT("过"),false)); }
     Finish(Action);
 
     UWidgetBlueprint* RuleConfig = Create(TEXT("Components"), TEXT("WBP_RuleConfig"), UMobileRuleConfigWidget::StaticClass());
@@ -463,11 +476,16 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
         UCanvasPanel* C = Root(HUD);
         Place(C, Text(HUD, TEXT("Txt_RoomId"), TEXT("房间：100001"), 20), {30,24}, {360,36});
         Place(C, Text(HUD, TEXT("Txt_CurrentPhase"), TEXT("阶段：玩家回合"), 20), {30,62}, {420,36});
-        Place(C, Text(HUD, TEXT("Txt_RemainingTileCount"), TEXT("剩余：83"), 26), {790,26}, {250,44});
-        Place(C, Text(HUD, TEXT("Txt_CurrentTurnPlayer"), TEXT("当前：玩家"), 20), {790,72}, {360,36});
-        Place(C, Text(HUD, TEXT("Txt_Countdown"), TEXT("15"), 36), {1510,26}, {120,52});
-        Place(C, Text(HUD, TEXT("Txt_FlippedJiTile"), TEXT("翻鸡：尚未翻牌"), 20), {1240,82}, {500,36});
-        Place(C, Text(HUD, TEXT("Txt_JiEvents"), TEXT("特殊鸡事件：无"), 18), {1240,120}, {620,82});
+        Place(C, Text(HUD, TEXT("Txt_RemainingTileCount"), TEXT("剩余：83"), 26), {820,20}, {250,44});
+        Place(C, Text(HUD, TEXT("Txt_CurrentTurnPlayer"), TEXT("当前：玩家"), 20), {790,62}, {360,36});
+        Place(C, Text(HUD, TEXT("Txt_Countdown"), TEXT("15"), 36), {1125,20}, {120,52});
+        Place(C, Text(HUD, TEXT("Txt_FlippedJiTile"), TEXT("翻鸡：尚未翻牌"), 20), {1300,35}, {500,36});
+        Place(C, Text(HUD, TEXT("Txt_JiEvents"), TEXT("特殊鸡事件：无"), 18), {1300,72}, {570,72});
+
+        // 参考传统桌面麻将布局：三家暗手沿桌边排列，只显示公开数量，不泄露牌面。
+        Place(C, Horizontal(HUD, TEXT("Panel_TopHandTiles")), {745,112}, {430,66});
+        Place(C, Vertical(HUD, TEXT("Panel_LeftHandTiles")), {205,315}, {58,360});
+        Place(C, Vertical(HUD, TEXT("Panel_RightHandTiles")), {1660,315}, {58,360});
 
         UWrapBox* SelfDiscards = Wrap(HUD, TEXT("Panel_SelfDiscards"));
         UWrapBox* TopDiscards = Wrap(HUD, TEXT("Panel_TopDiscards"));
@@ -477,25 +495,44 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
         {
             Panel->SetInnerSlotPadding(FVector2D(6.0f, 6.0f));
         }
-        Place(C, SelfDiscards, {650,590}, {620,150});
-        Place(C, TopDiscards, {650,235}, {620,150});
-        Place(C, LeftDiscards, {260,315}, {300,300});
-        Place(C, RightDiscards, {1360,315}, {300,300});
+        Place(C, SelfDiscards, {720,620}, {480,150});
+        Place(C, TopDiscards, {720,250}, {480,150});
+        Place(C, LeftDiscards, {445,385}, {300,250});
+        Place(C, RightDiscards, {1180,385}, {300,250});
 
-        Place(C, Vertical(HUD, TEXT("Panel_SelfMelds")), {330,735}, {300,130});
-        Place(C, Vertical(HUD, TEXT("Panel_TopMelds")), {330,145}, {300,130});
-        Place(C, Vertical(HUD, TEXT("Panel_LeftMelds")), {30,555}, {300,180});
-        Place(C, Vertical(HUD, TEXT("Panel_RightMelds")), {1590,555}, {300,180});
-        Place(C, Text(HUD, TEXT("Seat_Self"), TEXT("我\n13张\n0分"), 20), {60,810}, {240,96});
-        Place(C, Text(HUD, TEXT("Seat_Top"), TEXT("玩家\n13张\n0分"), 20), {825,125}, {270,96});
-        Place(C, Text(HUD, TEXT("Seat_Left"), TEXT("玩家\n13张\n0分"), 20), {40,365}, {210,96});
-        Place(C, Text(HUD, TEXT("Seat_Right"), TEXT("玩家\n13张\n0分"), 20), {1665,365}, {210,96});
-        Place(C, Horizontal(HUD, TEXT("Panel_SelfHandTiles")), {260,890}, {1400,150});
+        Place(C, Vertical(HUD, TEXT("Panel_SelfMelds")), {400,755}, {300,130});
+        Place(C, Vertical(HUD, TEXT("Panel_TopMelds")), {440,155}, {300,130});
+        Place(C, Vertical(HUD, TEXT("Panel_LeftMelds")), {275,600}, {260,150});
+        Place(C, Vertical(HUD, TEXT("Panel_RightMelds")), {1385,600}, {260,150});
+        // 玩家头像贴近四边，信息放在头像相邻区域，形成清晰的四人座次关系。
+        auto AddSeatAvatar = [HUD, C](const FName Name, const FVector2D Position)
+        {
+            UImage* Avatar = Image(HUD, Name, FLinearColor::White);
+            Avatar->SetBrush(TextureBrush(TEXT("/Game/UI/Textures/Avatars/T_Seat_Ready.T_Seat_Ready")));
+            Place(C, Avatar, Position, {88,88});
+        };
+        AddSeatAvatar(TEXT("Img_Seat_Self"), {40,790});
+        AddSeatAvatar(TEXT("Img_Seat_Top"), {1495,105});
+        AddSeatAvatar(TEXT("Img_Seat_Left"), {30,190});
+        AddSeatAvatar(TEXT("Img_Seat_Right"), {1795,190});
+        Place(C, Text(HUD, TEXT("Seat_Self"), TEXT("我\n13张\n0分"), 20), {138,795}, {190,96});
+        Place(C, Text(HUD, TEXT("Seat_Top"), TEXT("玩家\n13张\n0分"), 20), {1595,110}, {260,96});
+        Place(C, Text(HUD, TEXT("Seat_Left"), TEXT("玩家\n13张\n0分"), 20), {30,285}, {180,96});
+        Place(C, Text(HUD, TEXT("Seat_Right"), TEXT("玩家\n13张\n0分"), 20), {1710,285}, {180,96});
+
+        UBorder* TableCenter = Border(HUD, TEXT("Panel_TableCenter"), FLinearColor(0.025f, 0.13f, 0.11f, 0.96f));
+        TableCenter->SetPadding(FMargin(12.0f));
+        UTextBlock* TableCenterText = Text(HUD, TEXT("Txt_TableCenter"), TEXT("第 2 局\n等待碰杠胡"), 22);
+        TableCenterText->SetJustification(ETextJustify::Center);
+        TableCenter->AddChild(TableCenterText);
+        Place(C, TableCenter, {830,430}, {260,150});
+
+        Place(C, Horizontal(HUD, TEXT("Panel_SelfHandTiles")), {210,890}, {1500,150});
 
         UClass* ActionClass = Action->GeneratedClass;
         UWidget* ActionWidget = HUD->WidgetTree->ConstructWidget<UWidget>(ActionClass, TEXT("ActionButtonPanel"));
         MarkVariable(HUD, ActionWidget);
-        Place(C, ActionWidget, {660,780}, {600,96});
+        Place(C, ActionWidget, {660,785}, {600,96});
         UOverlay* Popup = HUD->WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("PopupLayer"));
         MarkVariable(HUD, Popup);
         UCanvasPanelSlot* PopupSlot = Place(C, Popup, {0,0}, {0,0}, FAnchors(0,0,1,1));

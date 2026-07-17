@@ -8,10 +8,14 @@
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "Game/GuiyangMahjongPlayerState.h"
 #include "Components/HorizontalBox.h"
+#include "Components/HorizontalBoxSlot.h"
+#include "Components/Image.h"
 #include "Components/Overlay.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Components/VerticalBoxSlot.h"
 #include "Components/WrapBox.h"
+#include "Engine/Texture2D.h"
 #include "GuiyangMahjong.h"
 
 namespace
@@ -119,6 +123,7 @@ void UMobileMahjongHUDWidget::RefreshTableState(const FMahjongPublicTableState& 
             TEXT("%s%s\n手牌 %d\n%d 分 · %s"), *TurnMark, *Seat.PlayerName,
             Seat.HandTileCount, Seat.Score, *OnlineText)));
     }
+    RefreshOpponentHands(LocalSeat);
     RefreshDiscards(LocalSeat);
     RefreshMelds(LocalSeat);
     RefreshJiDisplay();
@@ -209,17 +214,82 @@ void UMobileMahjongHUDWidget::RebuildPrivateHand()
     }
     const bool bCanPlay = CachedPublicState.Phase == EMahjongTablePhase::PlayerTurn
         && CachedPublicState.CurrentTurnSeat == CachedPrivateState.SeatIndex;
-    for (const FMahjongTile& Tile : CachedPrivateState.Hand.Tiles)
+    for (int32 TileIndex = 0; TileIndex < CachedPrivateState.Hand.Tiles.Num(); ++TileIndex)
     {
+        const FMahjongTile& Tile = CachedPrivateState.Hand.Tiles[TileIndex];
         if (UMobileHandTileWidget* TileWidget = CreateWidget<UMobileHandTileWidget>(GetOwningPlayer(), TileWidgetClass))
         {
             TileWidget->SetTile(Tile, bCanPlay);
             TileWidget->OnTileSelected.AddUniqueDynamic(this, &ThisClass::HandleTileSelected);
-            Panel_SelfHandTiles->AddChildToHorizontalBox(TileWidget);
+            if (UHorizontalBoxSlot* HandSlot = Panel_SelfHandTiles->AddChildToHorizontalBox(TileWidget))
+            {
+                // 十四张时将最后一张视作摸牌区，参照桌面麻将常见布局留出可辨识间隔。
+                if (CachedPrivateState.Hand.Tiles.Num() == 14 && TileIndex == 13)
+                {
+                    HandSlot->SetPadding(FMargin(20.0f, 0.0f, 0.0f, 0.0f));
+                }
+            }
         }
     }
     UE_LOG(LogMahjongUI, Log, TEXT("私有手牌 UI 刷新：%d 张，可出牌=%s"),
         CachedPrivateState.Hand.Tiles.Num(), bCanPlay ? TEXT("是") : TEXT("否"));
+}
+
+void UMobileMahjongHUDWidget::RefreshOpponentHands(const int32 LocalSeat)
+{
+    Panel_TopHandTiles->ClearChildren();
+    Panel_LeftHandTiles->ClearChildren();
+    Panel_RightHandTiles->ClearChildren();
+
+    UTexture2D* BackTexture = LoadObject<UTexture2D>(nullptr,
+        TEXT("/Game/UI/Textures/Tiles/T_Tile_Back.T_Tile_Back"));
+    if (!BackTexture)
+    {
+        UE_LOG(LogMahjongUI, Warning, TEXT("未找到对手牌背纹理，跳过暗手展示"));
+        return;
+    }
+
+    int32 HandCounts[4] = {};
+    for (const FMahjongSeatInfo& Seat : CachedPublicState.Seats)
+    {
+        const int32 RelativeSeat = GetRelativeSeatIndex(Seat.SeatIndex, LocalSeat);
+        if (RelativeSeat != INDEX_NONE)
+        {
+            HandCounts[RelativeSeat] = FMath::Clamp(Seat.HandTileCount, 0, 14);
+        }
+    }
+
+    FSlateBrush BackBrush;
+    BackBrush.SetResourceObject(BackTexture);
+    BackBrush.ImageSize = FVector2D(BackTexture->GetSizeX(), BackTexture->GetSizeY());
+    BackBrush.DrawAs = ESlateBrushDrawType::Image;
+
+    for (int32 Index = 0; Index < HandCounts[2]; ++Index)
+    {
+        UImage* TileBack = NewObject<UImage>(this);
+        TileBack->SetBrush(BackBrush);
+        TileBack->SetDesiredSizeOverride(FVector2D(44.0f, 60.0f));
+        if (UHorizontalBoxSlot* HandSlot = Panel_TopHandTiles->AddChildToHorizontalBox(TileBack))
+        {
+            HandSlot->SetPadding(FMargin(0.0f, 0.0f, -14.0f, 0.0f));
+        }
+    }
+
+    auto FillVerticalHand = [this, &BackBrush](UVerticalBox* Panel, const int32 Count)
+    {
+        for (int32 Index = 0; Index < Count; ++Index)
+        {
+            UImage* TileBack = NewObject<UImage>(this);
+            TileBack->SetBrush(BackBrush);
+            TileBack->SetDesiredSizeOverride(FVector2D(44.0f, 60.0f));
+            if (UVerticalBoxSlot* HandSlot = Panel->AddChildToVerticalBox(TileBack))
+            {
+                HandSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, -34.0f));
+            }
+        }
+    };
+    FillVerticalHand(Panel_RightHandTiles, HandCounts[1]);
+    FillVerticalHand(Panel_LeftHandTiles, HandCounts[3]);
 }
 
 void UMobileMahjongHUDWidget::RefreshDiscards(const int32 LocalSeat)

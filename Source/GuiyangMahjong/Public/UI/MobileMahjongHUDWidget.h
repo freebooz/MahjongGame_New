@@ -28,6 +28,9 @@ protected:
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_FlippedJiTile;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_JiEvents;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UHorizontalBox> Panel_SelfHandTiles;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UHorizontalBox> Panel_TopHandTiles;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UVerticalBox> Panel_LeftHandTiles;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UVerticalBox> Panel_RightHandTiles;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UWrapBox> Panel_SelfDiscards;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UWrapBox> Panel_TopDiscards;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UWrapBox> Panel_LeftDiscards;
@@ -68,6 +71,7 @@ public:
 private:
     int32 ResolveLocalSeat() const;
     void RebuildPrivateHand();
+    void RefreshOpponentHands(int32 LocalSeat);
     void RefreshDiscards(int32 LocalSeat);
     void RefreshMelds(int32 LocalSeat);
     void RefreshJiDisplay();

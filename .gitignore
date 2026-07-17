@@ -17,6 +17,7 @@ Saved/
 # 本机打包和临时导出
 Build/Receipts/
 Build/Windows/FileOpenOrder/
+Build/Android/src/
 *.log
 *.tmp
 *.bak

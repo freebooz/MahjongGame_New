@@ -1,5 +1,6 @@
 #include "UI/MobileHandTileWidget.h"
 #include "UI/MahjongTileVisualLibrary.h"
+#include "UI/MahjongUISoundLibrary.h"
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
@@ -53,6 +54,7 @@ void UMobileHandTileWidget::HandleTileClicked()
 {
     if (!bSelected)
     {
+        UMahjongUISoundLibrary::PlayUISound(this, EMahjongUISound::TileSelect);
         SetSelected(true);
         OnTileSelected.Broadcast(this);
         UE_LOG(LogMahjongUI, Log, TEXT("选中手牌：%s"), *TileData.ToDebugString());
@@ -60,6 +62,7 @@ void UMobileHandTileWidget::HandleTileClicked()
     }
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
     {
+        UMahjongUISoundLibrary::PlayUISound(this, EMahjongUISound::TilePlay);
         PC->RequestTableAction(EMahjongActionType::Play, TileData.UniqueId);
     }
 }
