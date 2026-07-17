@@ -19,6 +19,7 @@
 #include "UI/MobileReconnectOverlayWidget.h"
 #include "Network/GuiyangReconnectSubsystem.h"
 #include "UI/MobileRuleSummaryWidget.h"
+#include "UI/MahjongTileVisualLibrary.h"
 #include "UObject/UnrealType.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -152,6 +153,26 @@ bool FMahjongHudSeatMappingTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("非法座位不会访问 UI 数组"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(INDEX_NONE, 2), INDEX_NONE);
     TestEqual(TEXT("牌局阶段显示中文"), UMobileMahjongHUDWidget::GetPhaseDisplayText(
         EMahjongTablePhase::WaitingForAction), FString(TEXT("等待碰杠胡")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongTileVisualMappingTest, "GuiyangMahjong.UI.TileVisualMapping", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongTileVisualMappingTest::RunTest(const FString& Parameters)
+{
+    FMahjongTile Tile;
+    Tile.Type = EMahjongTileType::Number;
+    Tile.Rank = 1;
+    Tile.UniqueId = 1;
+
+    Tile.Suit = EMahjongSuit::Characters;
+    TestTrue(TEXT("一万映射到万牌资源"), UMahjongTileVisualLibrary::GetFaceTexturePath(Tile).Contains(TEXT("T_Tile_Wan_01")));
+    Tile.Suit = EMahjongSuit::Bamboo;
+    TestTrue(TEXT("一条映射到条牌资源"), UMahjongTileVisualLibrary::GetFaceTexturePath(Tile).Contains(TEXT("T_Tile_Tiao_01")));
+    Tile.Suit = EMahjongSuit::Dots;
+    TestTrue(TEXT("一筒映射到筒牌资源"), UMahjongTileVisualLibrary::GetFaceTexturePath(Tile).Contains(TEXT("T_Tile_Tong_01")));
+
+    Tile.Type = EMahjongTileType::East;
+    TestTrue(TEXT("未提供独立牌面的字牌回退为文字"), UMahjongTileVisualLibrary::GetFaceTexturePath(Tile).IsEmpty());
     return true;
 }
 

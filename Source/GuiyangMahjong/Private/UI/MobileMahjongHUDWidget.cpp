@@ -236,7 +236,6 @@ void UMobileMahjongHUDWidget::RefreshDiscards(const int32 LocalSeat)
     {
         if (!Record.bClaimed) LatestSequence = FMath::Max(LatestSequence, Record.Sequence);
     }
-    const float Rotations[] = {0.0f, 90.0f, 180.0f, -90.0f};
     for (const FMahjongDiscardRecord& Record : CachedPublicState.Discards)
     {
         if (Record.bClaimed) continue;
@@ -244,7 +243,7 @@ void UMobileMahjongHUDWidget::RefreshDiscards(const int32 LocalSeat)
         if (RelativeSeat == INDEX_NONE) continue;
         if (UMobileDiscardTileWidget* TileWidget = CreateWidget<UMobileDiscardTileWidget>(GetOwningPlayer(), DiscardClass))
         {
-            TileWidget->SetDiscard(Record.Tile, Record.Sequence == LatestSequence, Rotations[RelativeSeat]);
+            TileWidget->SetDiscard(Record.Tile, Record.Sequence == LatestSequence);
             DiscardPanels[RelativeSeat]->AddChildToWrapBox(TileWidget);
         }
     }
@@ -259,7 +258,6 @@ void UMobileMahjongHUDWidget::RefreshMelds(const int32 LocalSeat)
         TEXT("/Game/UI/Components/WBP_DiscardTile.WBP_DiscardTile_C"));
     if (!TileClass) return;
 
-    const float Rotations[] = {0.0f, 90.0f, 180.0f, -90.0f};
     for (const FMahjongMeld& Meld : CachedPublicState.PublicMelds)
     {
         const int32 RelativeSeat = GetRelativeSeatIndex(Meld.OwnerSeat, LocalSeat);
@@ -272,7 +270,7 @@ void UMobileMahjongHUDWidget::RefreshMelds(const int32 LocalSeat)
         {
             if (UMobileDiscardTileWidget* TileWidget = CreateWidget<UMobileDiscardTileWidget>(GetOwningPlayer(), TileClass))
             {
-                TileWidget->SetDiscard(Tile, false, Rotations[RelativeSeat]);
+                TileWidget->SetDiscard(Tile, false);
                 Row->AddChildToHorizontalBox(TileWidget);
             }
         }

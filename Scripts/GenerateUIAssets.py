@@ -291,7 +291,8 @@ def generate_tiles() -> list[str]:
     with (DATA_DIR / "DT_TileTextureRegistry.csv").open("w", newline="", encoding="utf-8-sig") as handle:
         writer = csv.writer(handle); writer.writerow(["RuleIndex", "Suit", "Rank", "TextureName"])
         for rule_index in range(27):
-            suit = ("Wan", "Tong", "Tiao")[rule_index // 9]; rank = rule_index % 9 + 1
+            # 规则层顺序为万、条、筒；视觉注册表必须与 FMahjongTile::GetRuleIndex 保持一致。
+            suit = ("Wan", "Tiao", "Tong")[rule_index // 9]; rank = rule_index % 9 + 1
             writer.writerow([rule_index, suit, rank, f"T_Tile_{suit}_{rank:02d}"])
     return names
 

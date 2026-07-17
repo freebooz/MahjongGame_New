@@ -21,26 +21,44 @@ function Get-ImageMetrics {
         $nonBlack = 0
         $luminanceSum = 0.0
         $step = [Math]::Max(1, [Math]::Floor([Math]::Min($bitmap.Width, $bitmap.Height) / 90))
+        $edgeBandX = [Math]::Max($step, [Math]::Floor($bitmap.Width * 0.04))
+        $edgeBandY = [Math]::Max($step, [Math]::Floor($bitmap.Height * 0.04))
+        $edgeSamples = [ordered]@{ Left = 0; Right = 0; Top = 0; Bottom = 0 }
+        $edgeNonBlack = [ordered]@{ Left = 0; Right = 0; Top = 0; Bottom = 0 }
         for ($y = 0; $y -lt $bitmap.Height; $y += $step) {
             for ($x = 0; $x -lt $bitmap.Width; $x += $step) {
                 $pixel = $bitmap.GetPixel($x, $y)
                 $luminance = 0.2126 * $pixel.R + 0.7152 * $pixel.G + 0.0722 * $pixel.B
-                if ($pixel.R -gt 5 -or $pixel.G -gt 5 -or $pixel.B -gt 5) { $nonBlack++ }
+                $isNonBlack = $pixel.R -gt 5 -or $pixel.G -gt 5 -or $pixel.B -gt 5
+                if ($isNonBlack) { $nonBlack++ }
+                if ($x -lt $edgeBandX) { $edgeSamples.Left++; if ($isNonBlack) { $edgeNonBlack.Left++ } }
+                if ($x -ge $bitmap.Width - $edgeBandX) { $edgeSamples.Right++; if ($isNonBlack) { $edgeNonBlack.Right++ } }
+                if ($y -lt $edgeBandY) { $edgeSamples.Top++; if ($isNonBlack) { $edgeNonBlack.Top++ } }
+                if ($y -ge $bitmap.Height - $edgeBandY) { $edgeSamples.Bottom++; if ($isNonBlack) { $edgeNonBlack.Bottom++ } }
                 $luminanceSum += $luminance
                 $samples++
             }
         }
         $nonBlackRatio = if ($samples -gt 0) { $nonBlack / $samples } else { 0.0 }
         $averageLuminance = if ($samples -gt 0) { $luminanceSum / $samples } else { 0.0 }
+        $edgeRatios = [ordered]@{}
+        foreach ($edge in @('Left', 'Right', 'Top', 'Bottom')) {
+            $edgeRatios[$edge] = if ($edgeSamples[$edge] -gt 0) {
+                [Math]::Round($edgeNonBlack[$edge] / $edgeSamples[$edge], 4)
+            } else { 0.0 }
+        }
+        $minimumEdgeRatio = ($edgeRatios.Values | Measure-Object -Minimum).Minimum
         [pscustomobject]@{
             Width = $bitmap.Width
             Height = $bitmap.Height
             DimensionsMatch = $bitmap.Width -eq $ExpectedWidth -and $bitmap.Height -eq $ExpectedHeight
             NonBlackRatio = [Math]::Round($nonBlackRatio, 4)
             AverageLuminance = [Math]::Round($averageLuminance, 2)
+            EdgeNonBlackRatio = $edgeRatios
+            MinimumEdgeNonBlackRatio = $minimumEdgeRatio
             FileBytes = (Get-Item -LiteralPath $Path).Length
             Passed = ($bitmap.Width -eq $ExpectedWidth -and $bitmap.Height -eq $ExpectedHeight -and
-                $nonBlackRatio -ge 0.15 -and $averageLuminance -ge 8.0)
+                $nonBlackRatio -ge 0.15 -and $averageLuminance -ge 8.0 -and $minimumEdgeRatio -ge 0.10)
         }
     }
     finally {
@@ -109,6 +127,8 @@ foreach ($resolution in $Resolutions) {
             DimensionsMatch = $metrics.DimensionsMatch
             NonBlackRatio = $metrics.NonBlackRatio
             AverageLuminance = $metrics.AverageLuminance
+            EdgeNonBlackRatio = $metrics.EdgeNonBlackRatio
+            MinimumEdgeNonBlackRatio = $metrics.MinimumEdgeNonBlackRatio
             FileBytes = $metrics.FileBytes
             Passed = $metrics.Passed
         })

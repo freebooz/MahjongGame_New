@@ -384,7 +384,22 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(Hand);
 
     UWidgetBlueprint* Discard = Create(TEXT("Components"), TEXT("WBP_DiscardTile"), UMobileDiscardTileWidget::StaticClass());
-    { UCanvasPanel* C = Root(Discard); UBorder* B = Border(Discard, TEXT("Border_Tile"), WarmWhite); Place(C, B, {0,0}, {64,88}); UTextBlock* T = Text(Discard, TEXT("Txt_TileName"), TEXT("一万"), 22); T->SetColorAndOpacity(FSlateColor(FLinearColor::Black)); B->AddChild(T); }
+    {
+        UCanvasPanel* C = Root(Discard);
+        UBorder* B = Border(Discard, TEXT("Border_Tile"), WarmWhite);
+        FSlateBrush TileBrush = TextureBrush(TEXT("/Game/UI/Textures/Tiles/T_Tile_Wan_01.T_Tile_Wan_01"));
+        TileBrush.TintColor = FSlateColor(WarmWhite);
+        B->SetBrush(TileBrush);
+        B->SetPadding(FMargin(4.0f));
+        B->SetHorizontalAlignment(HAlign_Fill);
+        B->SetVerticalAlignment(VAlign_Center);
+        Place(C, B, {0,0}, {64,88});
+        UTextBlock* T = Text(Discard, TEXT("Txt_TileName"), TEXT("一万"), 22);
+        T->SetColorAndOpacity(FSlateColor(FLinearColor::Black));
+        T->SetJustification(ETextJustify::Center);
+        T->SetVisibility(ESlateVisibility::Collapsed);
+        B->AddChild(T);
+    }
     Finish(Discard);
 
     UWidgetBlueprint* Action = Create(TEXT("Components"), TEXT("WBP_ActionButtonPanel"), UMobileActionButtonPanel::StaticClass());
@@ -444,7 +459,48 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(Reconnect);
 
     UWidgetBlueprint* HUD = Create(TEXT("Screens"), TEXT("WBP_GameHUD"), UMobileMahjongHUDWidget::StaticClass());
-    { UCanvasPanel* C=Root(HUD); Place(C,Text(HUD,TEXT("Txt_RoomId"),TEXT("房间：100001"),22),{30,24},{320,40}); Place(C,Text(HUD,TEXT("Txt_RemainingTileCount"),TEXT("剩余：83"),28),{760,30},{280,45}); Place(C,Text(HUD,TEXT("Txt_CurrentPhase"),TEXT("阶段：玩家回合"),22),{30,70},{360,40}); Place(C,Text(HUD,TEXT("Txt_CurrentTurnPlayer"),TEXT("当前：玩家"),22),{760,80},{360,40}); Place(C,Text(HUD,TEXT("Txt_Countdown"),TEXT("15"),38),{1480,35},{120,60}); Place(C,Text(HUD,TEXT("Txt_FlippedJiTile"),TEXT("翻鸡：尚未翻牌"),22),{1240,105},{430,40}); Place(C,Text(HUD,TEXT("Txt_JiEvents"),TEXT("特殊鸡事件：无"),20),{1240,150},{600,110}); Place(C,Wrap(HUD,TEXT("Panel_SelfDiscards")),{620,620},{680,150}); Place(C,Wrap(HUD,TEXT("Panel_TopDiscards")),{620,250},{680,150}); Place(C,Wrap(HUD,TEXT("Panel_LeftDiscards")),{260,330},{280,350}); Place(C,Wrap(HUD,TEXT("Panel_RightDiscards")),{1380,330},{280,350}); Place(C,Vertical(HUD,TEXT("Panel_SelfMelds")),{330,720},{300,130}); Place(C,Vertical(HUD,TEXT("Panel_TopMelds")),{330,150},{300,130}); Place(C,Vertical(HUD,TEXT("Panel_LeftMelds")),{30,520},{300,180}); Place(C,Vertical(HUD,TEXT("Panel_RightMelds")),{1590,520},{300,180}); Place(C,Text(HUD,TEXT("Seat_Self"),TEXT("我\n13张\n0分"),22),{70,820},{250,100}); Place(C,Text(HUD,TEXT("Seat_Top"),TEXT("玩家\n13张\n0分"),22),{830,130},{250,100}); Place(C,Text(HUD,TEXT("Seat_Left"),TEXT("玩家\n13张\n0分"),22),{40,370},{250,100}); Place(C,Text(HUD,TEXT("Seat_Right"),TEXT("玩家\n13张\n0分"),22),{1630,370},{250,100}); Place(C,Horizontal(HUD,TEXT("Panel_SelfHandTiles")),{260,890},{1400,150}); UClass* ActionClass=Action->GeneratedClass; UWidget* ActionWidget=HUD->WidgetTree->ConstructWidget<UWidget>(ActionClass,TEXT("ActionButtonPanel")); MarkVariable(HUD,ActionWidget); Place(C,ActionWidget,{660,780},{600,96}); UOverlay* Popup=HUD->WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(),TEXT("PopupLayer")); MarkVariable(HUD,Popup); UCanvasPanelSlot* PopupSlot=Place(C,Popup,{0,0},{0,0},FAnchors(0,0,1,1)); PopupSlot->SetOffsets(FMargin(0)); }
+    {
+        UCanvasPanel* C = Root(HUD);
+        Place(C, Text(HUD, TEXT("Txt_RoomId"), TEXT("房间：100001"), 20), {30,24}, {360,36});
+        Place(C, Text(HUD, TEXT("Txt_CurrentPhase"), TEXT("阶段：玩家回合"), 20), {30,62}, {420,36});
+        Place(C, Text(HUD, TEXT("Txt_RemainingTileCount"), TEXT("剩余：83"), 26), {790,26}, {250,44});
+        Place(C, Text(HUD, TEXT("Txt_CurrentTurnPlayer"), TEXT("当前：玩家"), 20), {790,72}, {360,36});
+        Place(C, Text(HUD, TEXT("Txt_Countdown"), TEXT("15"), 36), {1510,26}, {120,52});
+        Place(C, Text(HUD, TEXT("Txt_FlippedJiTile"), TEXT("翻鸡：尚未翻牌"), 20), {1240,82}, {500,36});
+        Place(C, Text(HUD, TEXT("Txt_JiEvents"), TEXT("特殊鸡事件：无"), 18), {1240,120}, {620,82});
+
+        UWrapBox* SelfDiscards = Wrap(HUD, TEXT("Panel_SelfDiscards"));
+        UWrapBox* TopDiscards = Wrap(HUD, TEXT("Panel_TopDiscards"));
+        UWrapBox* LeftDiscards = Wrap(HUD, TEXT("Panel_LeftDiscards"));
+        UWrapBox* RightDiscards = Wrap(HUD, TEXT("Panel_RightDiscards"));
+        for (UWrapBox* Panel : {SelfDiscards, TopDiscards, LeftDiscards, RightDiscards})
+        {
+            Panel->SetInnerSlotPadding(FVector2D(6.0f, 6.0f));
+        }
+        Place(C, SelfDiscards, {650,590}, {620,150});
+        Place(C, TopDiscards, {650,235}, {620,150});
+        Place(C, LeftDiscards, {260,315}, {300,300});
+        Place(C, RightDiscards, {1360,315}, {300,300});
+
+        Place(C, Vertical(HUD, TEXT("Panel_SelfMelds")), {330,735}, {300,130});
+        Place(C, Vertical(HUD, TEXT("Panel_TopMelds")), {330,145}, {300,130});
+        Place(C, Vertical(HUD, TEXT("Panel_LeftMelds")), {30,555}, {300,180});
+        Place(C, Vertical(HUD, TEXT("Panel_RightMelds")), {1590,555}, {300,180});
+        Place(C, Text(HUD, TEXT("Seat_Self"), TEXT("我\n13张\n0分"), 20), {60,810}, {240,96});
+        Place(C, Text(HUD, TEXT("Seat_Top"), TEXT("玩家\n13张\n0分"), 20), {825,125}, {270,96});
+        Place(C, Text(HUD, TEXT("Seat_Left"), TEXT("玩家\n13张\n0分"), 20), {40,365}, {210,96});
+        Place(C, Text(HUD, TEXT("Seat_Right"), TEXT("玩家\n13张\n0分"), 20), {1665,365}, {210,96});
+        Place(C, Horizontal(HUD, TEXT("Panel_SelfHandTiles")), {260,890}, {1400,150});
+
+        UClass* ActionClass = Action->GeneratedClass;
+        UWidget* ActionWidget = HUD->WidgetTree->ConstructWidget<UWidget>(ActionClass, TEXT("ActionButtonPanel"));
+        MarkVariable(HUD, ActionWidget);
+        Place(C, ActionWidget, {660,780}, {600,96});
+        UOverlay* Popup = HUD->WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("PopupLayer"));
+        MarkVariable(HUD, Popup);
+        UCanvasPanelSlot* PopupSlot = Place(C, Popup, {0,0}, {0,0}, FAnchors(0,0,1,1));
+        PopupSlot->SetOffsets(FMargin(0));
+    }
     Finish(HUD);
 
     UE_LOG(LogTemp, Display, TEXT("P0 UMG 生成结束：成功=%d/17"), Created);
