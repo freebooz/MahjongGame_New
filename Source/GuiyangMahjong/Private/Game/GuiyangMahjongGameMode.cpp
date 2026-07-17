@@ -3,11 +3,14 @@
 #include "Game/GuiyangMahjongGameState.h"
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "Game/GuiyangMahjongPlayerState.h"
+#include "GuiyangMahjong.h"
 #include "Room/GuiyangRoomManager.h"
 #include "Table/MahjongTableEngine.h"
 #include "HAL/PlatformTime.h"
 #include "EngineUtils.h"
 #include "Misc/SecureHash.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 AGuiyangMahjongGameMode::AGuiyangMahjongGameMode()
 {
@@ -246,6 +249,12 @@ void AGuiyangMahjongGameMode::TryStartTable(const FMahjongRoomState& StartingRoo
     ArmedTimeoutPhase = EMahjongTablePhase::WaitingForPlayers;
     PublishRoomState(PlayingState);
     PublishTableSnapshots();
+    if (FParse::Param(FCommandLine::Get(), TEXT("MahjongEnableIntegrationHooks")))
+    {
+        UE_LOG(LogMahjongServer, Display,
+            TEXT("MAHJONG_INTEGRATION_TABLE_STARTED Room=%s Players=%d Round=%d"),
+            *PlayingState.RoomInfo.RoomId, PlayingState.Seats.Num(), TableEngine->GetPublicState().RoundId);
+    }
 }
 
 void AGuiyangMahjongGameMode::HandleNextRound(AGuiyangMahjongPlayerController* Controller)
@@ -411,6 +420,19 @@ void AGuiyangMahjongGameMode::PublishReconnectSnapshot(AGuiyangMahjongPlayerCont
         Actions = TableEngine->GetAvailableActions(Player->SeatIndex);
     }
     Controller->Client_RestoreReconnectSnapshot(Snapshot, Actions);
+    if (FParse::Param(FCommandLine::Get(), TEXT("MahjongEnableIntegrationHooks"))
+        && Player->MahjongPlayerId.StartsWith(TEXT("integration-client-")))
+    {
+        int32 OnlineSeats = 0;
+        for (const FMahjongSeatInfo& Seat : RoomState.Seats)
+        {
+            OnlineSeats += Seat.bOccupied && Seat.bOnline ? 1 : 0;
+        }
+        UE_LOG(LogMahjongReconnect, Display,
+            TEXT("MAHJONG_INTEGRATION_RECONNECT_OK Player=%s Seat=%d Online=%d Hand=%d Round=%d Remaining=%d"),
+            *Player->MahjongPlayerId, Player->SeatIndex, OnlineSeats, Snapshot.PrivateState.Hand.Tiles.Num(),
+            Snapshot.TableState.RoundId, RemainingReconnectSeconds);
+    }
     FMahjongSettlementResult Settlement;
     if (TableEngine && TableEngine->GetSettlementResult(Settlement)) Controller->Client_ShowSettlement(Settlement);
     if (RoomState.Lifecycle == EMahjongRoomLifecycle::Settlement

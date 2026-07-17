@@ -37,6 +37,9 @@ public:
     /** 仅供本地网络层提交给服务器验证；调用方不得记录返回值。 */
     const FString& GetSessionTokenForNetwork() const { return SessionToken; }
 
+    /** 仅供显式启用的非 Shipping 多进程集成测试使用，不写 SaveGame。 */
+    bool LoginForIntegrationTest(const FString& PlayerId, const FString& DisplayName, const FString& InSessionToken);
+
 private:
     static constexpr const TCHAR* SaveSlotName = TEXT("GuiyangLoginSettings");
 

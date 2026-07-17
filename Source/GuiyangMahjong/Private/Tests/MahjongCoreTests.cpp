@@ -16,6 +16,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Network/MahjongNetworkTypes.h"
 #include "UI/MobileMahjongHUDWidget.h"
+#include "UI/MobileReconnectOverlayWidget.h"
+#include "Network/GuiyangReconnectSubsystem.h"
 #include "UI/MobileRuleSummaryWidget.h"
 #include "UObject/UnrealType.h"
 
@@ -150,6 +152,33 @@ bool FMahjongHudSeatMappingTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("非法座位不会访问 UI 数组"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(INDEX_NONE, 2), INDEX_NONE);
     TestEqual(TEXT("牌局阶段显示中文"), UMobileMahjongHUDWidget::GetPhaseDisplayText(
         EMahjongTablePhase::WaitingForAction), FString(TEXT("等待碰杠胡")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongReconnectPresentationTest, "GuiyangMahjong.UI.ReconnectPresentation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongReconnectPresentationTest::RunTest(const FString& Parameters)
+{
+    TestEqual(TEXT("重连时限不得低于服务端下限"),
+        UGuiyangReconnectSubsystem::ClampReconnectTimeoutSeconds(0), 15);
+    TestEqual(TEXT("重连时限不得超过服务端上限"),
+        UGuiyangReconnectSubsystem::ClampReconnectTimeoutSeconds(9999), 600);
+    TestEqual(TEXT("正常重连时限保持不变"),
+        UGuiyangReconnectSubsystem::ClampReconnectTimeoutSeconds(120), 120);
+    TestEqual(TEXT("倒计时不会显示负数"),
+        UMobileReconnectOverlayWidget::FormatRemainingTime(-5), FString(TEXT("剩余 0 秒")));
+    TestEqual(TEXT("倒计时显示中文秒数"),
+        UMobileReconnectOverlayWidget::FormatRemainingTime(12), FString(TEXT("剩余 12 秒")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongIntegrationHookSecurityTest, "GuiyangMahjong.Security.IntegrationHooksDisabledByDefault", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongIntegrationHookSecurityTest::RunTest(const FString& Parameters)
+{
+    UGameInstance* GameInstance = NewObject<UGameInstance>();
+    UGuiyangLoginSubsystem* Login = NewObject<UGuiyangLoginSubsystem>(GameInstance);
+    TestFalse(TEXT("未显式启用命令行开关时不得注入集成会话"), Login->LoginForIntegrationTest(
+        TEXT("integration-client-test"), TEXT("测试玩家"), TEXT("integration-session-token-disabled")));
+    TestFalse(TEXT("被拒绝的集成会话不得变为有效登录"), Login->IsSessionValid());
     return true;
 }
 

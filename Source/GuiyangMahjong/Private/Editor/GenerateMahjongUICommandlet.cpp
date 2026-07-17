@@ -15,6 +15,7 @@
 #include "Components/Overlay.h"
 #include "Components/SafeZone.h"
 #include "Components/ScaleBox.h"
+#include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/WrapBox.h"
@@ -216,26 +217,51 @@ namespace MahjongUIBuilder
             BP->WidgetVariableNameToGuidMap.Reset();
             BP->WidgetTree->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors);
         }
-        BP->WidgetTree = NewObject<UWidgetTree>(BP, TEXT("WidgetTree"), RF_Transactional | RF_ArchetypeObject);
-        USafeZone* Safe = BP->WidgetTree->ConstructWidget<USafeZone>(USafeZone::StaticClass(), TEXT("SafeZone_Root"));
-        UScaleBox* Scale = BP->WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass(), TEXT("Scale_Design1920x1080"));
-        UCanvasPanel* Canvas = BP->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Canvas_Root"));
-        Safe->AddChild(Scale); Scale->AddChild(Canvas);
-        Scale->SetStretch(EStretch::ScaleToFit);
-        Scale->SetStretchDirection(EStretchDirection::Both);
-        BP->WidgetTree->RootWidget = Safe;
-        MarkVariable(BP, Safe); MarkVariable(BP, Scale); MarkVariable(BP, Canvas);
         const FString BPName = BP->GetName();
-        const TCHAR* BackgroundPath = BPName == TEXT("WBP_Lobby") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Lobby_JiaxiuTower.T_BG_Lobby_JiaxiuTower")
+        FVector2D DesignResolution(1920.0f, 1080.0f);
+        if (BPName == TEXT("WBP_HandTile"))
+        {
+            DesignResolution = FVector2D(92.0f, 128.0f);
+        }
+        else if (BPName == TEXT("WBP_DiscardTile"))
+        {
+            DesignResolution = FVector2D(64.0f, 88.0f);
+        }
+        else if (BPName == TEXT("WBP_ActionButtonPanel"))
+        {
+            DesignResolution = FVector2D(600.0f, 96.0f);
+        }
+        else if (BPName == TEXT("WBP_RuleConfig"))
+        {
+            DesignResolution = FVector2D(1400.0f, 640.0f);
+        }
+        else if (BPName == TEXT("WBP_RuleSummary"))
+        {
+            DesignResolution = FVector2D(560.0f, 440.0f);
+        }
+
+        BP->WidgetTree = NewObject<UWidgetTree>(BP, TEXT("WidgetTree"), RF_Transactional | RF_ArchetypeObject);
+        UOverlay* ViewportRoot = BP->WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("Overlay_ViewportRoot"));
+        UScaleBox* BackgroundScale = BP->WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass(), TEXT("Scale_BackgroundFill"));
+        USizeBox* BackgroundSize = BP->WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("Size_BackgroundDesign"));
+        BackgroundScale->SetStretch(EStretch::ScaleToFill);
+        BackgroundScale->SetStretchDirection(EStretchDirection::Both);
+        BackgroundScale->SetClipping(EWidgetClipping::ClipToBounds);
+        BackgroundSize->SetWidthOverride(DesignResolution.X);
+        BackgroundSize->SetHeightOverride(DesignResolution.Y);
+
+        const TCHAR* BackgroundPath = (BPName == TEXT("WBP_Login") || BPName == TEXT("WBP_ConnectServer"))
+            ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Login_Guiyang.T_BG_Login_Guiyang")
+            : BPName == TEXT("WBP_Lobby") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Lobby_JiaxiuTower.T_BG_Lobby_JiaxiuTower")
             : BPName == TEXT("WBP_Room") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Room_GuiyangNight.T_BG_Room_GuiyangNight")
             : BPName == TEXT("WBP_GameHUD") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_GameTable_GreenFelt.T_BG_GameTable_GreenFelt")
             : BPName == TEXT("WBP_Settlement") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Settlement_GuiyangRiver.T_BG_Settlement_GuiyangRiver")
-            : BPName == TEXT("WBP_ConnectServer") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Login_Guiyang.T_BG_Login_Guiyang")
             : nullptr;
         UWidget* Background = nullptr;
         if (BackgroundPath)
         {
-            UImage* BackgroundImage = BP->WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Background_ComponentSlot"));
+            const FName BackgroundName = BPName == TEXT("WBP_Login") ? TEXT("Img_Background") : TEXT("Background_ComponentSlot");
+            UImage* BackgroundImage = BP->WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), BackgroundName);
             BackgroundImage->SetBrush(TextureBrush(BackgroundPath));
             MarkVariable(BP, BackgroundImage);
             Background = BackgroundImage;
@@ -244,8 +270,26 @@ namespace MahjongUIBuilder
         {
             Background = Border(BP, TEXT("Background_ComponentSlot"), DeepGreen);
         }
-        UCanvasPanelSlot* Slot = Place(Canvas, Background, FVector2D::ZeroVector, FVector2D::ZeroVector, FAnchors(0,0,1,1));
-        Slot->SetOffsets(FMargin(0));
+        BackgroundSize->AddChild(Background);
+        BackgroundScale->AddChild(BackgroundSize);
+        ViewportRoot->AddChildToOverlay(BackgroundScale);
+
+        USafeZone* Safe = BP->WidgetTree->ConstructWidget<USafeZone>(USafeZone::StaticClass(), TEXT("SafeZone_Root"));
+        UScaleBox* Scale = BP->WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass(), TEXT("Scale_Design1920x1080"));
+        USizeBox* DesignSize = BP->WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("Size_Design1920x1080"));
+        UCanvasPanel* Canvas = BP->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Canvas_Root"));
+        Safe->AddChild(Scale);
+        Scale->AddChild(DesignSize);
+        DesignSize->AddChild(Canvas);
+        Scale->SetStretch(EStretch::ScaleToFit);
+        Scale->SetStretchDirection(EStretchDirection::Both);
+        DesignSize->SetWidthOverride(DesignResolution.X);
+        DesignSize->SetHeightOverride(DesignResolution.Y);
+        ViewportRoot->AddChildToOverlay(Safe);
+
+        BP->WidgetTree->RootWidget = ViewportRoot;
+        MarkVariable(BP, ViewportRoot); MarkVariable(BP, BackgroundScale); MarkVariable(BP, BackgroundSize);
+        MarkVariable(BP, Safe); MarkVariable(BP, Scale); MarkVariable(BP, DesignSize); MarkVariable(BP, Canvas);
         return Canvas;
     }
 
@@ -352,7 +396,7 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(RuleConfig);
 
     UWidgetBlueprint* RuleSummary = Create(TEXT("Components"), TEXT("WBP_RuleSummary"), UMobileRuleSummaryWidget::StaticClass());
-    { UCanvasPanel* C=Root(RuleSummary); UBorder* B=Border(RuleSummary,TEXT("Panel_RuleSummary9Slice"),PanelGreen); Place(C,B,{30,30},{1860,1020}); UVerticalBox* V=Vertical(RuleSummary,TEXT("Panel_RuleSummaryContent")); B->AddChild(V); V->AddChildToVerticalBox(Text(RuleSummary,TEXT("Txt_RuleTitle"),TEXT("GuiyangMainstreamV1 · 版本 1"),34)); V->AddChildToVerticalBox(Text(RuleSummary,TEXT("Txt_RuleLines"),TEXT("108 张万筒条 · 4 局 · 公开房\n冲锋鸡开 · 责任鸡开 · 乌骨鸡开\n抢杠胡开 · 一炮多响开 · 七对开\n底分 1 · 鸡分 1 · 豆分 1 · 自摸 ×2\n出牌 15 秒 · 操作 8 秒 · 重连 120 秒"),24)); V->AddChildToVerticalBox(Text(RuleSummary,TEXT("Txt_RuleHash"),TEXT("规则哈希：--"),20)); }
+    { UCanvasPanel* C=Root(RuleSummary); UBorder* B=Border(RuleSummary,TEXT("Panel_RuleSummary9Slice"),PanelGreen); Place(C,B,{0,0},{560,440}); UVerticalBox* V=Vertical(RuleSummary,TEXT("Panel_RuleSummaryContent")); B->AddChild(V); V->AddChildToVerticalBox(Text(RuleSummary,TEXT("Txt_RuleTitle"),TEXT("GuiyangMainstreamV1 · 版本 1"),28)); V->AddChildToVerticalBox(Text(RuleSummary,TEXT("Txt_RuleLines"),TEXT("108 张万筒条 · 4 局 · 公开房\n冲锋鸡开 · 责任鸡开 · 乌骨鸡开\n抢杠胡开 · 一炮多响开 · 七对开\n底分 1 · 鸡分 1 · 豆分 1 · 自摸 ×2\n出牌 15 秒 · 操作 8 秒 · 重连 120 秒"),20)); V->AddChildToVerticalBox(Text(RuleSummary,TEXT("Txt_RuleHash"),TEXT("规则哈希：--"),16)); }
     Finish(RuleSummary);
 
     UWidgetBlueprint* Toast = Create(TEXT("Components"), TEXT("WBP_ErrorToast"), UMobileErrorToastWidget::StaticClass());
@@ -360,7 +404,7 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(Toast);
 
     UWidgetBlueprint* Login = Create(TEXT("Screens"), TEXT("WBP_Login"), UMobileLoginWidget::StaticClass());
-    { UCanvasPanel* C=Root(Login); UImage* Bg=Image(Login,TEXT("Img_Background"),FLinearColor(0.02f,0.12f,0.10f,1.0f)); UCanvasPanelSlot* BgSlot=Place(C,Bg,{0,0},{0,0},FAnchors(0,0,1,1)); BgSlot->SetOffsets(FMargin(0)); UImage* Logo=Image(Login,TEXT("Img_GameLogo"),Gold); Place(C,Logo,{0,100},{420,150},FAnchors(0.5f,0),{0.5f,0}); Place(C,Text(Login,TEXT("Txt_LoginStatus"),TEXT("请选择登录方式"),28),{0,300},{700,52},FAnchors(0.5f,0),{0.5f,0}); UCircularThrobber* Loading=Login->WidgetTree->ConstructWidget<UCircularThrobber>(UCircularThrobber::StaticClass(),TEXT("Loading_Login")); MarkVariable(Login,Loading); Loading->SetVisibility(ESlateVisibility::Collapsed); Place(C,Loading,{0,370},{64,64},FAnchors(0.5f,0),{0.5f,0}); Place(C,Button(Login,TEXT("Btn_WechatLogin"),TEXT("微信登录（PC 模拟授权）")),{-230,470},{460,78},FAnchors(0.5f,0)); Place(C,Button(Login,TEXT("Btn_GuestLogin"),TEXT("游客登录")),{-230,570},{460,78},FAnchors(0.5f,0)); UCheckBox* Terms=Login->WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(),TEXT("Chk_AgreeTerms")); MarkVariable(Login,Terms); Place(C,Terms,{-300,680},{44,44},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_AgreeHint"),TEXT("我已阅读并同意"),24),{-245,682},{180,40},FAnchors(0.5f,0)); Place(C,Button(Login,TEXT("Btn_UserAgreement"),TEXT("用户协议")),{-60,672},{170,56},FAnchors(0.5f,0)); Place(C,Button(Login,TEXT("Btn_PrivacyPolicy"),TEXT("隐私政策")),{125,672},{170,56},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_Version"),TEXT("版本 0.2.0 · UE 5.8"),22),{30,-54},{360,36},FAnchors(0,1)); }
+    { UCanvasPanel* C=Root(Login); UImage* Logo=Image(Login,TEXT("Img_GameLogo"),Gold); Logo->SetBrush(TextureBrush(TEXT("/Game/UI/Textures/Icons/Icon_Chicken.Icon_Chicken"))); Place(C,Logo,{-320,72},{140,140},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_GameTitle"),TEXT("贵阳捉鸡麻将"),54),{-150,92},{620,76},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_GameSubtitle"),TEXT("黔韵牌局 · 地道玩法"),22),{-145,166},{520,42},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_LoginStatus"),TEXT("请选择登录方式"),28),{0,282},{700,52},FAnchors(0.5f,0),{0.5f,0}); UCircularThrobber* Loading=Login->WidgetTree->ConstructWidget<UCircularThrobber>(UCircularThrobber::StaticClass(),TEXT("Loading_Login")); MarkVariable(Login,Loading); Loading->SetVisibility(ESlateVisibility::Collapsed); Place(C,Loading,{0,350},{64,64},FAnchors(0.5f,0),{0.5f,0}); Place(C,Button(Login,TEXT("Btn_WechatLogin"),TEXT("微信登录（PC 模拟授权）")),{-230,440},{460,78},FAnchors(0.5f,0)); Place(C,Button(Login,TEXT("Btn_GuestLogin"),TEXT("游客登录")),{-230,540},{460,78},FAnchors(0.5f,0)); UCheckBox* Terms=Login->WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(),TEXT("Chk_AgreeTerms")); MarkVariable(Login,Terms); Place(C,Terms,{-330,654},{44,44},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_AgreeHint"),TEXT("我已阅读并同意"),24),{-275,656},{210,40},FAnchors(0.5f,0)); Place(C,Button(Login,TEXT("Btn_UserAgreement"),TEXT("用户协议")),{-45,646},{170,56},FAnchors(0.5f,0)); Place(C,Button(Login,TEXT("Btn_PrivacyPolicy"),TEXT("隐私政策")),{145,646},{170,56},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_Version"),TEXT("版本 0.2.0 · UE 5.8"),22),{30,-54},{360,36},FAnchors(0,1)); }
     Finish(Login);
 
     UWidgetBlueprint* Confirm = Create(TEXT("Dialogs"), TEXT("WBP_ConfirmDialog"), UMobileConfirmDialogWidget::StaticClass());
@@ -372,7 +416,7 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(CreateRoom);
 
     UWidgetBlueprint* JoinRoom = Create(TEXT("Dialogs"), TEXT("WBP_JoinRoomDialog"), UMobileJoinRoomDialogWidget::StaticClass());
-    { UCanvasPanel* C=Root(JoinRoom); UBorder* Mask=Border(JoinRoom,TEXT("Border_Mask"),FLinearColor(0,0,0,0.65f)); UCanvasPanelSlot* MaskSlot=Place(C,Mask,{0,0},{0,0},FAnchors(0,0,1,1)); MaskSlot->SetOffsets(FMargin(0)); UBorder* Dialog=Border(JoinRoom,TEXT("Border_Dialog9Slice"),PanelGreen); Place(C,Dialog,{0,0},{760,520},FAnchors(0.5f,0.5f),{0.5f,0.5f}); UVerticalBox* V=Vertical(JoinRoom,TEXT("Panel_JoinRoomContent")); Dialog->AddChild(V); V->AddChildToVerticalBox(Text(JoinRoom,TEXT("Txt_Title"),TEXT("加入房间"),42)); V->AddChildToVerticalBox(Edit(JoinRoom,TEXT("Txt_RoomCode"),TEXT("请输入 6 位房间号"))); UEditableTextBox* Password=Edit(JoinRoom,TEXT("Txt_Password"),TEXT("密码房请输入密码")); Password->SetIsPassword(true); V->AddChildToVerticalBox(Password); V->AddChildToVerticalBox(Text(JoinRoom,TEXT("Txt_Status"),TEXT("请输入 6 位房间号"),22)); UHorizontalBox* Buttons=Horizontal(JoinRoom,TEXT("Panel_JoinRoomButtons")); Buttons->AddChildToHorizontalBox(Button(JoinRoom,TEXT("Btn_Join"),TEXT("加入"))); Buttons->AddChildToHorizontalBox(Button(JoinRoom,TEXT("Btn_Cancel"),TEXT("取消"))); V->AddChildToVerticalBox(Buttons); }
+    { UCanvasPanel* C=Root(JoinRoom); UBorder* Mask=Border(JoinRoom,TEXT("Border_Mask"),FLinearColor(0,0,0,0.65f)); UCanvasPanelSlot* MaskSlot=Place(C,Mask,{0,0},{0,0},FAnchors(0,0,1,1)); MaskSlot->SetOffsets(FMargin(0)); UBorder* Dialog=Border(JoinRoom,TEXT("Border_Dialog9Slice"),PanelGreen); Place(C,Dialog,{0,0},{760,520},FAnchors(0.5f,0.5f),{0.5f,0.5f}); UCanvasPanel* D=JoinRoom->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("Panel_JoinRoomContent")); MarkVariable(JoinRoom,D); Dialog->AddChild(D); Place(D,Text(JoinRoom,TEXT("Txt_Title"),TEXT("加入房间"),42),{40,25},{680,64}); Place(D,Edit(JoinRoom,TEXT("Txt_RoomCode"),TEXT("请输入 6 位房间号")),{40,110},{680,64}); UEditableTextBox* Password=Edit(JoinRoom,TEXT("Txt_Password"),TEXT("密码房请输入密码")); Password->SetIsPassword(true); Place(D,Password,{40,195},{680,64}); Place(D,Text(JoinRoom,TEXT("Txt_Status"),TEXT("请输入 6 位房间号"),22),{40,280},{680,48}); Place(D,Button(JoinRoom,TEXT("Btn_Join"),TEXT("加入房间")),{130,370},{230,72}); Place(D,Button(JoinRoom,TEXT("Btn_Cancel"),TEXT("取消")),{400,370},{230,72}); }
     Finish(JoinRoom);
 
     UWidgetBlueprint* RootHUD = Create(TEXT("Screens"), TEXT("WBP_RootHUD"), UMobileRootHUDWidget::StaticClass());
@@ -392,11 +436,11 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(Room);
 
     UWidgetBlueprint* Settlement = Create(TEXT("Dialogs"), TEXT("WBP_Settlement"), UMobileSettlementWidget::StaticClass());
-    { UCanvasPanel* C=Root(Settlement); UBorder* B=Border(Settlement,TEXT("Panel_Dialog9Slice"),PanelGreen); Place(C,B,{0,0},{980,720},FAnchors(0.5f,0.5f),{0.5f,0.5f}); UVerticalBox* V=Vertical(Settlement,TEXT("Panel_SettlementContent")); B->AddChild(V); V->AddChildToVerticalBox(Text(Settlement,TEXT("Txt_ResultTitle"),TEXT("本局结算"),42)); V->AddChildToVerticalBox(Text(Settlement,TEXT("Txt_HuType"),TEXT("自摸"),28)); V->AddChildToVerticalBox(Text(Settlement,TEXT("Txt_JiResult"),TEXT("鸡牌：0 张"),28)); V->AddChildToVerticalBox(Vertical(Settlement,TEXT("Panel_PlayerScores"))); V->AddChildToVerticalBox(Button(Settlement,TEXT("Btn_NextRound"),TEXT("再来一局"))); V->AddChildToVerticalBox(Button(Settlement,TEXT("Btn_BackLobby"),TEXT("返回大厅"))); }
+    { UCanvasPanel* C=Root(Settlement); UBorder* B=Border(Settlement,TEXT("Panel_Dialog9Slice"),PanelGreen); Place(C,B,{0,0},{980,720},FAnchors(0.5f,0.5f),{0.5f,0.5f}); UCanvasPanel* D=Settlement->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("Panel_SettlementContent")); MarkVariable(Settlement,D); B->AddChild(D); Place(D,Text(Settlement,TEXT("Txt_ResultTitle"),TEXT("本局结算"),42),{50,30},{880,64}); Place(D,Text(Settlement,TEXT("Txt_HuType"),TEXT("自摸"),28),{50,105},{880,48}); Place(D,Text(Settlement,TEXT("Txt_JiResult"),TEXT("鸡牌：0 张"),24),{50,160},{880,90}); Place(D,Vertical(Settlement,TEXT("Panel_PlayerScores")),{50,255},{880,250}); Place(D,Button(Settlement,TEXT("Btn_NextRound"),TEXT("再来一局")),{230,555},{240,76}); Place(D,Button(Settlement,TEXT("Btn_BackLobby"),TEXT("返回大厅")),{510,555},{240,76}); }
     Finish(Settlement);
 
     UWidgetBlueprint* Reconnect = Create(TEXT("Dialogs"), TEXT("WBP_ReconnectOverlay"), UMobileReconnectOverlayWidget::StaticClass());
-    { UCanvasPanel* C=Root(Reconnect); UBorder* B=Border(Reconnect,TEXT("Panel_Reconnect9Slice"),FLinearColor(0.01f,0.05f,0.045f,0.94f)); Place(C,B,{0,0},{760,460},FAnchors(0.5f,0.5f),{0.5f,0.5f}); UVerticalBox* V=Vertical(Reconnect,TEXT("Panel_ReconnectContent")); B->AddChild(V); V->AddChildToVerticalBox(Text(Reconnect,TEXT("Txt_ReconnectStatus"),TEXT("网络连接已断开，正在尝试重连"),30)); V->AddChildToVerticalBox(Text(Reconnect,TEXT("Txt_RemainingTime"),TEXT("剩余 120 秒"),25)); V->AddChildToVerticalBox(Button(Reconnect,TEXT("Btn_Reconnect"),TEXT("重新连接"))); V->AddChildToVerticalBox(Button(Reconnect,TEXT("Btn_BackConnect"),TEXT("返回连接界面"))); }
+    { UCanvasPanel* C=Root(Reconnect); UBorder* B=Border(Reconnect,TEXT("Panel_Reconnect9Slice"),FLinearColor(0.01f,0.05f,0.045f,0.94f)); Place(C,B,{0,0},{760,460},FAnchors(0.5f,0.5f),{0.5f,0.5f}); UCanvasPanel* D=Reconnect->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("Panel_ReconnectContent")); MarkVariable(Reconnect,D); B->AddChild(D); Place(D,Text(Reconnect,TEXT("Txt_ReconnectStatus"),TEXT("网络连接已断开，正在尝试重连"),30),{55,45},{650,64}); Place(D,Text(Reconnect,TEXT("Txt_RemainingTime"),TEXT("剩余 120 秒"),25),{55,120},{650,48}); Place(D,Button(Reconnect,TEXT("Btn_Reconnect"),TEXT("重新连接")),{170,220},{420,76}); Place(D,Button(Reconnect,TEXT("Btn_BackConnect"),TEXT("返回连接界面")),{170,320},{420,76}); }
     Finish(Reconnect);
 
     UWidgetBlueprint* HUD = Create(TEXT("Screens"), TEXT("WBP_GameHUD"), UMobileMahjongHUDWidget::StaticClass());

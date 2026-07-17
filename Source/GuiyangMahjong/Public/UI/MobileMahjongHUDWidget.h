@@ -48,6 +48,7 @@ protected:
     UPROPERTY() FMahjongPublicTableState CachedPublicState;
     UPROPERTY() FMahjongPrivatePlayerState CachedPrivateState;
     bool bHasPrivateState = false;
+    bool bVisualReviewMode = false;
     UFUNCTION() void HandlePublicTableState(const FMahjongPublicTableState& State);
     UFUNCTION() void HandlePrivateHand(const FMahjongPrivatePlayerState& State);
     UFUNCTION() void HandleAvailableActions(const TArray<FMahjongAction>& Actions);
@@ -58,6 +59,9 @@ protected:
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshTableState(const FMahjongPublicTableState& State);
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshPrivateHand(const FMahjongPrivatePlayerState& State);
+    /** 注入只读的本地截图预览数据，不发送任何牌局请求。 */
+    void ApplyVisualReviewState(const FMahjongPublicTableState& PublicState,
+        const FMahjongPrivatePlayerState& PrivateState, const TArray<FMahjongAction>& Actions);
     static int32 GetRelativeSeatIndex(int32 AbsoluteSeat, int32 LocalSeat);
     static FString GetPhaseDisplayText(EMahjongTablePhase Phase);
 

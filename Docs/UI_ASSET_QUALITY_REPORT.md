@@ -16,8 +16,10 @@
 - Unreal 导入已实际执行：146 Texture、6 DataAsset、9 Material、5 Material Instance；回读 146/146、0 导入设置错误。
 - 现有 17 个 Widget 已重建并编译保存：17/17；原始强制清单完成 16/16。
 - GameHUD 已接入本地座位旋转、四方弃牌池、副露、鸡牌事件、当前回合手牌启用和单选交互。
-- 运行截图捕获产出黑图，视觉验收仍为失败，不计入通过数量。
-- `GuiyangMahjong` 自动化回归：29/29 Success。
+- ReconnectOverlay 已接入跨地图重连状态、保留窗口倒计时、手动重试和返回连接页。
+- 阶段 19 已完成 10 个产品页面在 1920×1080、1280×720 下的 20/20 运行截图矩阵；超宽屏因物理显示区域限制仍待真宽屏验证。
+- Login 标识复用 `Icon_Chicken` 与 UMG 中文标题，协议区间距已修复；GameHUD 对手弃牌文字旋转和局面信息密度仍待最终精修。
+- `GuiyangMahjong` 自动化回归：31/31 Success；阶段 19 日志未发现 Fatal、Assertion、Ensure 或 `LogMahjongUI: Error`。
 
 ## 体积
 

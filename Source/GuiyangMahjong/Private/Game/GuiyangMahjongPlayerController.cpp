@@ -3,15 +3,24 @@
 #include "UI/MobileRootHUDWidget.h"
 #include "Game/GuiyangMahjongGameMode.h"
 #include "Game/GuiyangMahjongGameState.h"
+#include "Game/GuiyangMahjongPlayerState.h"
 #include "Auth/GuiyangLoginSubsystem.h"
 #include "History/GuiyangMatchHistorySubsystem.h"
+#include "Network/GuiyangReconnectSubsystem.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformMisc.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "TimerManager.h"
 #include "UnrealClient.h"
+#include "Engine/NetConnection.h"
+
+namespace
+{
+    bool GIntegrationDisconnectTriggered = false;
+}
 
 void AGuiyangMahjongPlayerController::BeginPlay()
 {
@@ -47,13 +56,39 @@ void AGuiyangMahjongPlayerController::BeginPlay()
     SetInputMode(InputMode);
     UE_LOG(LogMahjongUI, Log, TEXT("本地客户端 RootHUD 已加入视口"));
 
+    InitializeIntegrationClient();
+
     if (FParse::Param(FCommandLine::Get(), TEXT("UIReviewScreenshot")))
     {
+        FString ReviewScreen = TEXT("Login");
+        FParse::Value(FCommandLine::Get(), TEXT("UIReviewScreen="), ReviewScreen);
+        if (!RootHUDInstance->ApplyVisualReviewScenario(ReviewScreen))
+        {
+            UE_LOG(LogMahjongUI, Error, TEXT("UI 审查场景初始化失败：%s"), *ReviewScreen);
+            return;
+        }
         FString ReviewName = TEXT("UIReview");
         FParse::Value(FCommandLine::Get(), TEXT("UIReviewName="), ReviewName);
+        ReviewName.ReplaceInline(TEXT("\\"), TEXT("/"));
+        while (ReviewName.StartsWith(TEXT("/")))
+        {
+            ReviewName.RightChopInline(1);
+        }
+        if (ReviewName.IsEmpty() || ReviewName.Contains(TEXT("..")) || !FPaths::IsRelative(ReviewName))
+        {
+            UE_LOG(LogMahjongUI, Error, TEXT("UI 审查截图名称不安全，已拒绝：%s"), *ReviewName);
+            return;
+        }
+        if (!ReviewName.EndsWith(TEXT(".png"), ESearchCase::IgnoreCase))
+        {
+            ReviewName += TEXT(".png");
+        }
         const FString ReviewDirectory = FPaths::ProjectSavedDir() / TEXT("UIReview");
-        IFileManager::Get().MakeDirectory(*ReviewDirectory, true);
-        const FString ScreenshotPath = ReviewDirectory / (ReviewName + TEXT(".png"));
+        const FString ScreenshotPath = ReviewDirectory / ReviewName;
+        IFileManager::Get().MakeDirectory(*FPaths::GetPath(ScreenshotPath), true);
+        float CaptureDelaySeconds = 2.0f;
+        FParse::Value(FCommandLine::Get(), TEXT("UIReviewDelaySeconds="), CaptureDelaySeconds);
+        CaptureDelaySeconds = FMath::Clamp(CaptureDelaySeconds, 1.0f, 30.0f);
         FTimerHandle ScreenshotTimer;
         GetWorldTimerManager().SetTimer(ScreenshotTimer, FTimerDelegate::CreateWeakLambda(this, [this, ScreenshotPath]()
         {
@@ -61,7 +96,7 @@ void AGuiyangMahjongPlayerController::BeginPlay()
             UE_LOG(LogMahjongUI, Log, TEXT("UI 审查截图已请求：%s"), *ScreenshotPath);
             FTimerHandle ExitTimer;
             GetWorldTimerManager().SetTimer(ExitTimer, [] { FPlatformMisc::RequestExit(false); }, 1.0f, false);
-        }), 2.0f, false);
+        }), CaptureDelaySeconds, false);
     }
 }
 
@@ -82,8 +117,11 @@ void AGuiyangMahjongPlayerController::ConnectToServer(const FString& ServerIP, c
         return;
     }
     PendingPlayerName = CleanName;
-    LastServerIP = CleanIP;
-    LastServerPort = Port;
+    if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>() : nullptr)
+    {
+        Reconnect->RememberConnection(CleanIP, Port, CleanName);
+    }
     const FString TravelURL = FString::Printf(TEXT("%s:%d"), *CleanIP, Port);
     UE_LOG(LogMahjongNet, Log, TEXT("客户端准备连接服务器：地址=%s，玩家=%s"), *TravelURL, *CleanName);
     ClientTravel(TravelURL, TRAVEL_Absolute);
@@ -91,13 +129,30 @@ void AGuiyangMahjongPlayerController::ConnectToServer(const FString& ServerIP, c
 
 void AGuiyangMahjongPlayerController::RetryLastConnection()
 {
-    if (LastServerIP.IsEmpty())
+    UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>() : nullptr;
+    FString ServerIP;
+    FString PlayerName;
+    int32 ServerPort = 7777;
+    if (!Reconnect || !Reconnect->GetLastConnection(ServerIP, ServerPort, PlayerName)
+        || !Reconnect->CanRetry())
     {
-        Client_ShowErrorMessage(TEXT("没有可用的上次连接地址"));
+        Client_ShowErrorMessage(TEXT("重连地址不可用或重连保留时间已结束"));
         return;
     }
-    UE_LOG(LogMahjongReconnect, Log, TEXT("客户端尝试重连：%s:%d"), *LastServerIP, LastServerPort);
-    ConnectToServer(LastServerIP, LastServerPort, PendingPlayerName);
+    Reconnect->MarkRetrying();
+    UE_LOG(LogMahjongReconnect, Log, TEXT("客户端尝试重连：%s:%d"), *ServerIP, ServerPort);
+    ConnectToServer(ServerIP, ServerPort, PlayerName);
+}
+
+void AGuiyangMahjongPlayerController::ReturnToConnectScreen()
+{
+    if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>() : nullptr)
+    {
+        Reconnect->CancelReconnect();
+    }
+    if (RootHUDInstance) RootHUDInstance->ShowConnectServer();
 }
 
 void AGuiyangMahjongPlayerController::RequestTableAction(const EMahjongActionType Type, const int32 TargetTileId)
@@ -213,11 +268,31 @@ void AGuiyangMahjongPlayerController::Server_RequestAction_Implementation(const 
     UE_LOG(LogMahjongServer, Log, TEXT("收到玩家操作请求：类型=%d，序号=%d"), static_cast<int32>(Request.Type), Request.ClientSequence);
 }
 
+void AGuiyangMahjongPlayerController::Server_RequestIntegrationDisconnect_Implementation()
+{
+#if !UE_BUILD_SHIPPING
+    const AGuiyangMahjongPlayerState* MahjongPlayer = GetPlayerState<AGuiyangMahjongPlayerState>();
+    if (!FParse::Param(FCommandLine::Get(), TEXT("MahjongEnableIntegrationHooks"))
+        || !MahjongPlayer || !MahjongPlayer->MahjongPlayerId.StartsWith(TEXT("integration-client-")))
+    {
+        UE_LOG(LogMahjongReconnect, Warning, TEXT("拒绝未授权的集成断线请求"));
+        return;
+    }
+    UE_LOG(LogMahjongReconnect, Display, TEXT("MAHJONG_INTEGRATION_DISCONNECT_TRIGGERED Player=%s Seat=%d"),
+        *MahjongPlayer->MahjongPlayerId, MahjongPlayer->SeatIndex);
+    GetWorldTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+    {
+        if (UNetConnection* Connection = GetNetConnection()) Connection->Close();
+    }));
+#endif
+}
+
 void AGuiyangMahjongPlayerController::Client_UpdatePrivateHand_Implementation(const FMahjongPrivatePlayerState& PrivateState)
 {
     LastClientActionSequence = FMath::Max(LastClientActionSequence, PrivateState.LastAcceptedClientSequence);
     UE_LOG(LogMahjongNet, Log, TEXT("收到私有手牌：座位=%d，牌数=%d，序号=%d"), PrivateState.SeatIndex, PrivateState.Hand.Tiles.Num(), PrivateState.StateSequence);
     OnPrivateHandUpdated.Broadcast(PrivateState);
+    HandleIntegrationPrivateState(PrivateState);
 }
 
 void AGuiyangMahjongPlayerController::Client_ShowAvailableActions_Implementation(const TArray<FMahjongAction>& Actions)
@@ -236,11 +311,23 @@ void AGuiyangMahjongPlayerController::Client_RestoreReconnectSnapshot_Implementa
     const FMahjongReconnectSnapshot& Snapshot, const TArray<FMahjongAction>& AvailableActions)
 {
     LastClientActionSequence = Snapshot.PrivateState.LastAcceptedClientSequence;
+    if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>() : nullptr)
+    {
+        Reconnect->MarkRestored();
+    }
     OnReconnectRestored.Broadcast(Snapshot);
     OnPrivateHandUpdated.Broadcast(Snapshot.PrivateState);
     OnAvailableActionsUpdated.Broadcast(AvailableActions);
     UE_LOG(LogMahjongReconnect, Log, TEXT("重连快照恢复完成：Room=%s，Seat=%d，Round=%d"),
         *Snapshot.RoomState.RoomInfo.RoomId, Snapshot.PrivateState.SeatIndex, Snapshot.TableState.RoundId);
+    if (IntegrationClientIndex != INDEX_NONE)
+    {
+        UE_LOG(LogMahjongReconnect, Display,
+            TEXT("MAHJONG_INTEGRATION_CLIENT_RESTORED Client=%d Seat=%d Hand=%d Round=%d Remaining=%d"),
+            IntegrationClientIndex, Snapshot.PrivateState.SeatIndex, Snapshot.PrivateState.Hand.Tiles.Num(),
+            Snapshot.TableState.RoundId, Snapshot.RemainingReconnectSeconds);
+    }
 }
 
 void AGuiyangMahjongPlayerController::Client_ShowFinalSettlement_Implementation(
@@ -258,4 +345,106 @@ void AGuiyangMahjongPlayerController::Client_ShowErrorMessage_Implementation(con
 {
     UE_LOG(LogMahjongUI, Warning, TEXT("显示中文错误提示：%s"), *Message);
     OnErrorShown.Broadcast(Message);
+}
+
+void AGuiyangMahjongPlayerController::InitializeIntegrationClient()
+{
+#if !UE_BUILD_SHIPPING
+    if (!FParse::Param(FCommandLine::Get(), TEXT("MahjongEnableIntegrationHooks"))
+        || !FParse::Value(FCommandLine::Get(), TEXT("MahjongIntegrationClient="), IntegrationClientIndex)
+        || IntegrationClientIndex < 0 || IntegrationClientIndex > 3)
+    {
+        IntegrationClientIndex = INDEX_NONE;
+        return;
+    }
+
+    FString Endpoint = TEXT("127.0.0.1:17777");
+    FParse::Value(FCommandLine::Get(), TEXT("MahjongIntegrationServer="), Endpoint);
+    FString ServerIP;
+    FString PortText;
+    int32 ServerPort = 17777;
+    if (!Endpoint.Split(TEXT(":"), &ServerIP, &PortText, ESearchCase::IgnoreCase, ESearchDir::FromEnd)
+        || !LexTryParseString(ServerPort, *PortText))
+    {
+        ServerIP = TEXT("127.0.0.1");
+        ServerPort = 17777;
+    }
+    PendingPlayerName = FString::Printf(TEXT("集成玩家%d"), IntegrationClientIndex);
+    if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>())
+    {
+        Reconnect->RememberConnection(ServerIP, ServerPort, PendingPlayerName);
+    }
+
+    if (UGuiyangLoginSubsystem* Login = GetGameInstance()->GetSubsystem<UGuiyangLoginSubsystem>();
+        Login && !Login->IsSessionValid())
+    {
+        const FString PlayerId = FString::Printf(TEXT("integration-client-%d"), IntegrationClientIndex);
+        const FString Token = FString::Printf(TEXT("integration-session-token-%d-2026"), IntegrationClientIndex);
+        Login->LoginForIntegrationTest(PlayerId, PendingPlayerName, Token);
+    }
+
+    GetWorldTimerManager().SetTimer(IntegrationPollTimer, this, &ThisClass::PollIntegrationClient, 0.25f, true, 0.25f);
+    UE_LOG(LogMahjongNet, Display, TEXT("MAHJONG_INTEGRATION_CLIENT_READY Client=%d Endpoint=%s:%d"),
+        IntegrationClientIndex, *ServerIP, ServerPort);
+#endif
+}
+
+void AGuiyangMahjongPlayerController::PollIntegrationClient()
+{
+#if !UE_BUILD_SHIPPING
+    if (IntegrationClientIndex == INDEX_NONE) return;
+    if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>();
+        Reconnect && Reconnect->IsReconnectPending())
+    {
+        if (IntegrationReconnectObservedAtSeconds <= 0.0)
+        {
+            IntegrationReconnectObservedAtSeconds = FPlatformTime::Seconds();
+            return;
+        }
+        if (!bIntegrationRetryRequested && Reconnect->CanRetry()
+            && FPlatformTime::Seconds() - IntegrationReconnectObservedAtSeconds >= 1.0)
+        {
+            bIntegrationRetryRequested = true;
+            UE_LOG(LogMahjongReconnect, Display, TEXT("MAHJONG_INTEGRATION_RETRY Client=%d"), IntegrationClientIndex);
+            RetryLastConnection();
+        }
+        return;
+    }
+
+    const AGuiyangMahjongPlayerState* MahjongPlayer = GetPlayerState<AGuiyangMahjongPlayerState>();
+    if (!MahjongPlayer || MahjongPlayer->MahjongPlayerId.IsEmpty()) return;
+    if (MahjongPlayer->RoomCode.IsEmpty())
+    {
+        if (!bIntegrationQuickStartRequested)
+        {
+            bIntegrationQuickStartRequested = true;
+            Server_RequestQuickStart();
+        }
+        return;
+    }
+    if (!MahjongPlayer->bReady && !bIntegrationReadyRequested)
+    {
+        const AGuiyangMahjongGameState* State = GetWorld()->GetGameState<AGuiyangMahjongGameState>();
+        if (State && (State->RoomState.Lifecycle == EMahjongRoomLifecycle::WaitingForPlayers
+            || State->RoomState.Lifecycle == EMahjongRoomLifecycle::ReadyCheck))
+        {
+            bIntegrationReadyRequested = true;
+            Server_RequestReady();
+        }
+    }
+#endif
+}
+
+void AGuiyangMahjongPlayerController::HandleIntegrationPrivateState(const FMahjongPrivatePlayerState& PrivateState)
+{
+#if !UE_BUILD_SHIPPING
+    if (IntegrationClientIndex == INDEX_NONE || PrivateState.RoundId <= 0 || PrivateState.Hand.Tiles.IsEmpty()) return;
+    UE_LOG(LogMahjongNet, Display, TEXT("MAHJONG_INTEGRATION_PRIVATE_STATE Client=%d Seat=%d Hand=%d Round=%d"),
+        IntegrationClientIndex, PrivateState.SeatIndex, PrivateState.Hand.Tiles.Num(), PrivateState.RoundId);
+    if (IntegrationClientIndex == 0 && !GIntegrationDisconnectTriggered)
+    {
+        GIntegrationDisconnectTriggered = true;
+        Server_RequestIntegrationDisconnect();
+    }
+#endif
 }

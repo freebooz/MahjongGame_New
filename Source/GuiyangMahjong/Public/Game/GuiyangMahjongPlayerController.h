@@ -34,6 +34,7 @@ public:
     /** 校验地址后执行 ClientTravel；不直接修改房间或牌局状态。 */
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void ConnectToServer(const FString& ServerIP, int32 Port, const FString& PlayerName);
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void RetryLastConnection();
+    UFUNCTION(BlueprintCallable, Category="麻将|网络") void ReturnToConnectScreen();
     UFUNCTION(BlueprintCallable, Category="麻将|牌桌") void RequestTableAction(EMahjongActionType Type, int32 TargetTileId);
 
     UFUNCTION(Server, Reliable) void Server_RequestCreateRoom();
@@ -48,6 +49,8 @@ public:
     UFUNCTION(Server, Reliable) void Server_RequestNextRound();
     UFUNCTION(Server, Reliable) void Server_RequestPlayTile(FMahjongTile Tile);
     UFUNCTION(Server, Reliable) void Server_RequestAction(FMahjongActionRequest Request);
+    /** 仅在非 Shipping 且服务端显式启用集成钩子时关闭本测试连接。 */
+    UFUNCTION(Server, Reliable) void Server_RequestIntegrationDisconnect();
 
     UFUNCTION(Client, Reliable) void Client_UpdatePrivateHand(const FMahjongPrivatePlayerState& PrivateState);
     UFUNCTION(Client, Reliable) void Client_ShowAvailableActions(const TArray<FMahjongAction>& Actions);
@@ -65,7 +68,15 @@ protected:
 private:
     UPROPERTY(Transient) TObjectPtr<UMobileRootHUDWidget> RootHUDInstance;
     UPROPERTY() FString PendingPlayerName;
-    UPROPERTY() FString LastServerIP;
-    int32 LastServerPort = 7777;
     int32 LastClientActionSequence = -1;
+    int32 IntegrationClientIndex = INDEX_NONE;
+    bool bIntegrationQuickStartRequested = false;
+    bool bIntegrationReadyRequested = false;
+    bool bIntegrationRetryRequested = false;
+    double IntegrationReconnectObservedAtSeconds = 0.0;
+    FTimerHandle IntegrationPollTimer;
+
+    void InitializeIntegrationClient();
+    void PollIntegrationClient();
+    void HandleIntegrationPrivateState(const FMahjongPrivatePlayerState& PrivateState);
 };

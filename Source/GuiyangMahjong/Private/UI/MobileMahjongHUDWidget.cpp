@@ -69,6 +69,11 @@ void UMobileMahjongHUDWidget::NativeDestruct()
 void UMobileMahjongHUDWidget::NativeTick(const FGeometry& MyGeometry, const float InDeltaTime)
 {
     Super::NativeTick(MyGeometry, InDeltaTime);
+    if (bVisualReviewMode)
+    {
+        Txt_Countdown->SetText(FText::AsNumber(12));
+        return;
+    }
     const AGuiyangMahjongGameState* GS = GetWorld() ? GetWorld()->GetGameState<AGuiyangMahjongGameState>() : nullptr;
     if (!GS || GS->PublicTableState.ActionDeadlineServerTimeSeconds <= 0.0)
     {
@@ -134,6 +139,18 @@ void UMobileMahjongHUDWidget::RefreshPrivateHand(const FMahjongPrivatePlayerStat
     {
         RebuildPrivateHand();
     }
+}
+
+void UMobileMahjongHUDWidget::ApplyVisualReviewState(const FMahjongPublicTableState& PublicState,
+    const FMahjongPrivatePlayerState& PrivateState, const TArray<FMahjongAction>& Actions)
+{
+#if !UE_BUILD_SHIPPING
+    bVisualReviewMode = true;
+    RefreshPrivateHand(PrivateState);
+    RefreshTableState(PublicState);
+    ActionButtonPanel->ShowActions(Actions);
+    Txt_Countdown->SetText(FText::AsNumber(12));
+#endif
 }
 
 int32 UMobileMahjongHUDWidget::GetRelativeSeatIndex(const int32 AbsoluteSeat, const int32 LocalSeat)

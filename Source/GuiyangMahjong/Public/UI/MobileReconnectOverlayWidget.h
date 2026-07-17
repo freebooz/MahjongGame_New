@@ -13,6 +13,7 @@ class GUIYANGMAHJONG_API UMobileReconnectOverlayWidget : public UUserWidget
     GENERATED_BODY()
 protected:
     virtual void NativeConstruct() override;
+    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_ReconnectStatus;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_RemainingTime;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_Reconnect;
@@ -20,4 +21,10 @@ protected:
     UFUNCTION() void HandleReconnect(); UFUNCTION() void HandleBackConnect();
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshReconnectState(const FString& Status, int32 RemainingSeconds, bool bCanRetry);
+    UFUNCTION(BlueprintPure, Category="麻将|UI") static FString FormatRemainingTime(int32 RemainingSeconds);
+
+private:
+    FString LastDisplayedStatus;
+    int32 LastDisplayedSeconds = INDEX_NONE;
+    bool bLastCanRetry = false;
 };

@@ -4,6 +4,8 @@
 #include "Engine/World.h"
 #include "GuiyangMahjong.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "TimerManager.h"
 
 FString FGuiyangLoginProfile::GetProviderDisplayName() const
@@ -165,6 +167,30 @@ void UGuiyangLoginSubsystem::ExpireSession(const FString& ChineseReason)
 bool UGuiyangLoginSubsystem::IsSessionValid() const
 {
     return LoginState == EGuiyangLoginState::LoggedIn && CurrentProfile.IsValid() && !SessionToken.IsEmpty() && FDateTime::UtcNow() < SessionExpireAtUtc;
+}
+
+bool UGuiyangLoginSubsystem::LoginForIntegrationTest(const FString& PlayerId, const FString& DisplayName,
+    const FString& InSessionToken)
+{
+#if UE_BUILD_SHIPPING
+    return false;
+#else
+    if (!FParse::Param(FCommandLine::Get(), TEXT("MahjongEnableIntegrationHooks"))
+        || PlayerId.IsEmpty() || DisplayName.IsEmpty() || InSessionToken.Len() < 16)
+    {
+        return false;
+    }
+    if (UWorld* World = GetWorld()) World->GetTimerManager().ClearTimer(PendingLoginTimer);
+    CurrentProfile.PlayerId = PlayerId.Left(80);
+    CurrentProfile.DisplayName = DisplayName.Left(24);
+    CurrentProfile.Provider = EGuiyangLoginProvider::Guest;
+    SessionToken = InSessionToken.Left(256);
+    SessionExpireAtUtc = FDateTime::UtcNow() + FTimespan::FromHours(1.0);
+    LoginState = EGuiyangLoginState::LoggedIn;
+    UE_LOG(LogMahjongNet, Display, TEXT("MAHJONG_INTEGRATION_LOGIN_READY Player=%s"), *CurrentProfile.PlayerId);
+    OnLoginStateChanged.Broadcast(LoginState, CurrentProfile);
+    return true;
+#endif
 }
 
 void UGuiyangLoginSubsystem::SaveAutoLoginPreference()

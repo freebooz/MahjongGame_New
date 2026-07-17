@@ -9,7 +9,7 @@ public class GuiyangMahjong : ModuleRules
         PublicDependencyModuleNames.AddRange(new[]
         {
             "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
-            "UMG", "Slate", "SlateCore", "Networking", "Sockets",
+            "UMG", "Slate", "SlateCore", "Networking", "Sockets", "NetCore",
             "OnlineSubsystem", "Json", "JsonUtilities", "ApplicationCore"
         });
 
