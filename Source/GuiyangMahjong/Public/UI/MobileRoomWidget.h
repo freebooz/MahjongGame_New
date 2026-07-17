@@ -23,10 +23,10 @@ protected:
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Seat_Right;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Seat_Bottom;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_Ready;
-    UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_LeaveRoom;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_ReturnLobby;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_StartTip;
     UFUNCTION() void HandleReady();
-    UFUNCTION() void HandleLeave();
+    UFUNCTION() void HandleReturnLobby();
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshRoomState(const FMahjongRoomState& State, int32 LocalSeat);
 };

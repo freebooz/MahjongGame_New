@@ -61,7 +61,13 @@ def import_sound(source: Path):
     task.replace_existing = True
     task.save = True
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
-    return unreal.EditorAssetLibrary.load_asset(asset_path)
+    sound = unreal.EditorAssetLibrary.load_asset(asset_path)
+    if sound and source.stem.startswith("BGM_"):
+        # 背景音乐由全局子系统持续播放，SoundWave 本身负责无缝循环。
+        set_prop(sound, "looping", True)
+        post_edit(sound)
+        unreal.EditorAssetLibrary.save_loaded_asset(sound, only_if_is_dirty=False)
+    return sound
 
 
 def configure_texture(texture, large_background: bool) -> None:

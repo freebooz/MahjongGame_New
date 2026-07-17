@@ -9,7 +9,7 @@ void UMobileRoomWidget::NativeConstruct()
 {
     Super::NativeConstruct();
     Btn_Ready->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleReady);
-    Btn_LeaveRoom->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleLeave);
+    Btn_ReturnLobby->OnClicked.AddUniqueDynamic(this, &ThisClass::HandleReturnLobby);
     UE_LOG(LogMahjongUI, Log, TEXT("房间界面创建完成"));
 }
 
@@ -18,7 +18,7 @@ void UMobileRoomWidget::HandleReady()
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer())) PC->Server_RequestReady();
 }
 
-void UMobileRoomWidget::HandleLeave()
+void UMobileRoomWidget::HandleReturnLobby()
 {
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer())) PC->Server_RequestLeaveRoom();
 }

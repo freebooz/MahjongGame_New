@@ -16,6 +16,7 @@
 #include "Components/SafeZone.h"
 #include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
+#include "Components/Slider.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/WrapBox.h"
@@ -42,6 +43,8 @@
 #include "UI/MobileConfirmDialogWidget.h"
 #include "UI/MobileCreateRoomDialogWidget.h"
 #include "UI/MobileJoinRoomDialogWidget.h"
+#include "UI/MobileSettingsWidget.h"
+#include "UI/MahjongResponsiveScaleBox.h"
 #include "UI/MobileRuleConfigWidget.h"
 #include "UI/MobileRuleSummaryWidget.h"
 
@@ -109,7 +112,8 @@ namespace MahjongUIBuilder
         if (Value.Contains(TEXT("Peng"))) return TEXT("Peng");
         if (Value.Contains(TEXT("Pass"))) return TEXT("Pass");
         if (Value.Contains(TEXT("PlayTile"))) return TEXT("PlayTile");
-        if (Value.Contains(TEXT("Leave")) || Value.Contains(TEXT("Back")) || Value.Contains(TEXT("Cancel"))) return TEXT("NeutralDark");
+        if (Value.Contains(TEXT("Leave")) || Value.Contains(TEXT("Exit")) || Value.Contains(TEXT("Back")) || Value.Contains(TEXT("Cancel"))
+            || Value.Contains(TEXT("Close"))) return TEXT("NeutralDark");
         if (Value.Contains(TEXT("Connect")) || Value.Contains(TEXT("Quick")) || Value.Contains(TEXT("Ready")) || Value.Contains(TEXT("Confirm"))) return TEXT("PrimaryGold");
         return TEXT("PrimaryGreen");
     }
@@ -176,6 +180,19 @@ namespace MahjongUIBuilder
     static UCheckBox* Check(UWidgetBlueprint* BP, const FName Name)
     {
         UCheckBox* Widget = BP->WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(), Name);
+        MarkVariable(BP, Widget);
+        return Widget;
+    }
+
+    static USlider* Slider(UWidgetBlueprint* BP, const FName Name, const float Value)
+    {
+        USlider* Widget = BP->WidgetTree->ConstructWidget<USlider>(USlider::StaticClass(), Name);
+        Widget->SetMinValue(0.0f);
+        Widget->SetMaxValue(1.0f);
+        Widget->SetStepSize(0.05f);
+        Widget->SetValue(Value);
+        Widget->SetSliderBarColor(FLinearColor(0.72f, 0.52f, 0.16f, 1.0f));
+        Widget->SetSliderHandleColor(WarmWhite);
         MarkVariable(BP, Widget);
         return Widget;
     }
@@ -257,7 +274,7 @@ namespace MahjongUIBuilder
         UOverlay* ViewportRoot = BP->WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("Overlay_ViewportRoot"));
         UScaleBox* BackgroundScale = BP->WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass(), TEXT("Scale_BackgroundFill"));
         USizeBox* BackgroundSize = BP->WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("Size_BackgroundDesign"));
-        BackgroundScale->SetStretch(EStretch::ScaleToFill);
+        BackgroundScale->SetStretch(EStretch::Fill);
         BackgroundScale->SetStretchDirection(EStretchDirection::Both);
         BackgroundScale->SetClipping(EWidgetClipping::ClipToBounds);
         BackgroundSize->SetWidthOverride(DesignResolution.X);
@@ -288,13 +305,17 @@ namespace MahjongUIBuilder
         ViewportRoot->AddChildToOverlay(BackgroundScale);
 
         USafeZone* Safe = BP->WidgetTree->ConstructWidget<USafeZone>(USafeZone::StaticClass(), TEXT("SafeZone_Root"));
-        UScaleBox* Scale = BP->WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass(), TEXT("Scale_Design1920x1080"));
+        // 本项目要求移动端前景 UI 覆盖刘海区域，不再由 SafeZone 自动收缩四边。
+        Safe->SetSidesToPad(false, false, false, false);
+        UMahjongResponsiveScaleBox* Scale = BP->WidgetTree->ConstructWidget<UMahjongResponsiveScaleBox>(
+            UMahjongResponsiveScaleBox::StaticClass(), TEXT("Scale_Design1920x1080"));
         USizeBox* DesignSize = BP->WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("Size_Design1920x1080"));
         UCanvasPanel* Canvas = BP->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Canvas_Root"));
         Safe->AddChild(Scale);
         Scale->AddChild(DesignSize);
         DesignSize->AddChild(Canvas);
-        Scale->SetStretch(EStretch::ScaleToFit);
+        // 20:9 等移动端宽屏直接铺满可用区域；PC 16:9 设计分辨率下比例保持不变。
+        Scale->SetStretch(EStretch::Fill);
         Scale->SetStretchDirection(EStretchDirection::Both);
         DesignSize->SetWidthOverride(DesignResolution.X);
         DesignSize->SetHeightOverride(DesignResolution.Y);
@@ -440,12 +461,90 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(Confirm);
 
     UWidgetBlueprint* CreateRoom = Create(TEXT("Dialogs"), TEXT("WBP_CreateRoomDialog"), UMobileCreateRoomDialogWidget::StaticClass());
-    { UCanvasPanel* C=Root(CreateRoom); UBorder* Mask=Border(CreateRoom,TEXT("Border_Mask"),FLinearColor(0,0,0,0.65f)); UCanvasPanelSlot* MaskSlot=Place(C,Mask,{0,0},{0,0},FAnchors(0,0,1,1)); MaskSlot->SetOffsets(FMargin(0)); UBorder* Dialog=Border(CreateRoom,TEXT("Border_Dialog9Slice"),PanelGreen); Place(C,Dialog,{0,0},{1600,940},FAnchors(0.5f,0.5f),{0.5f,0.5f}); UCanvasPanel* D=CreateRoom->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("Panel_CreateRoomContent")); MarkVariable(CreateRoom,D); Dialog->AddChild(D); Place(D,Text(CreateRoom,TEXT("Txt_Title"),TEXT("创建房间与规则确认"),42),{50,25},{700,60}); Place(D,Text(CreateRoom,TEXT("Txt_RoundCountLabel"),TEXT("局数"),24),{50,100},{100,50}); Place(D,Edit(CreateRoom,TEXT("Txt_RoundCount"),TEXT("1-16 局")),{150,95},{180,56}); Place(D,Check(CreateRoom,TEXT("Chk_PublicRoom")),{380,100},{44,44}); Place(D,Text(CreateRoom,TEXT("Txt_PublicRoomLabel"),TEXT("允许快速匹配"),24),{435,100},{260,44}); Place(D,Check(CreateRoom,TEXT("Chk_EnablePassword")),{710,100},{44,44}); Place(D,Text(CreateRoom,TEXT("Txt_EnablePasswordLabel"),TEXT("启用密码"),24),{765,100},{180,44}); UEditableTextBox* Password=Edit(CreateRoom,TEXT("Txt_Password"),TEXT("6-12 位可选密码")); Password->SetIsPassword(true); Place(D,Password,{960,95},{360,56}); UClass* RuleConfigClass=RuleConfig->GeneratedClass; UWidget* RuleConfigWidget=CreateRoom->WidgetTree->ConstructWidget<UWidget>(RuleConfigClass,TEXT("RuleConfig")); MarkVariable(CreateRoom,RuleConfigWidget); Place(D,RuleConfigWidget,{40,180},{930,590}); UClass* RuleSummaryClass=RuleSummary->GeneratedClass; UWidget* RuleSummaryWidget=CreateRoom->WidgetTree->ConstructWidget<UWidget>(RuleSummaryClass,TEXT("RuleSummary")); MarkVariable(CreateRoom,RuleSummaryWidget); Place(D,RuleSummaryWidget,{990,180},{560,590}); Place(D,Text(CreateRoom,TEXT("Txt_Status"),TEXT("请确认规则摘要后创建房间"),22),{60,800},{850,48}); Place(D,Button(CreateRoom,TEXT("Btn_Create"),TEXT("创建房间")),{1020,800},{240,76}); Place(D,Button(CreateRoom,TEXT("Btn_Cancel"),TEXT("取消")),{1290,800},{200,76}); }
+    {
+        UCanvasPanel* C = Root(CreateRoom);
+        UBorder* Mask = Border(CreateRoom, TEXT("Border_Mask"), FLinearColor(0, 0, 0, 0.65f));
+        UCanvasPanelSlot* MaskSlot = Place(C, Mask, {0, 0}, {0, 0}, FAnchors(0, 0, 1, 1));
+        MaskSlot->SetOffsets(FMargin(0));
+
+        // Android 使用 1.5 倍应用缩放：700 高度可在 1224px 横屏内完整显示，并保留上下边距。
+        UBorder* Dialog = Border(CreateRoom, TEXT("Border_Dialog9Slice"), PanelGreen);
+        Place(C, Dialog, {0, 0}, {1720, 700}, FAnchors(0.5f, 0.5f), {0.5f, 0.5f});
+        UCanvasPanel* D = CreateRoom->WidgetTree->ConstructWidget<UCanvasPanel>(
+            UCanvasPanel::StaticClass(), TEXT("Panel_CreateRoomContent"));
+        MarkVariable(CreateRoom, D);
+        Dialog->AddChild(D);
+
+        Place(D, Text(CreateRoom, TEXT("Txt_Title"), TEXT("创建房间与规则确认"), 38), {40, 15}, {700, 50});
+        Place(D, Text(CreateRoom, TEXT("Txt_RoundCountLabel"), TEXT("局数"), 22), {40, 75}, {90, 44});
+        Place(D, Edit(CreateRoom, TEXT("Txt_RoundCount"), TEXT("1-16 局")), {125, 68}, {180, 52});
+        Place(D, Check(CreateRoom, TEXT("Chk_PublicRoom")), {350, 72}, {44, 44});
+        Place(D, Text(CreateRoom, TEXT("Txt_PublicRoomLabel"), TEXT("允许快速匹配"), 22), {405, 72}, {240, 44});
+        Place(D, Check(CreateRoom, TEXT("Chk_EnablePassword")), {665, 72}, {44, 44});
+        Place(D, Text(CreateRoom, TEXT("Txt_EnablePasswordLabel"), TEXT("启用密码"), 22), {720, 72}, {170, 44});
+        UEditableTextBox* Password = Edit(CreateRoom, TEXT("Txt_Password"), TEXT("6-12 位可选密码"));
+        Password->SetIsPassword(true);
+        Place(D, Password, {900, 68}, {360, 52});
+
+        UClass* RuleConfigClass = RuleConfig->GeneratedClass;
+        UWidget* RuleConfigWidget = CreateRoom->WidgetTree->ConstructWidget<UWidget>(
+            RuleConfigClass, TEXT("RuleConfig"));
+        MarkVariable(CreateRoom, RuleConfigWidget);
+        Place(D, RuleConfigWidget, {30, 135}, {1080, 430});
+
+        UClass* RuleSummaryClass = RuleSummary->GeneratedClass;
+        UWidget* RuleSummaryWidget = CreateRoom->WidgetTree->ConstructWidget<UWidget>(
+            RuleSummaryClass, TEXT("RuleSummary"));
+        MarkVariable(CreateRoom, RuleSummaryWidget);
+        Place(D, RuleSummaryWidget, {1130, 135}, {540, 430});
+
+        Place(D, Text(CreateRoom, TEXT("Txt_Status"), TEXT("请确认规则摘要后创建房间"), 22),
+            {45, 595}, {850, 44});
+        Place(D, Button(CreateRoom, TEXT("Btn_Create"), TEXT("创建房间")), {1110, 585}, {260, 68});
+        Place(D, Button(CreateRoom, TEXT("Btn_Cancel"), TEXT("取消")), {1400, 585}, {220, 68});
+    }
     Finish(CreateRoom);
 
     UWidgetBlueprint* JoinRoom = Create(TEXT("Dialogs"), TEXT("WBP_JoinRoomDialog"), UMobileJoinRoomDialogWidget::StaticClass());
     { UCanvasPanel* C=Root(JoinRoom); UBorder* Mask=Border(JoinRoom,TEXT("Border_Mask"),FLinearColor(0,0,0,0.65f)); UCanvasPanelSlot* MaskSlot=Place(C,Mask,{0,0},{0,0},FAnchors(0,0,1,1)); MaskSlot->SetOffsets(FMargin(0)); UBorder* Dialog=Border(JoinRoom,TEXT("Border_Dialog9Slice"),PanelGreen); Place(C,Dialog,{0,0},{760,520},FAnchors(0.5f,0.5f),{0.5f,0.5f}); UCanvasPanel* D=JoinRoom->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(),TEXT("Panel_JoinRoomContent")); MarkVariable(JoinRoom,D); Dialog->AddChild(D); Place(D,Text(JoinRoom,TEXT("Txt_Title"),TEXT("加入房间"),42),{40,25},{680,64}); Place(D,Edit(JoinRoom,TEXT("Txt_RoomCode"),TEXT("请输入 6 位房间号")),{40,110},{680,64}); UEditableTextBox* Password=Edit(JoinRoom,TEXT("Txt_Password"),TEXT("密码房请输入密码")); Password->SetIsPassword(true); Place(D,Password,{40,195},{680,64}); Place(D,Text(JoinRoom,TEXT("Txt_Status"),TEXT("请输入 6 位房间号"),22),{40,280},{680,48}); Place(D,Button(JoinRoom,TEXT("Btn_Join"),TEXT("加入房间")),{130,370},{230,72}); Place(D,Button(JoinRoom,TEXT("Btn_Cancel"),TEXT("取消")),{400,370},{230,72}); }
     Finish(JoinRoom);
+
+    UWidgetBlueprint* Settings = Create(TEXT("Dialogs"), TEXT("WBP_Settings"), UMobileSettingsWidget::StaticClass());
+    {
+        UCanvasPanel* C = Root(Settings);
+        UBorder* Mask = Border(Settings, TEXT("Border_Mask"), FLinearColor(0,0,0,0.68f));
+        UCanvasPanelSlot* MaskSlot = Place(C, Mask, {0,0}, {0,0}, FAnchors(0,0,1,1));
+        MaskSlot->SetOffsets(FMargin(0));
+        UBorder* Dialog = Border(Settings, TEXT("Border_Dialog9Slice"), PanelGreen);
+        Place(C, Dialog, {0,0}, {920,700}, FAnchors(0.5f,0.5f), {0.5f,0.5f});
+        UCanvasPanel* D = Settings->WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass(), TEXT("Panel_SettingsContent"));
+        MarkVariable(Settings, D);
+        Dialog->AddChild(D);
+        Place(D, Text(Settings, TEXT("Txt_Title"), TEXT("本地设置"), 42), {40,20}, {500,64});
+        Place(D, Text(Settings, TEXT("Txt_Subtitle"), TEXT("设置仅保存在当前设备，可随时调整"), 20), {40,78}, {720,42});
+
+        Place(D, Check(Settings, TEXT("Chk_MusicEnabled")), {48,145}, {44,44});
+        Place(D, Text(Settings, TEXT("Lbl_MusicEnabled"), TEXT("背景音乐"), 26), {110,146}, {220,44});
+        Place(D, Slider(Settings, TEXT("Slider_MusicVolume"), 0.70f), {330,148}, {430,40});
+        Place(D, Text(Settings, TEXT("Txt_MusicVolumeValue"), TEXT("70"), 24), {785,145}, {80,44});
+
+        Place(D, Check(Settings, TEXT("Chk_SoundEnabled")), {48,235}, {44,44});
+        Place(D, Text(Settings, TEXT("Lbl_SoundEnabled"), TEXT("操作音效"), 26), {110,236}, {220,44});
+        Place(D, Slider(Settings, TEXT("Slider_SoundVolume"), 0.85f), {330,238}, {430,40});
+        Place(D, Text(Settings, TEXT("Txt_SoundVolumeValue"), TEXT("85"), 24), {785,235}, {80,44});
+
+        Place(D, Check(Settings, TEXT("Chk_VibrationEnabled")), {48,325}, {44,44});
+        Place(D, Text(Settings, TEXT("Lbl_VibrationEnabled"), TEXT("触感反馈"), 26), {110,326}, {300,44});
+        Place(D, Text(Settings, TEXT("Txt_VibrationHint"), TEXT("支持设备上用于出牌与操作确认"), 20), {330,329}, {520,40});
+
+        UBorder* HintPanel = Border(Settings, TEXT("Panel_SettingsNotice"), FLinearColor(0.03f,0.14f,0.12f,0.90f));
+        HintPanel->AddChild(Text(Settings, TEXT("Txt_SettingsNotice"), TEXT("提示：关闭操作音效后，按钮点击、选牌、出牌、碰杠胡过均保持静音。"), 20));
+        Place(D, HintPanel, {48,410}, {817,90});
+        Place(D, Button(Settings, TEXT("Btn_Reset"), TEXT("恢复默认")), {70,550}, {220,76});
+        Place(D, Button(Settings, TEXT("Btn_ExitGame"), TEXT("退出游戏")), {350,550}, {220,76});
+        Place(D, Button(Settings, TEXT("Btn_Close"), TEXT("完成")), {630,550}, {220,76});
+    }
+    Finish(Settings);
 
     UWidgetBlueprint* RootHUD = Create(TEXT("Screens"), TEXT("WBP_RootHUD"), UMobileRootHUDWidget::StaticClass());
     { UCanvasPanel* C=Root(RootHUD); UOverlay* Screen=RootHUD->WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(),TEXT("ScreenLayer")); MarkVariable(RootHUD,Screen); UCanvasPanelSlot* ScreenSlot=Place(C,Screen,{0,0},{0,0},FAnchors(0,0,1,1)); ScreenSlot->SetOffsets(FMargin(0)); UOverlay* Popup=RootHUD->WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(),TEXT("PopupLayer")); MarkVariable(RootHUD,Popup); UCanvasPanelSlot* PopupSlot=Place(C,Popup,{0,0},{0,0},FAnchors(0,0,1,1)); PopupSlot->SetOffsets(FMargin(0)); PopupSlot->SetZOrder(100); }
@@ -460,7 +559,24 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(Lobby);
 
     UWidgetBlueprint* Room = Create(TEXT("Screens"), TEXT("WBP_Room"), UMobileRoomWidget::StaticClass());
-    { UCanvasPanel* C=Root(Room); Place(C,Text(Room,TEXT("Txt_RoomId"),TEXT("房间号：100001"),34),{60,50},{500,60}); Place(C,Text(Room,TEXT("Txt_RuleSummary"),TEXT("贵阳捉鸡·四人房"),24),{60,115},{500,44}); UClass* RuleSummaryClass=RuleSummary->GeneratedClass; UWidget* RuleSummaryWidget=Room->WidgetTree->ConstructWidget<UWidget>(RuleSummaryClass,TEXT("RuleSummary")); MarkVariable(Room,RuleSummaryWidget); Place(C,RuleSummaryWidget,{40,180},{560,440}); Place(C,Text(Room,TEXT("Seat_Top"),TEXT("等待玩家"),25),{760,120},{400,100}); Place(C,Text(Room,TEXT("Seat_Left"),TEXT("等待玩家"),25),{140,650},{400,100}); Place(C,Text(Room,TEXT("Seat_Right"),TEXT("等待玩家"),25),{1380,430},{400,100}); Place(C,Text(Room,TEXT("Seat_Bottom"),TEXT("等待玩家"),25),{760,720},{400,100}); Place(C,Button(Room,TEXT("Btn_Ready"),TEXT("准备")),{760,860},{240,80}); Place(C,Button(Room,TEXT("Btn_LeaveRoom"),TEXT("离开房间")),{1020,860},{240,80}); Place(C,Text(Room,TEXT("Txt_StartTip"),TEXT("满四人并准备后自动开始"),24),{710,970},{520,48}); }
+    {
+        UCanvasPanel* C = Root(Room);
+        Place(C, Text(Room, TEXT("Txt_RoomId"), TEXT("房间号：100001"), 34), {60, 45}, {500, 60});
+        Place(C, Text(Room, TEXT("Txt_RuleSummary"), TEXT("贵阳捉鸡·四人房"), 24), {60, 105}, {500, 44});
+        UClass* RuleSummaryClass = RuleSummary->GeneratedClass;
+        UWidget* RuleSummaryWidget = Room->WidgetTree->ConstructWidget<UWidget>(RuleSummaryClass, TEXT("RuleSummary"));
+        MarkVariable(Room, RuleSummaryWidget);
+        Place(C, RuleSummaryWidget, {40, 160}, {560, 390});
+
+        // 返回大厅始终固定在右上角，避免 1.5 倍缩放后落到屏幕外。
+        Place(C, Button(Room, TEXT("Btn_ReturnLobby"), TEXT("返回大厅")), {1600, 45}, {240, 68});
+        Place(C, Text(Room, TEXT("Seat_Top"), TEXT("等待玩家"), 25), {760, 105}, {400, 86});
+        Place(C, Text(Room, TEXT("Seat_Left"), TEXT("等待玩家"), 25), {140, 545}, {400, 86});
+        Place(C, Text(Room, TEXT("Seat_Right"), TEXT("等待玩家"), 25), {1380, 410}, {400, 86});
+        Place(C, Text(Room, TEXT("Seat_Bottom"), TEXT("等待玩家"), 25), {760, 500}, {400, 86});
+        Place(C, Button(Room, TEXT("Btn_Ready"), TEXT("准备")), {760, 610}, {240, 68});
+        Place(C, Text(Room, TEXT("Txt_StartTip"), TEXT("满四人并准备后自动开始"), 22), {1030, 618}, {520, 44});
+    }
     Finish(Room);
 
     UWidgetBlueprint* Settlement = Create(TEXT("Dialogs"), TEXT("WBP_Settlement"), UMobileSettlementWidget::StaticClass());
@@ -540,8 +656,8 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     }
     Finish(HUD);
 
-    UE_LOG(LogTemp, Display, TEXT("P0 UMG 生成结束：成功=%d/17"), Created);
-    return Created == 17 ? 0 : 1;
+    UE_LOG(LogTemp, Display, TEXT("P0 UMG 生成结束：成功=%d/18"), Created);
+    return Created == 18 ? 0 : 1;
 }
 #else
 UGenerateMahjongUICommandlet::UGenerateMahjongUICommandlet()

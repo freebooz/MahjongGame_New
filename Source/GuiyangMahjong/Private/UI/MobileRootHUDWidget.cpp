@@ -9,6 +9,7 @@
 #include "GuiyangMahjong.h"
 #include "Network/GuiyangReconnectSubsystem.h"
 #include "UI/MobileErrorToastWidget.h"
+#include "UI/MahjongBackgroundMusicSubsystem.h"
 #include "UI/MobileLobbyWidget.h"
 #include "UI/MobileMahjongHUDWidget.h"
 #include "UI/MobileRoomWidget.h"
@@ -172,6 +173,11 @@ namespace
 void UMobileRootHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+    if (UMahjongBackgroundMusicSubsystem* Music =
+        GetGameInstance()->GetSubsystem<UMahjongBackgroundMusicSubsystem>())
+    {
+        Music->EnsurePlaying(this);
+    }
     if (UGuiyangLoginSubsystem* Login = GetGameInstance()->GetSubsystem<UGuiyangLoginSubsystem>())
     {
         Login->OnLoginStateChanged.AddUniqueDynamic(this, &ThisClass::HandleLoginStateChanged);

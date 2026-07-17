@@ -7,6 +7,7 @@
 class UButton; class UTextBlock;
 class UMobileCreateRoomDialogWidget;
 class UMobileJoinRoomDialogWidget;
+class UMobileSettingsWidget;
 
 /** 大厅页 C++ 基类。只发起房间请求，不保存或修改权威房间状态。 */
 UCLASS(Abstract, BlueprintType)
@@ -24,6 +25,7 @@ protected:
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_OnlineCount;
     UPROPERTY(Transient) TObjectPtr<UMobileCreateRoomDialogWidget> CreateRoomDialogInstance;
     UPROPERTY(Transient) TObjectPtr<UMobileJoinRoomDialogWidget> JoinRoomDialogInstance;
+    UPROPERTY(Transient) TObjectPtr<UMobileSettingsWidget> SettingsDialogInstance;
     UFUNCTION() void HandleQuickStart();
     UFUNCTION() void HandleCreateRoom();
     UFUNCTION() void HandleJoinRoom();

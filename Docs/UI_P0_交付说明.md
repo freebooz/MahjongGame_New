@@ -76,7 +76,7 @@ Canvas_Root
 ├─ Txt_RuleSummary
 ├─ Seat_Top / Seat_Left / Seat_Right / Seat_Bottom
 ├─ Btn_Ready
-├─ Btn_LeaveRoom
+├─ Btn_ReturnLobby
 └─ Txt_StartTip
 ```
 
@@ -145,7 +145,7 @@ Blueprint 不重复实现业务逻辑。控件名与 C++ `UPROPERTY(meta=(BindWi
 
 - ConnectServer：`Txt_ServerIP`、`Txt_ServerPort`、`Txt_PlayerName`、`Chk_RememberAddress`、`Btn_Connect`、`Txt_ConnectButton`、`Txt_Version`。
 - Lobby：`Btn_QuickStart`、`Btn_CreateRoom`、`Btn_JoinRoom`、`Btn_Setting`、`Txt_PlayerName`、`Txt_PlayerId`、`Txt_OnlineCount`。
-- Room：`Txt_RoomId`、`Txt_RuleSummary`、四个 `Seat_*`、`Btn_Ready`、`Btn_LeaveRoom`、`Txt_StartTip`。
+- Room：`Txt_RoomId`、`Txt_RuleSummary`、四个 `Seat_*`、`Btn_Ready`、`Btn_ReturnLobby`、`Txt_StartTip`。
 - GameHUD：五个状态 `Txt_*`、四个 `Panel_*Discards`、`Panel_SelfHandTiles`、四个 `Seat_*`、`ActionButtonPanel`、`PopupLayer`。
 - HandTile：`Btn_Tile`、`Txt_TileName`。
 - DiscardTile：`Border_Tile`、`Txt_TileName`。

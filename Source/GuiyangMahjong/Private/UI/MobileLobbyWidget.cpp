@@ -5,6 +5,7 @@
 #include "GuiyangMahjong.h"
 #include "UI/MobileCreateRoomDialogWidget.h"
 #include "UI/MobileJoinRoomDialogWidget.h"
+#include "UI/MobileSettingsWidget.h"
 
 void UMobileLobbyWidget::NativeConstruct()
 {
@@ -50,7 +51,25 @@ void UMobileLobbyWidget::HandleJoinRoom()
 
 void UMobileLobbyWidget::HandleSetting()
 {
-    UE_LOG(LogMahjongUI, Log, TEXT("玩家打开本地设置界面"));
+    if (SettingsDialogInstance && SettingsDialogInstance->IsInViewport())
+    {
+        return;
+    }
+
+    UClass* SettingsClass = LoadClass<UMobileSettingsWidget>(nullptr,
+        TEXT("/Game/UI/Dialogs/WBP_Settings.WBP_Settings_C"));
+    if (!SettingsClass)
+    {
+        UE_LOG(LogMahjongUI, Error, TEXT("无法加载本地设置界面"));
+        return;
+    }
+    SettingsDialogInstance = CreateWidget<UMobileSettingsWidget>(GetOwningPlayer(), SettingsClass);
+    if (!SettingsDialogInstance)
+    {
+        UE_LOG(LogMahjongUI, Error, TEXT("无法创建本地设置界面实例"));
+        return;
+    }
+    SettingsDialogInstance->AddToViewport(220);
 }
 
 void UMobileLobbyWidget::HandleQuickStart()

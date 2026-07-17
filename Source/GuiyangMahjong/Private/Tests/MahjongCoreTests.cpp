@@ -20,12 +20,21 @@
 #include "Network/GuiyangReconnectSubsystem.h"
 #include "UI/MobileRuleSummaryWidget.h"
 #include "UI/MahjongTileVisualLibrary.h"
+#include "UI/MahjongLocalSettings.h"
+#include "UI/MobileSettingsWidget.h"
+#include "UI/MahjongResponsiveScaleBox.h"
+#include "UI/MahjongUIScalingRule.h"
 #include "UObject/UnrealType.h"
 #include "Sound/SoundBase.h"
 #if WITH_EDITOR
 #include "WidgetBlueprint.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Button.h"
+#include "Components/Border.h"
+#include "Components/CanvasPanelSlot.h"
+#include "Components/CheckBox.h"
+#include "Components/Slider.h"
+#include "Components/TextBlock.h"
 #endif
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -1110,7 +1119,8 @@ bool FMahjongUISoundAssetsTest::RunTest(const FString& Parameters)
         TEXT("/Game/UI/Audio/SFX_Peng.SFX_Peng"),
         TEXT("/Game/UI/Audio/SFX_Gang.SFX_Gang"),
         TEXT("/Game/UI/Audio/SFX_Hu.SFX_Hu"),
-        TEXT("/Game/UI/Audio/SFX_Pass.SFX_Pass")
+        TEXT("/Game/UI/Audio/SFX_Pass.SFX_Pass"),
+        TEXT("/Game/UI/Audio/BGM_FirstLightParticles.BGM_FirstLightParticles")
     };
     for (const TCHAR* SoundPath : SoundPaths)
     {
@@ -1170,6 +1180,138 @@ bool FMahjongUISoundAssetsTest::RunTest(const FString& Parameters)
             TestNull(TEXT("手牌按钮不应叠加通用点击声"),
                 Cast<USoundBase>(TileButton->GetStyle().PressedSlateSound.GetResourceObject()));
         }
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongSettingsDialogTest, "GuiyangMahjong.UI.SettingsDialogAsset", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongSettingsDialogTest::RunTest(const FString& Parameters)
+{
+    FMahjongLocalSettings InvalidSettings;
+    InvalidSettings.MusicVolume = -1.0f;
+    InvalidSettings.SoundVolume = 2.0f;
+    InvalidSettings.Sanitize();
+    TestEqual(TEXT("音乐音量必须限制为 0"), InvalidSettings.MusicVolume, 0.0f);
+    TestEqual(TEXT("音效音量必须限制为 1"), InvalidSettings.SoundVolume, 1.0f);
+
+    UWidgetBlueprint* Settings = LoadObject<UWidgetBlueprint>(nullptr,
+        TEXT("/Game/UI/Dialogs/WBP_Settings.WBP_Settings"));
+    TestNotNull(TEXT("设置弹窗资产必须存在"), Settings);
+    if (!Settings || !Settings->WidgetTree)
+    {
+        return false;
+    }
+
+    TestTrue(TEXT("设置弹窗必须继承 UMobileSettingsWidget"),
+        Settings->GeneratedClass && Settings->GeneratedClass->IsChildOf(UMobileSettingsWidget::StaticClass()));
+    TestNotNull(TEXT("音乐开关必须存在"), Cast<UCheckBox>(Settings->WidgetTree->FindWidget(TEXT("Chk_MusicEnabled"))));
+    TestNotNull(TEXT("音效开关必须存在"), Cast<UCheckBox>(Settings->WidgetTree->FindWidget(TEXT("Chk_SoundEnabled"))));
+    TestNotNull(TEXT("震动开关必须存在"), Cast<UCheckBox>(Settings->WidgetTree->FindWidget(TEXT("Chk_VibrationEnabled"))));
+    TestNotNull(TEXT("音乐音量滑块必须存在"), Cast<USlider>(Settings->WidgetTree->FindWidget(TEXT("Slider_MusicVolume"))));
+    TestNotNull(TEXT("音效音量滑块必须存在"), Cast<USlider>(Settings->WidgetTree->FindWidget(TEXT("Slider_SoundVolume"))));
+    TestNotNull(TEXT("重置按钮必须存在"), Cast<UButton>(Settings->WidgetTree->FindWidget(TEXT("Btn_Reset"))));
+    TestNotNull(TEXT("退出游戏按钮必须存在"), Cast<UButton>(Settings->WidgetTree->FindWidget(TEXT("Btn_ExitGame"))));
+    TestNotNull(TEXT("关闭按钮必须存在"), Cast<UButton>(Settings->WidgetTree->FindWidget(TEXT("Btn_Close"))));
+
+    UWidgetBlueprint* Lobby = LoadObject<UWidgetBlueprint>(nullptr,
+        TEXT("/Game/UI/Screens/WBP_Lobby.WBP_Lobby"));
+    TestNotNull(TEXT("大厅资产必须存在"), Lobby);
+    if (Lobby && Lobby->WidgetTree)
+    {
+        TestNotNull(TEXT("大厅设置按钮必须存在"),
+            Cast<UButton>(Lobby->WidgetTree->FindWidget(TEXT("Btn_Setting"))));
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongCreateRoomDialogLayoutTest, "GuiyangMahjong.UI.CreateRoomDialogLayout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongCreateRoomDialogLayoutTest::RunTest(const FString& Parameters)
+{
+    UWidgetBlueprint* CreateRoom = LoadObject<UWidgetBlueprint>(nullptr,
+        TEXT("/Game/UI/Dialogs/WBP_CreateRoomDialog.WBP_CreateRoomDialog"));
+    TestNotNull(TEXT("创建房间弹窗资源必须存在"), CreateRoom);
+    if (!CreateRoom || !CreateRoom->WidgetTree)
+    {
+        return false;
+    }
+
+    const UBorder* Dialog = Cast<UBorder>(CreateRoom->WidgetTree->FindWidget(TEXT("Border_Dialog9Slice")));
+    TestNotNull(TEXT("创建房间弹窗背景必须存在"), Dialog);
+    const UCanvasPanelSlot* DialogSlot = Dialog ? Cast<UCanvasPanelSlot>(Dialog->Slot) : nullptr;
+    TestNotNull(TEXT("创建房间弹窗必须使用画布布局"), DialogSlot);
+    if (DialogSlot)
+    {
+        TestTrue(TEXT("1.5 倍缩放下弹窗宽度必须适配手机横屏"), DialogSlot->GetSize().X <= 1720.0f);
+        TestTrue(TEXT("1.5 倍缩放下弹窗高度不得超过 700"), DialogSlot->GetSize().Y <= 700.0f);
+    }
+
+    for (const FName WidgetName : {FName(TEXT("RuleConfig")), FName(TEXT("RuleSummary")),
+        FName(TEXT("Txt_Status")), FName(TEXT("Btn_Create")), FName(TEXT("Btn_Cancel"))})
+    {
+        const UWidget* Widget = CreateRoom->WidgetTree->FindWidget(WidgetName);
+        TestNotNull(FString::Printf(TEXT("创建房间关键控件必须存在：%s"), *WidgetName.ToString()), Widget);
+        const UCanvasPanelSlot* Slot = Widget ? Cast<UCanvasPanelSlot>(Widget->Slot) : nullptr;
+        TestNotNull(FString::Printf(TEXT("创建房间关键控件必须使用画布槽：%s"), *WidgetName.ToString()), Slot);
+        if (Slot)
+        {
+            const FVector2D FarEdge = Slot->GetPosition() + Slot->GetSize();
+            TestTrue(FString::Printf(TEXT("控件不得超出弹窗右边界：%s"), *WidgetName.ToString()),
+                FarEdge.X <= 1720.0f);
+            TestTrue(FString::Printf(TEXT("控件不得超出弹窗下边界：%s"), *WidgetName.ToString()),
+                FarEdge.Y <= 700.0f);
+        }
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongRoomReturnLobbyButtonTest, "GuiyangMahjong.UI.RoomReturnLobbyButton", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongRoomReturnLobbyButtonTest::RunTest(const FString& Parameters)
+{
+    UWidgetBlueprint* Room = LoadObject<UWidgetBlueprint>(nullptr,
+        TEXT("/Game/UI/Screens/WBP_Room.WBP_Room"));
+    TestNotNull(TEXT("游戏房间界面必须存在"), Room);
+    if (!Room || !Room->WidgetTree)
+    {
+        return false;
+    }
+
+    const UButton* ReturnButton = Cast<UButton>(Room->WidgetTree->FindWidget(TEXT("Btn_ReturnLobby")));
+    TestNotNull(TEXT("游戏房间必须提供返回大厅按钮"), ReturnButton);
+    const UCanvasPanelSlot* ReturnSlot = ReturnButton ? Cast<UCanvasPanelSlot>(ReturnButton->Slot) : nullptr;
+    TestNotNull(TEXT("返回大厅按钮必须使用画布槽"), ReturnSlot);
+    if (ReturnSlot)
+    {
+        const FVector2D FarEdge = ReturnSlot->GetPosition() + ReturnSlot->GetSize();
+        TestTrue(TEXT("返回大厅按钮不得超出房间界面右边界"), FarEdge.X <= 1920.0f);
+        TestTrue(TEXT("返回大厅按钮必须位于移动端可视高度内"), FarEdge.Y <= 720.0f);
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongPhoneTabletScalingTest, "GuiyangMahjong.UI.PhoneTabletScaling", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongPhoneTabletScalingTest::RunTest(const FString& Parameters)
+{
+    const UMahjongUIScalingRule* Rule = GetDefault<UMahjongUIScalingRule>();
+    const float PhoneScale = Rule->GetDPIScaleBasedOnSize(FIntPoint(2700, 1224));
+    const float Tablet16x10Scale = Rule->GetDPIScaleBasedOnSize(FIntPoint(2560, 1600));
+    const float Tablet4x3Scale = Rule->GetDPIScaleBasedOnSize(FIntPoint(2048, 1536));
+    TestEqual(TEXT("20:9 手机必须保持 1.5 倍 UI"), PhoneScale, 1.50f);
+    TestTrue(TEXT("16:10 平板缩放必须小于手机"), Tablet16x10Scale < PhoneScale);
+    TestTrue(TEXT("4:3 平板缩放必须小于手机"), Tablet4x3Scale < PhoneScale);
+    TestEqual(TEXT("手机宽屏前景必须使用 Fill"),
+        UMahjongResponsiveScaleBox::ResolveStretchForViewport(FIntPoint(2700, 1224)), EStretch::Fill);
+    TestEqual(TEXT("16:10 平板前景必须保持比例"),
+        UMahjongResponsiveScaleBox::ResolveStretchForViewport(FIntPoint(2560, 1600)), EStretch::ScaleToFit);
+    TestEqual(TEXT("4:3 平板前景必须保持比例"),
+        UMahjongResponsiveScaleBox::ResolveStretchForViewport(FIntPoint(2048, 1536)), EStretch::ScaleToFit);
+
+    UWidgetBlueprint* RootHUD = LoadObject<UWidgetBlueprint>(nullptr,
+        TEXT("/Game/UI/Screens/WBP_RootHUD.WBP_RootHUD"));
+    TestNotNull(TEXT("RootHUD 必须存在"), RootHUD);
+    if (RootHUD && RootHUD->WidgetTree)
+    {
+        TestNotNull(TEXT("RootHUD 必须使用手机/平板响应式前景缩放框"),
+            Cast<UMahjongResponsiveScaleBox>(RootHUD->WidgetTree->FindWidget(TEXT("Scale_Design1920x1080"))));
     }
     return true;
 }

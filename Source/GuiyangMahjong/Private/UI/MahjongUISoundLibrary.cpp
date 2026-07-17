@@ -3,6 +3,7 @@
 #include "GuiyangMahjong.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+#include "UI/MahjongLocalSettings.h"
 
 namespace
 {
@@ -24,6 +25,12 @@ const TCHAR* ResolveSoundPath(const EMahjongUISound SoundType)
 
 bool UMahjongUISoundLibrary::PlayUISound(const UObject* WorldContextObject, const EMahjongUISound SoundType)
 {
+    const FMahjongLocalSettings Settings = FMahjongLocalSettings::Load();
+    if (!Settings.bSoundEnabled || Settings.SoundVolume <= KINDA_SMALL_NUMBER)
+    {
+        return false;
+    }
+
     const TCHAR* AssetPath = ResolveSoundPath(SoundType);
     if (!WorldContextObject || !AssetPath)
     {
@@ -37,6 +44,6 @@ bool UMahjongUISoundLibrary::PlayUISound(const UObject* WorldContextObject, cons
         return false;
     }
 
-    UGameplayStatics::PlaySound2D(WorldContextObject, Sound);
+    UGameplayStatics::PlaySound2D(WorldContextObject, Sound, Settings.SoundVolume);
     return true;
 }
