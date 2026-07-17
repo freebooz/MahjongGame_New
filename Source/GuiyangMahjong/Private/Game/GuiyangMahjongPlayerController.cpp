@@ -20,6 +20,12 @@
 namespace
 {
     bool GIntegrationDisconnectTriggered = false;
+
+    bool IsFullMatchIntegrationEnabled()
+    {
+        return FParse::Param(FCommandLine::Get(), TEXT("MahjongEnableIntegrationHooks"))
+            && FParse::Param(FCommandLine::Get(), TEXT("MahjongIntegrationFullMatch"));
+    }
 }
 
 void AGuiyangMahjongPlayerController::BeginPlay()
@@ -339,6 +345,14 @@ void AGuiyangMahjongPlayerController::Client_ShowFinalSettlement_Implementation(
     OnFinalSettlementShown.Broadcast(Result);
     UE_LOG(LogMahjongUI, Log, TEXT("最终大结算已显示：Room=%s，Rounds=%d"),
         *Result.RoomId, Result.CompletedRounds);
+#if !UE_BUILD_SHIPPING
+    if (IntegrationClientIndex != INDEX_NONE && IsFullMatchIntegrationEnabled())
+    {
+        UE_LOG(LogMahjongNet, Display,
+            TEXT("MAHJONG_INTEGRATION_FINAL_SETTLEMENT Client=%d Room=%s Rounds=%d Players=%d"),
+            IntegrationClientIndex, *Result.RoomId, Result.CompletedRounds, Result.Players.Num());
+    }
+#endif
 }
 
 void AGuiyangMahjongPlayerController::Client_ShowErrorMessage_Implementation(const FString& Message)
@@ -418,7 +432,22 @@ void AGuiyangMahjongPlayerController::PollIntegrationClient()
         if (!bIntegrationQuickStartRequested)
         {
             bIntegrationQuickStartRequested = true;
-            Server_RequestQuickStart();
+            if (IntegrationClientIndex == 0 && IsFullMatchIntegrationEnabled())
+            {
+                // 完整对局集成只跑一局；牌桌动作仍由服务端权威托管推进。
+                FMahjongCreateRoomRequest Request;
+                Request.RoundCount = 1;
+                Request.Rules.bEnableTimeoutAutoPlay = true;
+                Request.Rules.TurnTimeoutSeconds = 3;
+                Request.Rules.ReactionTimeoutSeconds = 3;
+                Request.bPublicRoom = true;
+                Request.bAutoStart = true;
+                Server_RequestCreateRoomWithConfig(Request);
+            }
+            else
+            {
+                Server_RequestQuickStart();
+            }
         }
         return;
     }
@@ -441,7 +470,8 @@ void AGuiyangMahjongPlayerController::HandleIntegrationPrivateState(const FMahjo
     if (IntegrationClientIndex == INDEX_NONE || PrivateState.RoundId <= 0 || PrivateState.Hand.Tiles.IsEmpty()) return;
     UE_LOG(LogMahjongNet, Display, TEXT("MAHJONG_INTEGRATION_PRIVATE_STATE Client=%d Seat=%d Hand=%d Round=%d"),
         IntegrationClientIndex, PrivateState.SeatIndex, PrivateState.Hand.Tiles.Num(), PrivateState.RoundId);
-    if (IntegrationClientIndex == 0 && !GIntegrationDisconnectTriggered)
+    if (IntegrationClientIndex == 0 && !GIntegrationDisconnectTriggered
+        && !IsFullMatchIntegrationEnabled())
     {
         GIntegrationDisconnectTriggered = true;
         Server_RequestIntegrationDisconnect();

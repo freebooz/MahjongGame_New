@@ -4,6 +4,7 @@
 #include "UI/MobileErrorToastWidget.h"
 #include "UI/MobileHandTileWidget.h"
 #include "UI/MobileSettlementWidget.h"
+#include "Game/Mahjong3DTableActor.h"
 #include "Game/GuiyangMahjongGameState.h"
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "Game/GuiyangMahjongPlayerState.h"
@@ -14,6 +15,7 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Components/Viewport.h"
 #include "Components/WrapBox.h"
 #include "Engine/Texture2D.h"
 #include "GuiyangMahjong.h"
@@ -37,6 +39,32 @@ namespace
 void UMobileMahjongHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+    if (Table3DViewport)
+    {
+        Table3DViewport->SetVisibility(ESlateVisibility::HitTestInvisible);
+        Table3DViewport->SetEnableAdvancedFeatures(true);
+        Table3DViewport->SetBackgroundColor(FLinearColor(0.01f, 0.055f, 0.045f, 1.0f));
+        Table3DViewport->SetLightIntensity(4.0f);
+        Table3DViewport->SetSkyIntensity(1.25f);
+        const FVector CameraLocation(0.0f, -1120.0f, 900.0f);
+        Table3DViewport->SetViewLocation(CameraLocation);
+        Table3DViewport->SetViewRotation((FVector(0.0f, 0.0f, 20.0f) - CameraLocation).Rotation());
+        Table3DActor = Cast<AMahjong3DTableActor>(Table3DViewport->Spawn(AMahjong3DTableActor::StaticClass()));
+
+        // 旧二维牌面仅保留本家透明点击层，其余牌区全部由三维模型表现。
+        Panel_SelfHandTiles->SetRenderOpacity(0.0f);
+        Panel_TopHandTiles->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_LeftHandTiles->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_RightHandTiles->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_SelfDiscards->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_TopDiscards->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_LeftDiscards->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_RightDiscards->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_SelfMelds->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_TopMelds->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_LeftMelds->SetVisibility(ESlateVisibility::Collapsed);
+        Panel_RightMelds->SetVisibility(ESlateVisibility::Collapsed);
+    }
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
     {
         PC->OnPrivateHandUpdated.AddUniqueDynamic(this, &ThisClass::HandlePrivateHand);
@@ -55,6 +83,11 @@ void UMobileMahjongHUDWidget::NativeConstruct()
 
 void UMobileMahjongHUDWidget::NativeDestruct()
 {
+    if (Table3DActor)
+    {
+        Table3DActor->Destroy();
+        Table3DActor = nullptr;
+    }
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
     {
         PC->OnPrivateHandUpdated.RemoveDynamic(this, &ThisClass::HandlePrivateHand);
@@ -128,6 +161,7 @@ void UMobileMahjongHUDWidget::RefreshTableState(const FMahjongPublicTableState& 
     RefreshMelds(LocalSeat);
     RefreshJiDisplay();
     if (bHasPrivateState) RebuildPrivateHand();
+    Refresh3DTable();
     UE_LOG(LogMahjongUI, Verbose, TEXT("公共牌桌 UI 刷新：序号=%d"), State.StateSequence);
 }
 
@@ -144,6 +178,7 @@ void UMobileMahjongHUDWidget::RefreshPrivateHand(const FMahjongPrivatePlayerStat
     {
         RebuildPrivateHand();
     }
+    Refresh3DTable();
 }
 
 void UMobileMahjongHUDWidget::ApplyVisualReviewState(const FMahjongPublicTableState& PublicState,
@@ -379,6 +414,19 @@ void UMobileMahjongHUDWidget::HandleTileSelected(UMobileHandTileWidget* TileWidg
         {
             Child->SetSelected(Child == TileWidget);
         }
+    }
+    if (Table3DActor && TileWidget)
+    {
+        Table3DActor->SetSelectedTile(TileWidget->GetTileData().UniqueId);
+    }
+}
+
+void UMobileMahjongHUDWidget::Refresh3DTable()
+{
+    if (Table3DActor)
+    {
+        Table3DActor->UpdateLayout(CachedPublicState, CachedPrivateState,
+            bHasPrivateState, ResolveLocalSeat());
     }
 }
 

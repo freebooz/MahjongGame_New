@@ -26,4 +26,5 @@ public:
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongHandTileSelected OnTileSelected;
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void SetTile(const FMahjongTile& Tile, bool bInteractive);
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void SetSelected(bool bInSelected);
+    const FMahjongTile& GetTileData() const { return TileData; }
 };

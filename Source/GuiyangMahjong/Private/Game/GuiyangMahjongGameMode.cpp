@@ -12,6 +12,15 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 
+namespace
+{
+    bool IsFullMatchIntegrationEnabled()
+    {
+        return FParse::Param(FCommandLine::Get(), TEXT("MahjongEnableIntegrationHooks"))
+            && FParse::Param(FCommandLine::Get(), TEXT("MahjongIntegrationFullMatch"));
+    }
+}
+
 AGuiyangMahjongGameMode::AGuiyangMahjongGameMode()
 {
     GameStateClass = AGuiyangMahjongGameState::StaticClass();
@@ -138,6 +147,13 @@ void AGuiyangMahjongGameMode::HandleCreateRoom(AGuiyangMahjongPlayerController* 
     }
     Player->EnterRoomServer(State.RoomInfo.RoomId, 0);
     PublishRoomState(State);
+    if (IsFullMatchIntegrationEnabled() && Player->MahjongPlayerId == TEXT("integration-client-0"))
+    {
+        UE_LOG(LogMahjongServer, Display,
+            TEXT("MAHJONG_INTEGRATION_FULL_MATCH_ROOM_READY Room=%s Rounds=%d TurnTimeout=%d ReactionTimeout=%d"),
+            *State.RoomInfo.RoomId, State.RoomInfo.RoundCount, State.RuleSnapshot.Config.TurnTimeoutSeconds,
+            State.RuleSnapshot.Config.ReactionTimeoutSeconds);
+    }
 }
 
 void AGuiyangMahjongGameMode::HandleQuickStart(AGuiyangMahjongPlayerController* Controller)
@@ -362,10 +378,13 @@ void AGuiyangMahjongGameMode::RefreshActionTimeoutTimer()
     const int32 TimeoutSeconds = State.Phase == EMahjongTablePhase::PlayerTurn
         ? TableEngine->GetLockedRuleSnapshot().Config.TurnTimeoutSeconds
         : TableEngine->GetLockedRuleSnapshot().Config.ReactionTimeoutSeconds;
-    TableEngine->SetActionDeadlineForServer(GetWorld()->GetTimeSeconds() + TimeoutSeconds, TimeoutSeconds);
+    // 仅显式完整对局集成模式使用快速计时器；正式游戏仍严格采用规则快照秒数。
+    const float TimerDelay = IsFullMatchIntegrationEnabled() ? 0.05f : static_cast<float>(TimeoutSeconds);
+    TableEngine->SetActionDeadlineForServer(GetWorld()->GetTimeSeconds() + TimerDelay,
+        IsFullMatchIntegrationEnabled() ? 1 : TimeoutSeconds);
     FTimerDelegate Delegate;
     Delegate.BindUObject(this, &ThisClass::HandleActionTimeout, State.RoundId, State.TurnId, State.Phase);
-    GetWorldTimerManager().SetTimer(ActionTimeoutHandle, Delegate, TimeoutSeconds, false);
+    GetWorldTimerManager().SetTimer(ActionTimeoutHandle, Delegate, TimerDelay, false);
 }
 
 void AGuiyangMahjongGameMode::HandleActionTimeout(const int32 ExpectedRoundId, const int32 ExpectedTurnId,
@@ -446,6 +465,12 @@ void AGuiyangMahjongGameMode::PublishFinalSettlement(const FMahjongRoomState& Ro
     const FMahjongFinalSettlementResult Result = UGuiyangRoomManager::BuildFinalSettlement(RoomState);
     for (TActorIterator<AGuiyangMahjongPlayerController> It(GetWorld()); It; ++It)
         It->Client_ShowFinalSettlement(Result);
+    if (IsFullMatchIntegrationEnabled())
+    {
+        UE_LOG(LogMahjongServer, Display,
+            TEXT("MAHJONG_INTEGRATION_FULL_MATCH_COMPLETE Room=%s Rounds=%d Players=%d"),
+            *Result.RoomId, Result.CompletedRounds, Result.Players.Num());
+    }
     LastPublishedFinalRoomSequence = RoomState.StateSequence;
 }
 

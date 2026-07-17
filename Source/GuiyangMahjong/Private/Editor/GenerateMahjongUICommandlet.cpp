@@ -19,6 +19,7 @@
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
+#include "Components/Viewport.h"
 #include "Components/WrapBox.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -453,7 +454,32 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(Toast);
 
     UWidgetBlueprint* Login = Create(TEXT("Screens"), TEXT("WBP_Login"), UMobileLoginWidget::StaticClass());
-    { UCanvasPanel* C=Root(Login); UImage* Logo=Image(Login,TEXT("Img_GameLogo"),Gold); Logo->SetBrush(TextureBrush(TEXT("/Game/UI/Textures/Icons/Icon_Chicken.Icon_Chicken"))); Place(C,Logo,{-320,72},{140,140},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_GameTitle"),TEXT("贵阳捉鸡麻将"),54),{-150,92},{620,76},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_GameSubtitle"),TEXT("黔韵牌局 · 地道玩法"),22),{-145,166},{520,42},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_LoginStatus"),TEXT("请选择登录方式"),28),{0,282},{700,52},FAnchors(0.5f,0),{0.5f,0}); UCircularThrobber* Loading=Login->WidgetTree->ConstructWidget<UCircularThrobber>(UCircularThrobber::StaticClass(),TEXT("Loading_Login")); MarkVariable(Login,Loading); Loading->SetVisibility(ESlateVisibility::Collapsed); Place(C,Loading,{0,350},{64,64},FAnchors(0.5f,0),{0.5f,0}); Place(C,Button(Login,TEXT("Btn_WechatLogin"),TEXT("微信登录（PC 模拟授权）")),{-230,440},{460,78},FAnchors(0.5f,0)); Place(C,Button(Login,TEXT("Btn_GuestLogin"),TEXT("游客登录")),{-230,540},{460,78},FAnchors(0.5f,0)); UCheckBox* Terms=Login->WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(),TEXT("Chk_AgreeTerms")); MarkVariable(Login,Terms); Place(C,Terms,{-330,654},{44,44},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_AgreeHint"),TEXT("我已阅读并同意"),24),{-275,656},{210,40},FAnchors(0.5f,0)); Place(C,Button(Login,TEXT("Btn_UserAgreement"),TEXT("用户协议")),{-45,646},{170,56},FAnchors(0.5f,0)); Place(C,Button(Login,TEXT("Btn_PrivacyPolicy"),TEXT("隐私政策")),{145,646},{170,56},FAnchors(0.5f,0)); Place(C,Text(Login,TEXT("Txt_Version"),TEXT("版本 0.2.0 · UE 5.8"),22),{30,-54},{360,36},FAnchors(0,1)); }
+    {
+        // 超宽屏 Fill 会压缩可用逻辑高度；登录操作区控制在前 500 像素内，
+        // 同时也让 4:3 / 16:10 平板保留更舒适的上下留白。
+        UCanvasPanel* C = Root(Login);
+        UImage* Logo = Image(Login, TEXT("Img_GameLogo"), Gold);
+        Logo->SetBrush(TextureBrush(TEXT("/Game/UI/Textures/Icons/Icon_Chicken.Icon_Chicken")));
+        Place(C, Logo, {-280, 32}, {112, 112}, FAnchors(0.5f, 0));
+        Place(C, Text(Login, TEXT("Txt_GameTitle"), TEXT("贵阳捉鸡麻将"), 44), {-145, 44}, {560, 64}, FAnchors(0.5f, 0));
+        Place(C, Text(Login, TEXT("Txt_GameSubtitle"), TEXT("黔韵牌局 · 地道玩法"), 20), {-140, 108}, {480, 36}, FAnchors(0.5f, 0));
+        Place(C, Text(Login, TEXT("Txt_LoginStatus"), TEXT("请选择登录方式"), 26), {0, 178}, {660, 46}, FAnchors(0.5f, 0), {0.5f, 0});
+
+        UCircularThrobber* Loading = Login->WidgetTree->ConstructWidget<UCircularThrobber>(UCircularThrobber::StaticClass(), TEXT("Loading_Login"));
+        MarkVariable(Login, Loading);
+        Loading->SetVisibility(ESlateVisibility::Collapsed);
+        Place(C, Loading, {0, 228}, {54, 54}, FAnchors(0.5f, 0), {0.5f, 0});
+        Place(C, Button(Login, TEXT("Btn_WechatLogin"), TEXT("微信登录（PC 模拟授权）")), {-230, 272}, {460, 68}, FAnchors(0.5f, 0));
+        Place(C, Button(Login, TEXT("Btn_GuestLogin"), TEXT("游客登录")), {-230, 356}, {460, 68}, FAnchors(0.5f, 0));
+
+        UCheckBox* Terms = Login->WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(), TEXT("Chk_AgreeTerms"));
+        MarkVariable(Login, Terms);
+        Place(C, Terms, {-330, 452}, {40, 40}, FAnchors(0.5f, 0));
+        Place(C, Text(Login, TEXT("Txt_AgreeHint"), TEXT("我已阅读并同意"), 22), {-278, 454}, {205, 36}, FAnchors(0.5f, 0));
+        Place(C, Button(Login, TEXT("Btn_UserAgreement"), TEXT("用户协议")), {-52, 444}, {168, 52}, FAnchors(0.5f, 0));
+        Place(C, Button(Login, TEXT("Btn_PrivacyPolicy"), TEXT("隐私政策")), {136, 444}, {168, 52}, FAnchors(0.5f, 0));
+        Place(C, Text(Login, TEXT("Txt_Version"), TEXT("版本 0.2.0 · UE 5.8"), 22), {30, -54}, {360, 36}, FAnchors(0, 1));
+    }
     Finish(Login);
 
     UWidgetBlueprint* Confirm = Create(TEXT("Dialogs"), TEXT("WBP_ConfirmDialog"), UMobileConfirmDialogWidget::StaticClass());
@@ -467,7 +493,7 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
         UCanvasPanelSlot* MaskSlot = Place(C, Mask, {0, 0}, {0, 0}, FAnchors(0, 0, 1, 1));
         MaskSlot->SetOffsets(FMargin(0));
 
-        // Android 使用 1.5 倍应用缩放：700 高度可在 1224px 横屏内完整显示，并保留上下边距。
+        // 700 高度可在手机横屏和平板界面内完整显示，并保留上下边距。
         UBorder* Dialog = Border(CreateRoom, TEXT("Border_Dialog9Slice"), PanelGreen);
         Place(C, Dialog, {0, 0}, {1720, 700}, FAnchors(0.5f, 0.5f), {0.5f, 0.5f});
         UCanvasPanel* D = CreateRoom->WidgetTree->ConstructWidget<UCanvasPanel>(
@@ -568,7 +594,7 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
         MarkVariable(Room, RuleSummaryWidget);
         Place(C, RuleSummaryWidget, {40, 160}, {560, 390});
 
-        // 返回大厅始终固定在右上角，避免 1.5 倍缩放后落到屏幕外。
+        // 返回大厅始终固定在右上角，避免不同宽高比下落到屏幕外。
         Place(C, Button(Room, TEXT("Btn_ReturnLobby"), TEXT("返回大厅")), {1600, 45}, {240, 68});
         Place(C, Text(Room, TEXT("Seat_Top"), TEXT("等待玩家"), 25), {760, 105}, {400, 86});
         Place(C, Text(Room, TEXT("Seat_Left"), TEXT("等待玩家"), 25), {140, 545}, {400, 86});
@@ -590,6 +616,12 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     UWidgetBlueprint* HUD = Create(TEXT("Screens"), TEXT("WBP_GameHUD"), UMobileMahjongHUDWidget::StaticClass());
     {
         UCanvasPanel* C = Root(HUD);
+        UViewport* Table3DViewport = HUD->WidgetTree->ConstructWidget<UViewport>(
+            UViewport::StaticClass(), TEXT("Table3DViewport"));
+        MarkVariable(HUD, Table3DViewport);
+        Table3DViewport->SetBackgroundColor(FLinearColor(0.01f, 0.055f, 0.045f, 1.0f));
+        Table3DViewport->SetVisibility(ESlateVisibility::HitTestInvisible);
+        Place(C, Table3DViewport, {170,100}, {1580,840});
         Place(C, Text(HUD, TEXT("Txt_RoomId"), TEXT("房间：100001"), 20), {30,24}, {360,36});
         Place(C, Text(HUD, TEXT("Txt_CurrentPhase"), TEXT("阶段：玩家回合"), 20), {30,62}, {420,36});
         Place(C, Text(HUD, TEXT("Txt_RemainingTileCount"), TEXT("剩余：83"), 26), {820,20}, {250,44});

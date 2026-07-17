@@ -1,0 +1,225 @@
+{
+  "generator": "Blender 5.1+ GenerateMahjongTileAssets.py",
+  "blender_version": "5.1.2",
+  "mesh": "SM_MahjongTile",
+  "dimensions_mm": [
+    32,
+    22,
+    44
+  ],
+  "bevel_mm": 1.8,
+  "pivot": "bottom_center",
+  "material_slots": [
+    "M_MahjongTile_Body",
+    "M_MahjongTile_Face",
+    "M_MahjongTile_Back"
+  ],
+  "face_texture_count": 27,
+  "assets": [
+    {
+      "path": "SourceArt/3D/MahjongTiles/MahjongTile_Preview.png",
+      "bytes": 426433,
+      "sha256": "1ef39fdffaeb255688ebdb04acc852f17bfd74d4b9c8b6440801dc8448f169e6"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/SM_MahjongTile.blend",
+      "bytes": 106174,
+      "sha256": "54d50d7446c819938706b7e3e25d856658adff70640cb674d6c250fd8cab6c13"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/SM_MahjongTile.blend1",
+      "bytes": 106063,
+      "sha256": "fc6c022cdefc5832f2fc81ce3ef730a7b91c266c76e13dae807d892ebea157f9"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/SM_MahjongTile.fbx",
+      "bytes": 36540,
+      "sha256": "457e1060ae464ceaddebf38cda435ad64ab37bc49801b2d49d6b5d6d867c1f84"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/SM_MahjongTile.glb",
+      "bytes": 73084,
+      "sha256": "36a41287462b58dbd28f3578b687b659f187f1323e494a61e56a45723ab24b4f"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/SM_MahjongTile.usdc",
+      "bytes": 25921,
+      "sha256": "41ee508e92aaaef151d099fbaa13ed5f8ccd716936430d32c65e1a845239fb3e"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Back.png",
+      "bytes": 2221,
+      "sha256": "e3f9d0492b4940ee00b4290bdc9bd75a3008d89f70d54c93dbf1a699df1bf450"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_FrontBlank.png",
+      "bytes": 3948,
+      "sha256": "ad841ec20ab1c1830df868cf267a8017878f1284c0aacf72a636ed63a9cb3888"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tiao_01.png",
+      "bytes": 4254,
+      "sha256": "b0690595c2731314f63a430ee771f5e65a619a2386b66186d85de1aba380424c"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tiao_02.png",
+      "bytes": 4333,
+      "sha256": "aa635f42b2a3d259dce76aef6155eab7f78ab2dbdb60b89fe21ce344e406964f"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tiao_03.png",
+      "bytes": 4479,
+      "sha256": "4ad329359966dc17c645d06a5c9326bc733bf409da40b4fdd689f996c6f913c5"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tiao_04.png",
+      "bytes": 4609,
+      "sha256": "aa3841d5275d02f81512caf8253ecc66402849cece4e3ef14cdc04cfd3f89e51"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tiao_05.png",
+      "bytes": 4717,
+      "sha256": "f082b9cc8187c03f3c6add4c8728e5f57ee524ccc38898d3fab7b91efd0238ad"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tiao_06.png",
+      "bytes": 4811,
+      "sha256": "7f88058943ab1283559936d8310b869d598e15520241d68606e7f6db8fc12983"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tiao_07.png",
+      "bytes": 4919,
+      "sha256": "ff2e5b97e2b976cdda0a960ea732c83e7e25f93100f2d84ef02b82b397f93549"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tiao_08.png",
+      "bytes": 5053,
+      "sha256": "959d7e076bf1b5fa514e6942146dae71224a16f6584dd2614ecc0acde803753e"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tiao_09.png",
+      "bytes": 5121,
+      "sha256": "2698631ed7ee3dfa6a35c221f4716f486ca3e782c24a52da8c2f249631474da7"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tong_01.png",
+      "bytes": 4513,
+      "sha256": "22f09da11edce9e3c42ebabb94889915354233090f68eba170baed8425ad2cb6"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tong_02.png",
+      "bytes": 4861,
+      "sha256": "cf9f104e98239c60353b790f61f2d6aeecdecc3d48125c70596573c68423b4a5"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tong_03.png",
+      "bytes": 5280,
+      "sha256": "4b1b310b36b77cea571cae827f51901be96ac5b77f4f297f455f5718f7c926d2"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tong_04.png",
+      "bytes": 5692,
+      "sha256": "64b4768142f57be6f80cf2a4309fd2849893aee20c7ab116ba143aad78d90db5"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tong_05.png",
+      "bytes": 5991,
+      "sha256": "f2411ce1bc83cdc9f940410f030d85fee40cdad89da59014ccbc3366e210801d"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tong_06.png",
+      "bytes": 6369,
+      "sha256": "eaf44dc181b7d41918c3887cc3afa628815fbe9d52ca1a4fc8658ab7c1f20076"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tong_07.png",
+      "bytes": 6719,
+      "sha256": "cac02c876c89b4848aa9b4f4c5df496dfa351a8ca4643a56cfe99b8723b89e69"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tong_08.png",
+      "bytes": 7043,
+      "sha256": "c2fca06757b9d26cfa39da064415a4d742c11d5e9cf78783e560502836c5acf1"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Tong_09.png",
+      "bytes": 7377,
+      "sha256": "e02a79f6d87f76d72c37c1e6d8c3c29ca79946ade8b1e53c4583e5fbcccadee9"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Wan_01.png",
+      "bytes": 6003,
+      "sha256": "2b136435f52de7503f2a20e66670efde6b90a26fe2f8af27e040262a0c67b6dd"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Wan_02.png",
+      "bytes": 6074,
+      "sha256": "13107eb542ec19485881f03b06f18553ffcfffe718d4d811c625ef4a44f23d7e"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Wan_03.png",
+      "bytes": 6130,
+      "sha256": "18ea9b6b25f90e9e35782272a08d1440bd31344b3012844c90a48eca8cc3bfd8"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Wan_04.png",
+      "bytes": 6863,
+      "sha256": "d6eed1b8aa7665f4100d572705e728fef1e981b3160f4b7856de5162acf046cc"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Wan_05.png",
+      "bytes": 6538,
+      "sha256": "7d836be2775e393bb4d23331d85f9fa90dd1a9d06c527feed3006d9233b9f16b"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Wan_06.png",
+      "bytes": 7921,
+      "sha256": "566137b597150d9cafaab9e87316f4fc1b1d2e776a6162abffdc9090dff6ecb5"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Wan_07.png",
+      "bytes": 7156,
+      "sha256": "5d7d6383fa2c6f19196d3deb1a40d86b1b11d635fc4f7e917fe77087f3acb759"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Wan_08.png",
+      "bytes": 8157,
+      "sha256": "e57d2fb6591aaba2f8626d8688ef1059b26db0d01a076cd59852107112d1206c"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/Faces/T_Tile_Wan_09.png",
+      "bytes": 7409,
+      "sha256": "a4d31878f502754498b7fad346c8b80a98da2246512c38595f5d8b55796c5f96"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/T_MahjongBack_BaseColor.png",
+      "bytes": 14432,
+      "sha256": "39d5e25500640f056d69da0fa29e1655a6be451ccbddf456cc3adc508a756ae8"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/T_MahjongBody_BaseColor.png",
+      "bytes": 25862,
+      "sha256": "6a9a149ae76a49468ff6bd5f86803197309a56e98a8ee21832ecb801f96f8b17"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/T_MahjongBody_Normal.png",
+      "bytes": 1493,
+      "sha256": "1227c4e97c914f1d5ee1076d002e83b9d27c18ee6de5a8f2c48905e90f50fbd7"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/T_MahjongBody_Roughness.png",
+      "bytes": 3076,
+      "sha256": "491828cd03099825a30a63792f9509c15ec323649c8909c04d8d68d3f8f7a26a"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/T_Tile_FrontBlank.png",
+      "bytes": 1422,
+      "sha256": "729a5fd6b32b52267244ec6a024e1b5d3c9009867d462929d766615f91966a25"
+    },
+    {
+      "path": "SourceArt/3D/MahjongTiles/Textures/color_020403.exr",
+      "bytes": 461,
+      "sha256": "f75cf70556e2794dcfe0fda57e953c0e0e741d0cd833f906315d97cda3f1bcbc"
+    }
+  ]
+}

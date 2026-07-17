@@ -13,6 +13,7 @@
 #include "History/MahjongMatchHistorySaveGame.h"
 #include "History/GuiyangMatchHistorySubsystem.h"
 #include "Engine/GameInstance.h"
+#include "Engine/StaticMesh.h"
 #include "Kismet/GameplayStatics.h"
 #include "Network/MahjongNetworkTypes.h"
 #include "UI/MobileMahjongHUDWidget.h"
@@ -24,6 +25,7 @@
 #include "UI/MobileSettingsWidget.h"
 #include "UI/MahjongResponsiveScaleBox.h"
 #include "UI/MahjongUIScalingRule.h"
+#include "Game/Mahjong3DTableActor.h"
 #include "UObject/UnrealType.h"
 #include "Sound/SoundBase.h"
 #if WITH_EDITOR
@@ -35,6 +37,7 @@
 #include "Components/CheckBox.h"
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
+#include "Components/Viewport.h"
 #endif
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -1288,6 +1291,38 @@ bool FMahjongRoomReturnLobbyButtonTest::RunTest(const FString& Parameters)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongThreeDTableLayoutTest, "GuiyangMahjong.UI.ThreeDTableLayout", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
+{
+    UWidgetBlueprint* GameHUD = LoadObject<UWidgetBlueprint>(nullptr,
+        TEXT("/Game/UI/Screens/WBP_GameHUD.WBP_GameHUD"));
+    TestNotNull(TEXT("三维牌桌 HUD 必须存在"), GameHUD);
+    if (!GameHUD || !GameHUD->WidgetTree) return false;
+
+    const UViewport* Viewport = Cast<UViewport>(GameHUD->WidgetTree->FindWidget(TEXT("Table3DViewport")));
+    TestNotNull(TEXT("游戏 HUD 必须包含三维牌桌 Viewport"), Viewport);
+    const UCanvasPanelSlot* ViewportSlot = Viewport ? Cast<UCanvasPanelSlot>(Viewport->Slot) : nullptr;
+    TestNotNull(TEXT("三维牌桌 Viewport 必须使用画布布局"), ViewportSlot);
+    if (ViewportSlot)
+    {
+        TestTrue(TEXT("三维牌桌必须覆盖主要桌面宽度"), ViewportSlot->GetSize().X >= 1500.0f);
+        TestTrue(TEXT("三维牌桌必须覆盖主要桌面高度"), ViewportSlot->GetSize().Y >= 800.0f);
+    }
+    TestNotNull(TEXT("三维牌桌 Actor 类必须可加载"), AMahjong3DTableActor::StaticClass());
+    UStaticMesh* TileMesh = LoadObject<UStaticMesh>(nullptr,
+        TEXT("/Game/Art/Mahjong/Tiles/SM_MahjongTile.SM_MahjongTile"));
+    TestNotNull(TEXT("Blender 麻将牌静态网格必须已导入"), TileMesh);
+    if (TileMesh)
+    {
+        const FVector Extent = TileMesh->GetBounds().BoxExtent;
+        TestTrue(TEXT("麻将牌宽度必须约为 32mm"), FMath::IsNearlyEqual(Extent.X * 2.0f, 3.2f, 0.15f));
+        TestTrue(TEXT("麻将牌厚度必须约为 22mm"), FMath::IsNearlyEqual(Extent.Y * 2.0f, 2.3f, 0.15f));
+        TestTrue(TEXT("麻将牌高度必须约为 44mm"), FMath::IsNearlyEqual(Extent.Z * 2.0f, 4.4f, 0.15f));
+        TestEqual(TEXT("麻将牌必须包含牌身、牌面、牌背三个材质槽"), TileMesh->GetStaticMaterials().Num(), 3);
+    }
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongPhoneTabletScalingTest, "GuiyangMahjong.UI.PhoneTabletScaling", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FMahjongPhoneTabletScalingTest::RunTest(const FString& Parameters)
 {
@@ -1295,9 +1330,9 @@ bool FMahjongPhoneTabletScalingTest::RunTest(const FString& Parameters)
     const float PhoneScale = Rule->GetDPIScaleBasedOnSize(FIntPoint(2700, 1224));
     const float Tablet16x10Scale = Rule->GetDPIScaleBasedOnSize(FIntPoint(2560, 1600));
     const float Tablet4x3Scale = Rule->GetDPIScaleBasedOnSize(FIntPoint(2048, 1536));
-    TestEqual(TEXT("20:9 手机必须保持 1.5 倍 UI"), PhoneScale, 1.50f);
-    TestTrue(TEXT("16:10 平板缩放必须小于手机"), Tablet16x10Scale < PhoneScale);
-    TestTrue(TEXT("4:3 平板缩放必须小于手机"), Tablet4x3Scale < PhoneScale);
+    TestEqual(TEXT("20:9 手机必须使用 1.0 倍 UI"), PhoneScale, 1.0f);
+    TestEqual(TEXT("16:10 平板必须使用 1.0 倍 UI"), Tablet16x10Scale, 1.0f);
+    TestEqual(TEXT("4:3 平板必须使用 1.0 倍 UI"), Tablet4x3Scale, 1.0f);
     TestEqual(TEXT("手机宽屏前景必须使用 Fill"),
         UMahjongResponsiveScaleBox::ResolveStretchForViewport(FIntPoint(2700, 1224)), EStretch::Fill);
     TestEqual(TEXT("16:10 平板前景必须保持比例"),

@@ -5,7 +5,8 @@
 #include "Network/MahjongNetworkTypes.h"
 #include "MobileMahjongHUDWidget.generated.h"
 
-class UHorizontalBox; class UOverlay; class UTextBlock; class UVerticalBox; class UWrapBox;
+class UHorizontalBox; class UOverlay; class UTextBlock; class UVerticalBox; class UViewport; class UWrapBox;
+class AMahjong3DTableActor;
 class UMobileActionButtonPanel;
 class UMobileHandTileWidget;
 class UMobileErrorToastWidget;
@@ -27,6 +28,7 @@ protected:
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_Countdown;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_FlippedJiTile;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_JiEvents;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UViewport> Table3DViewport;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UHorizontalBox> Panel_SelfHandTiles;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UHorizontalBox> Panel_TopHandTiles;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UVerticalBox> Panel_LeftHandTiles;
@@ -48,6 +50,7 @@ protected:
     UPROPERTY(Transient) TObjectPtr<UMobileErrorToastWidget> ErrorToastInstance;
     UPROPERTY(Transient) TObjectPtr<UMobileSettlementWidget> SettlementInstance;
     UPROPERTY(Transient) TObjectPtr<UMobileHandTileWidget> SelectedHandTile;
+    UPROPERTY(Transient) TObjectPtr<AMahjong3DTableActor> Table3DActor;
     UPROPERTY() FMahjongPublicTableState CachedPublicState;
     UPROPERTY() FMahjongPrivatePlayerState CachedPrivateState;
     bool bHasPrivateState = false;
@@ -75,4 +78,5 @@ private:
     void RefreshDiscards(int32 LocalSeat);
     void RefreshMelds(int32 LocalSeat);
     void RefreshJiDisplay();
+    void Refresh3DTable();
 };
