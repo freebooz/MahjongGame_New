@@ -15,6 +15,8 @@
 #include "Engine/GameInstance.h"
 #include "Kismet/GameplayStatics.h"
 #include "Network/MahjongNetworkTypes.h"
+#include "UI/MobileMahjongHUDWidget.h"
+#include "UI/MobileRuleSummaryWidget.h"
 #include "UObject/UnrealType.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -116,6 +118,38 @@ bool FMahjongRuleSnapshotTest::RunTest(const FString& Parameters)
     FGuiyangRuleSnapshot Tampered = First;
     Tampered.Config.bEnableQiDui = !Tampered.Config.bEnableQiDui;
     TestFalse(TEXT("被修改的规则快照必须校验失败"), UGuiyangRuleSnapshotLibrary::VerifySnapshot(Tampered));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongRuleSummaryTest, "GuiyangMahjong.UI.RuleSummaryConsistency", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongRuleSummaryTest::RunTest(const FString& Parameters)
+{
+    FMahjongRuleConfig Config;
+    Config.TileSetMode = EMahjongTileSetMode::Standard136;
+    Config.bEnableChongFengJi = false;
+    Config.bEnableQiDui = false;
+    Config.BaseScore = 3;
+    Config.TurnTimeoutSeconds = 20;
+    const FGuiyangRuleSnapshot Snapshot = UGuiyangRuleSnapshotLibrary::CreateSnapshot(Config);
+    const FString Summary = UMobileRuleSummaryWidget::BuildSummaryText(Snapshot, 8, true);
+    TestTrue(TEXT("规则摘要显示 136 张牌制"), Summary.Contains(TEXT("136 张标准牌")));
+    TestTrue(TEXT("规则摘要显示局数和密码房"), Summary.Contains(TEXT("8 局")) && Summary.Contains(TEXT("密码房")));
+    TestTrue(TEXT("规则摘要显示关闭的冲锋鸡"), Summary.Contains(TEXT("冲锋鸡关")));
+    TestTrue(TEXT("规则摘要显示关闭的七对"), Summary.Contains(TEXT("七对关")));
+    TestTrue(TEXT("规则摘要显示分数和超时"), Summary.Contains(TEXT("底分 3")) && Summary.Contains(TEXT("出牌 20 秒")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FMahjongHudSeatMappingTest, "GuiyangMahjong.UI.HudSeatMapping", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FMahjongHudSeatMappingTest::RunTest(const FString& Parameters)
+{
+    TestEqual(TEXT("本地座位固定映射到底部"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(2, 2), 0);
+    TestEqual(TEXT("本地玩家下家映射到右侧"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(3, 2), 1);
+    TestEqual(TEXT("本地玩家对家映射到顶部"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(0, 2), 2);
+    TestEqual(TEXT("本地玩家上家映射到左侧"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(1, 2), 3);
+    TestEqual(TEXT("非法座位不会访问 UI 数组"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(INDEX_NONE, 2), INDEX_NONE);
+    TestEqual(TEXT("牌局阶段显示中文"), UMobileMahjongHUDWidget::GetPhaseDisplayText(
+        EMahjongTablePhase::WaitingForAction), FString(TEXT("等待碰杠胡")));
     return true;
 }
 

@@ -3,6 +3,7 @@
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "GuiyangMahjong.h"
+#include "UI/MobileRuleSummaryWidget.h"
 
 void UMobileRoomWidget::NativeConstruct()
 {
@@ -26,6 +27,7 @@ void UMobileRoomWidget::RefreshRoomState(const FMahjongRoomState& State, const i
 {
     Txt_RoomId->SetText(FText::FromString(FString::Printf(TEXT("房间号：%s"), *State.RoomInfo.RoomId)));
     Txt_RuleSummary->SetText(FText::FromString(State.RoomInfo.RuleSummary));
+    RuleSummary->SetRuleSnapshot(State.RuleSnapshot, State.RoomInfo.RoundCount, State.RoomInfo.bPasswordProtected);
     UTextBlock* SeatWidgets[] = {Seat_Bottom, Seat_Right, Seat_Top, Seat_Left};
     for (int32 Index = 0; Index < 4; ++Index)
     {

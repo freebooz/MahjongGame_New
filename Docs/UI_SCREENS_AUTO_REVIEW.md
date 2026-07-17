@@ -7,8 +7,8 @@
 | CreateRoomDialog | 待跑 | 待跑 | 待跑 | 待跑 | Widget 已生成并完成 C++ 绑定，待截图 |
 | JoinRoomDialog | 待跑 | 待跑 | 待跑 | 待跑 | Widget 已生成并完成 C++ 绑定，待截图 |
 | Room | 待跑 | 待跑 | 待跑 | 待跑 | 等待导入/地图 |
-| RuleConfig | 待跑 | 待跑 | 待跑 | 待跑 | Widget 尚缺 |
-| GameHUD | 待跑 | 待跑 | 待跑 | 待跑 | 等待导入/地图 |
+| RuleConfig | 待跑 | 待跑 | 待跑 | 待跑 | Widget 已生成、接入创建房并完成 C++ 绑定，待截图 |
+| GameHUD | 待跑 | 待跑 | 待跑 | 待跑 | 座位旋转、弃牌、副露、鸡牌和手牌交互已接线，待实际截图 |
 | Settlement | 待跑 | 待跑 | 待跑 | 待跑 | 等待导入/地图 |
 | ErrorToast | 待跑 | 待跑 | 待跑 | 待跑 | 等待导入/地图 |
 | ReconnectOverlay | 待跑 | 待跑 | 待跑 | 待跑 | 等待导入/地图 |

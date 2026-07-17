@@ -6,6 +6,7 @@
 #include "MobileRoomWidget.generated.h"
 
 class UButton; class UTextBlock;
+class UMobileRuleSummaryWidget;
 
 /** 房间页 C++ 基类。房间显示数据来自 GameState 的 OnRep_RoomState。 */
 UCLASS(Abstract, BlueprintType)
@@ -16,6 +17,7 @@ protected:
     virtual void NativeConstruct() override;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_RoomId;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_RuleSummary;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UMobileRuleSummaryWidget> RuleSummary;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Seat_Top;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Seat_Left;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Seat_Right;

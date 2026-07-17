@@ -5,8 +5,9 @@
 #include "Network/MahjongNetworkTypes.h"
 #include "MobileMahjongHUDWidget.generated.h"
 
-class UHorizontalBox; class UOverlay; class UTextBlock; class UWrapBox;
+class UHorizontalBox; class UOverlay; class UTextBlock; class UVerticalBox; class UWrapBox;
 class UMobileActionButtonPanel;
+class UMobileHandTileWidget;
 class UMobileErrorToastWidget;
 class UMobileSettlementWidget;
 
@@ -24,11 +25,17 @@ protected:
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_CurrentPhase;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_CurrentTurnPlayer;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_Countdown;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_FlippedJiTile;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_JiEvents;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UHorizontalBox> Panel_SelfHandTiles;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UWrapBox> Panel_SelfDiscards;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UWrapBox> Panel_TopDiscards;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UWrapBox> Panel_LeftDiscards;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UWrapBox> Panel_RightDiscards;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UVerticalBox> Panel_SelfMelds;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UVerticalBox> Panel_TopMelds;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UVerticalBox> Panel_LeftMelds;
+    UPROPERTY(meta=(BindWidget)) TObjectPtr<UVerticalBox> Panel_RightMelds;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Seat_Top;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Seat_Left;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Seat_Right;
@@ -37,13 +44,27 @@ protected:
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UOverlay> PopupLayer;
     UPROPERTY(Transient) TObjectPtr<UMobileErrorToastWidget> ErrorToastInstance;
     UPROPERTY(Transient) TObjectPtr<UMobileSettlementWidget> SettlementInstance;
+    UPROPERTY(Transient) TObjectPtr<UMobileHandTileWidget> SelectedHandTile;
+    UPROPERTY() FMahjongPublicTableState CachedPublicState;
+    UPROPERTY() FMahjongPrivatePlayerState CachedPrivateState;
+    bool bHasPrivateState = false;
     UFUNCTION() void HandlePublicTableState(const FMahjongPublicTableState& State);
     UFUNCTION() void HandlePrivateHand(const FMahjongPrivatePlayerState& State);
     UFUNCTION() void HandleAvailableActions(const TArray<FMahjongAction>& Actions);
     UFUNCTION() void HandleSettlement(const FMahjongSettlementResult& Result);
     UFUNCTION() void HandleFinalSettlement(const FMahjongFinalSettlementResult& Result);
     UFUNCTION() void HandleError(const FString& Message);
+    UFUNCTION() void HandleTileSelected(UMobileHandTileWidget* TileWidget);
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshTableState(const FMahjongPublicTableState& State);
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshPrivateHand(const FMahjongPrivatePlayerState& State);
+    static int32 GetRelativeSeatIndex(int32 AbsoluteSeat, int32 LocalSeat);
+    static FString GetPhaseDisplayText(EMahjongTablePhase Phase);
+
+private:
+    int32 ResolveLocalSeat() const;
+    void RebuildPrivateHand();
+    void RefreshDiscards(int32 LocalSeat);
+    void RefreshMelds(int32 LocalSeat);
+    void RefreshJiDisplay();
 };

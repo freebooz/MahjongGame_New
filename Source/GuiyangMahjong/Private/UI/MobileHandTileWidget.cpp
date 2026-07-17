@@ -13,17 +13,23 @@ void UMobileHandTileWidget::NativeConstruct()
 void UMobileHandTileWidget::SetTile(const FMahjongTile& Tile, const bool bInteractive)
 {
     TileData = Tile;
-    bSelected = false;
+    SetSelected(false);
     Txt_TileName->SetText(FText::FromString(Tile.ToDebugString()));
     Btn_Tile->SetIsEnabled(bInteractive);
+}
+
+void UMobileHandTileWidget::SetSelected(const bool bInSelected)
+{
+    bSelected = bInSelected;
+    SetRenderTranslation(bSelected ? FVector2D(0.0, -18.0) : FVector2D::ZeroVector);
 }
 
 void UMobileHandTileWidget::HandleTileClicked()
 {
     if (!bSelected)
     {
-        bSelected = true;
-        SetRenderTranslation(FVector2D(0.0, -18.0));
+        SetSelected(true);
+        OnTileSelected.Broadcast(this);
         UE_LOG(LogMahjongUI, Log, TEXT("选中手牌：%s"), *TileData.ToDebugString());
         return;
     }
