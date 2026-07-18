@@ -138,6 +138,127 @@ public sealed class AllocatorIntegrationDomainTests
         Assert.Null(failed?.PendingServerInstanceId);
     }
 
+    [Fact]
+    public async Task ReconnectRoute_UsesAuthenticatedPlayerMappingInsteadOfClientHints()
+    {
+        var fixture = CreateFixture();
+        var owner = new PlayerIdentity("owner-reconnect", "Owner", "Guest");
+        var created = await fixture.Service.CreateRoomAsync(
+            Guid.NewGuid().ToString(), owner, NewCreateRequest(), CancellationToken.None);
+        var room = await fixture.Store.GetRoomByIdAsync(created.RoomId, CancellationToken.None);
+        Assert.NotNull(room);
+        await fixture.Service.RegisterGameServerAsync(
+            Guid.NewGuid().ToString(),
+            new GameServerRegistration(
+                fixture.Allocator.ServerInstanceId, room.RoomId, room.MatchId,
+                "127.0.0.1", 19000, "test", "credential"),
+            CancellationToken.None);
+
+        var route = await fixture.Service.GetReconnectRouteAsync(
+            Guid.NewGuid().ToString(), owner,
+            new ReconnectRouteRequest(Guid.NewGuid().ToString(), Guid.NewGuid().ToString()),
+            CancellationToken.None);
+
+        Assert.Equal(room.RoomId, route.RoomId);
+        Assert.Equal(room.MatchId, route.MatchId);
+        await Assert.ThrowsAsync<LobbyOperationException>(() => fixture.Service.GetReconnectRouteAsync(
+            Guid.NewGuid().ToString(),
+            new PlayerIdentity("not-a-member", "Other", "Guest"),
+            new ReconnectRouteRequest(),
+            CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task MatchResult_IsPersistedOnceAndDuplicateIsAcknowledged()
+    {
+        var fixture = CreateFixture();
+        var owner = new PlayerIdentity("owner-result", "Owner", "Guest");
+        var created = await fixture.Service.CreateRoomAsync(
+            Guid.NewGuid().ToString(), owner, NewCreateRequest(), CancellationToken.None);
+        var room = await fixture.Store.GetRoomByIdAsync(created.RoomId, CancellationToken.None);
+        Assert.NotNull(room);
+        var registration = await fixture.Service.RegisterGameServerAsync(
+            Guid.NewGuid().ToString(),
+            new GameServerRegistration(
+                fixture.Allocator.ServerInstanceId, room.RoomId, room.MatchId,
+                "127.0.0.1", 19000, "test", "credential"),
+            CancellationToken.None);
+        await fixture.Service.RecordGameServerHeartbeatAsync(
+            Guid.NewGuid().ToString(), fixture.Allocator.ServerInstanceId,
+            NewHeartbeat(room.RoomId, "Playing"), CancellationToken.None);
+        await fixture.Service.RecordGameServerHeartbeatAsync(
+            Guid.NewGuid().ToString(), fixture.Allocator.ServerInstanceId,
+            NewHeartbeat(room.RoomId, "Settling"), CancellationToken.None);
+        var report = new MatchResultReport(
+            room.RoomId,
+            fixture.Allocator.ServerInstanceId,
+            42,
+            4,
+            [new MatchPlayerResult(owner.PlayerId, 0, 1, 16)]);
+
+        var first = await fixture.Service.SubmitMatchResultAsync(
+            Guid.NewGuid().ToString(), room.MatchId, registration.ResultCredential,
+            report, CancellationToken.None);
+        var duplicate = await fixture.Service.SubmitMatchResultAsync(
+            Guid.NewGuid().ToString(), room.MatchId, registration.ResultCredential,
+            report, CancellationToken.None);
+
+        Assert.True(first.Accepted);
+        Assert.False(first.Duplicate);
+        Assert.True(duplicate.Accepted);
+        Assert.True(duplicate.Duplicate);
+        Assert.Equal(RoomLifecycle.Closed,
+            (await fixture.Store.GetRoomByIdAsync(room.RoomId, CancellationToken.None))?.Lifecycle);
+        Assert.Equal(2, fixture.Allocator.DrainCount);
+        var conflicting = report with
+        {
+            Players = [new MatchPlayerResult(owner.PlayerId, 0, 1, 99)]
+        };
+        await Assert.ThrowsAsync<LobbyOperationException>(() => fixture.Service.SubmitMatchResultAsync(
+            Guid.NewGuid().ToString(), room.MatchId, registration.ResultCredential,
+            conflicting, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task MatchResult_RetryAfterDrainFailureDoesNotPersistTwice()
+    {
+        var fixture = CreateFixture();
+        var owner = new PlayerIdentity("owner-result-retry", "Owner", "Guest");
+        var created = await fixture.Service.CreateRoomAsync(
+            Guid.NewGuid().ToString(), owner, NewCreateRequest(), CancellationToken.None);
+        var room = await fixture.Store.GetRoomByIdAsync(created.RoomId, CancellationToken.None);
+        Assert.NotNull(room);
+        var registration = await fixture.Service.RegisterGameServerAsync(
+            Guid.NewGuid().ToString(),
+            new GameServerRegistration(
+                fixture.Allocator.ServerInstanceId, room.RoomId, room.MatchId,
+                "127.0.0.1", 19000, "test", "credential"),
+            CancellationToken.None);
+        await fixture.Service.RecordGameServerHeartbeatAsync(
+            Guid.NewGuid().ToString(), fixture.Allocator.ServerInstanceId,
+            NewHeartbeat(room.RoomId, "Playing"), CancellationToken.None);
+        await fixture.Service.RecordGameServerHeartbeatAsync(
+            Guid.NewGuid().ToString(), fixture.Allocator.ServerInstanceId,
+            NewHeartbeat(room.RoomId, "Settling"), CancellationToken.None);
+        var report = new MatchResultReport(
+            room.RoomId, fixture.Allocator.ServerInstanceId, 88, 4,
+            [new MatchPlayerResult(owner.PlayerId, 0, 1, 20)]);
+        fixture.Allocator.DrainFailuresRemaining = 1;
+
+        var firstFailure = await Assert.ThrowsAsync<LobbyOperationException>(() =>
+            fixture.Service.SubmitMatchResultAsync(
+                Guid.NewGuid().ToString(), room.MatchId, registration.ResultCredential,
+                report, CancellationToken.None));
+        Assert.Equal(LobbyErrorCode.ServerUnavailable, firstFailure.ErrorCode);
+        var recovered = await fixture.Service.SubmitMatchResultAsync(
+            Guid.NewGuid().ToString(), room.MatchId, registration.ResultCredential,
+            report, CancellationToken.None);
+
+        Assert.True(recovered.Accepted);
+        Assert.True(recovered.Duplicate);
+        Assert.Equal(2, fixture.Allocator.DrainCount);
+    }
+
     private static Fixture CreateFixture()
     {
         var options = Microsoft.Extensions.Options.Options.Create(new LobbyOptions
@@ -172,6 +293,15 @@ public sealed class AllocatorIntegrationDomainTests
         null,
         new Dictionary<string, object?> { ["ruleId"] = "GuiyangMainstreamV1" });
 
+    private static GameServerHeartbeat NewHeartbeat(string roomId, string lifecycle) => new(
+        roomId,
+        "heartbeat-credential",
+        1,
+        lifecycle,
+        1,
+        "test",
+        DateTimeOffset.UtcNow);
+
     private sealed record Fixture(
         LobbyService Service,
         InMemoryLobbyStore Store,
@@ -181,6 +311,8 @@ public sealed class AllocatorIntegrationDomainTests
     private sealed class RecordingAllocatorClient : IAllocatorClient
     {
         public string ServerInstanceId { get; } = Guid.NewGuid().ToString();
+        public int DrainCount { get; private set; }
+        public int DrainFailuresRemaining { get; set; }
         public bool Enabled => true;
 
         public Task<AllocatorAllocation> AllocateAsync(
@@ -198,6 +330,15 @@ public sealed class AllocatorIntegrationDomainTests
             string serverInstanceId,
             GameServerHeartbeat request,
             CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task DrainAsync(
+            string requestId, string serverInstanceId, CancellationToken cancellationToken)
+        {
+            Assert.Equal(ServerInstanceId, serverInstanceId);
+            DrainCount++;
+            if (DrainFailuresRemaining-- > 0) throw new HttpRequestException("temporary drain failure");
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class NoOpEventPublisher : ILobbyEventPublisher

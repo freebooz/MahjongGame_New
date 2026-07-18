@@ -37,6 +37,7 @@ public interface IAllocatorClient
         string serverInstanceId,
         GameServerHeartbeat request,
         CancellationToken cancellationToken);
+    Task DrainAsync(string requestId, string serverInstanceId, CancellationToken cancellationToken);
 }
 
 public sealed class DisabledAllocatorClient : IAllocatorClient
@@ -56,6 +57,9 @@ public sealed class DisabledAllocatorClient : IAllocatorClient
         string serverInstanceId,
         GameServerHeartbeat request,
         CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task DrainAsync(
+        string requestId, string serverInstanceId, CancellationToken cancellationToken) => Task.CompletedTask;
 }
 
 public sealed class HttpAllocatorClient(
@@ -107,6 +111,17 @@ public sealed class HttpAllocatorClient(
             $"/internal/instances/{serverInstanceId}/heartbeat",
             requestId);
         request.Content = JsonContent.Create(heartbeat);
+        using var response = await Client().SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DrainAsync(
+        string requestId, string serverInstanceId, CancellationToken cancellationToken)
+    {
+        using var request = CreateRequest(
+            HttpMethod.Post,
+            $"/internal/instances/{serverInstanceId}/drain",
+            requestId);
         using var response = await Client().SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
     }

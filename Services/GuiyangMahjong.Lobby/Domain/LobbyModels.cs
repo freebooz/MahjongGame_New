@@ -63,6 +63,8 @@ public sealed record LobbyRoom
     public required string[] PlayerIds { get; init; }
     public ProtectedPassword? Password { get; init; }
     public GameServerRoute? Route { get; init; }
+    public string? LastServerInstanceId { get; init; }
+    public string? ResultCredentialHash { get; init; }
     public string? PendingServerInstanceId { get; init; }
     public string MatchId { get; init; } = Guid.Empty.ToString();
     public long StateSequence { get; init; }
@@ -79,7 +81,27 @@ public sealed record CreateRoomRequest(
     Dictionary<string, object?> RuleSnapshot);
 
 public sealed record JoinRoomRequest(string? Password, int ClientProtocolVersion);
-public sealed record ReconnectRouteRequest(string RoomId, string MatchId);
+public sealed record ReconnectRouteRequest(string? RoomId = null, string? MatchId = null);
+
+public sealed record MatchPlayerResult(
+    string PlayerId,
+    int SeatIndex,
+    int Rank,
+    int TotalScore);
+
+public sealed record MatchResultReport(
+    string RoomId,
+    string ServerInstanceId,
+    long ResultSequence,
+    int CompletedRounds,
+    MatchPlayerResult[] Players);
+
+public sealed record MatchResultAck(
+    string RequestId,
+    string MatchId,
+    long ResultSequence,
+    bool Accepted,
+    bool Duplicate);
 
 public sealed record GameServerRegistration(
     string ServerInstanceId,
@@ -95,6 +117,7 @@ public sealed record GameServerRegistrationAck(
     bool Accepted,
     int HeartbeatIntervalSeconds,
     string HeartbeatCredential,
+    string ResultCredential,
     ManagedRoomBootstrap RoomBootstrap);
 
 public sealed record ManagedRoomBootstrap(

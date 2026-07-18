@@ -624,6 +624,7 @@ FMahjongFinalSettlementResult UGuiyangRoomManager::BuildFinalSettlement(const FM
     for (int32 Index = 0; Index < RankedSeats.Num(); ++Index)
     {
         FMahjongFinalPlayerResult Player;
+        Player.PlayerId = RankedSeats[Index].PlayerId;
         Player.Rank = Index + 1;
         Player.SeatIndex = RankedSeats[Index].SeatIndex;
         Player.PlayerName = RankedSeats[Index].PlayerName;

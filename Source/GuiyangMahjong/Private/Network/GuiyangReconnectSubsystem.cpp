@@ -36,6 +36,13 @@ void UGuiyangReconnectSubsystem::RememberConnection(const FString& ServerIP, con
     LastPlayerName = PlayerName.TrimStartAndEnd();
 }
 
+void UGuiyangReconnectSubsystem::RememberRemoteRoute(const FString& RoomId, const FString& MatchId)
+{
+    FGuid Parsed;
+    LastRemoteRoomId = FGuid::Parse(RoomId, Parsed) ? RoomId : FString();
+    LastRemoteMatchId = FGuid::Parse(MatchId, Parsed) ? MatchId : FString();
+}
+
 void UGuiyangReconnectSubsystem::BeginReconnectWindow(const FString& Status, const int32 TimeoutSeconds)
 {
     ReconnectStatus = Status.IsEmpty() ? TEXT("网络连接已断开") : Status;
@@ -67,9 +74,19 @@ void UGuiyangReconnectSubsystem::MarkRestored()
     BroadcastState();
 }
 
+void UGuiyangReconnectSubsystem::MarkRetryFailed(const FString& Status)
+{
+    if (!bReconnectPending || GetRemainingSeconds() <= 0) return;
+    bRetrying = false;
+    ReconnectStatus = Status.IsEmpty() ? TEXT("重连失败，请重试") : Status;
+    BroadcastState();
+}
+
 void UGuiyangReconnectSubsystem::CancelReconnect()
 {
     MarkRestored();
+    LastRemoteRoomId.Reset();
+    LastRemoteMatchId.Reset();
     UE_LOG(LogMahjongReconnect, Log, TEXT("玩家取消重连并返回连接界面"));
 }
 
@@ -82,8 +99,9 @@ int32 UGuiyangReconnectSubsystem::GetRemainingSeconds() const
 bool UGuiyangReconnectSubsystem::CanRetry() const
 {
     return bReconnectPending && !bRetrying && GetRemainingSeconds() > 0
-        && !LastServerIP.IsEmpty() && LastServerPort >= 1 && LastServerPort <= 65535
-        && !LastPlayerName.IsEmpty();
+        && ((!LastServerIP.IsEmpty() && LastServerPort >= 1 && LastServerPort <= 65535
+                && !LastPlayerName.IsEmpty())
+            || (!LastRemoteRoomId.IsEmpty() && !LastRemoteMatchId.IsEmpty()));
 }
 
 bool UGuiyangReconnectSubsystem::GetLastConnection(FString& OutServerIP, int32& OutServerPort,
@@ -93,6 +111,13 @@ bool UGuiyangReconnectSubsystem::GetLastConnection(FString& OutServerIP, int32& 
     OutServerPort = LastServerPort;
     OutPlayerName = LastPlayerName;
     return !OutServerIP.IsEmpty() && OutServerPort >= 1 && OutServerPort <= 65535 && !OutPlayerName.IsEmpty();
+}
+
+bool UGuiyangReconnectSubsystem::GetLastRemoteRoute(FString& OutRoomId, FString& OutMatchId) const
+{
+    OutRoomId = LastRemoteRoomId;
+    OutMatchId = LastRemoteMatchId;
+    return !OutRoomId.IsEmpty() && !OutMatchId.IsEmpty();
 }
 
 int32 UGuiyangReconnectSubsystem::ClampReconnectTimeoutSeconds(const int32 TimeoutSeconds)

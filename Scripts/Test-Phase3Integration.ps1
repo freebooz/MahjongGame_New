@@ -7,12 +7,14 @@ param(
     [int]$RegistrationTimeoutSeconds = 10,
     [int]$HeartbeatTimeoutSeconds = 3,
     [int]$RouteWaitAttempts = 40,
-    [int]$FailureWaitAttempts = 40
+    [int]$FailureWaitAttempts = 40,
+    [switch]$VerifySettlementOutboxRecovery
 )
 
 $ErrorActionPreference = 'Stop'
 $lobby = $null
 $allocator = $null
+$lobbySuspended = $false
 $serviceToken = 'integration-allocator-service-token-which-is-long-enough'
 $lobbyToken = 'integration-lobby-callback-token-which-is-long-enough'
 $playerKey = 'integration-player-signing-key-which-is-long-enough'
@@ -21,6 +23,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $lobbyDll = Join-Path $root 'Services/GuiyangMahjong.Lobby/bin/Release/net10.0/GuiyangMahjong.Lobby.dll'
 $allocatorDll = Join-Path $root 'Services/GuiyangMahjong.Allocator/bin/Release/net10.0/GuiyangMahjong.Allocator.dll'
 $fakeDll = Join-Path $root 'Services/GuiyangMahjong.FakeGameServer/bin/Release/net10.0/GuiyangMahjong.FakeGameServer.dll'
+$outboxDirectory = Join-Path $root "Saved/Automation/Phase6SettlementOutbox-$PID"
 if ($GameServerExecutablePath -eq 'dotnet' -and $GameServerPrefixArguments.Count -eq 0) {
     $GameServerPrefixArguments = @($fakeDll)
 }
@@ -135,6 +138,8 @@ try {
         '--Allocator:DrainGraceSeconds=0',
         '--Allocator:AdvertisedIp=127.0.0.1',
         "--Allocator:GameServerExecutablePath=$GameServerExecutablePath",
+        "--Allocator:MatchResultOutboxDirectory=$outboxDirectory",
+        '--Allocator:MatchResultRecoveryDelaySeconds=1',
         "--Allocator:LobbyInternalUrl=http://127.0.0.1:$LobbyPort",
         "--Allocator:ServiceToken=$serviceToken",
         "--Allocator:LobbyCallbackToken=$lobbyToken",
@@ -146,33 +151,42 @@ try {
     $allocator = Start-Process -FilePath 'dotnet' -ArgumentList $allocatorArguments -WindowStyle Hidden -PassThru
     Wait-Health "http://127.0.0.1:$AllocatorPort/health/ready"
 
-    $tokenPayloadJson = @{
-        Sub = 'integration-owner'
-        Name = 'IntegrationOwner'
-        Provider = 'Test'
-        Exp = [DateTimeOffset]::UtcNow.AddMinutes(5).ToUnixTimeSeconds()
-    } | ConvertTo-Json -Compress
-    $tokenPayload = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes($tokenPayloadJson))
-    $hmac = [Security.Cryptography.HMACSHA256]::new([Text.Encoding]::UTF8.GetBytes($playerKey))
-    try {
-        $tokenSignature = ConvertTo-Base64Url (
-            $hmac.ComputeHash([Text.Encoding]::ASCII.GetBytes($tokenPayload)))
+    function New-PlayerToken([string]$PlayerId) {
+        $tokenPayloadJson = @{
+            Sub = $PlayerId
+            Name = $PlayerId
+            Provider = 'Test'
+            Exp = [DateTimeOffset]::UtcNow.AddMinutes(5).ToUnixTimeSeconds()
+        } | ConvertTo-Json -Compress
+        $tokenPayload = ConvertTo-Base64Url ([Text.Encoding]::UTF8.GetBytes($tokenPayloadJson))
+        $hmac = [Security.Cryptography.HMACSHA256]::new([Text.Encoding]::UTF8.GetBytes($playerKey))
+        try {
+            $tokenSignature = ConvertTo-Base64Url (
+                $hmac.ComputeHash([Text.Encoding]::ASCII.GetBytes($tokenPayload)))
+        }
+        finally {
+            $hmac.Dispose()
+        }
+        "$tokenPayload.$tokenSignature"
     }
-    finally {
-        $hmac.Dispose()
-    }
-    $playerToken = "$tokenPayload.$tokenSignature"
+    $playerTokens = @(
+        (New-PlayerToken 'integration-owner-0'),
+        (New-PlayerToken 'integration-owner-1')
+    )
     $rooms = @()
     for ($index = 0; $index -lt 2; $index++) {
         $createBody = if ($index -eq 0) { New-CreateRoomBody 2 17 } else { New-CreateRoomBody 5 23 }
         $rooms += Invoke-RestMethod `
             -Method Post `
             -Uri "http://127.0.0.1:$LobbyPort/v1/rooms" `
-            -Headers (New-Headers $playerToken "integration-create-room-$index-0001") `
+            -Headers (New-Headers $playerTokens[$index] "integration-create-room-$index-0001") `
             -ContentType 'application/json' `
             -Body $createBody
     }
-    $routes = @($rooms | ForEach-Object { Wait-Route $_ $playerToken })
+    $routes = @()
+    for ($index = 0; $index -lt $rooms.Count; $index++) {
+        $routes += Wait-Route $rooms[$index] $playerTokens[$index]
+    }
 
     $null = Wait-AuthoritativeHeartbeats @($routes.serverInstanceId)
 
@@ -205,13 +219,70 @@ try {
     }
     if ($null -eq $failed) { throw 'Crashed instance was not marked failed.' }
 
+    $outboxRecovered = $false
+    if ($VerifySettlementOutboxRecovery) {
+        $victimRoute = $routes | Where-Object serverInstanceId -eq $victim.serverInstanceId
+        if ($null -eq $victimRoute) { throw 'Victim route was not found for outbox recovery.' }
+        Start-Sleep -Milliseconds 500
+        if (-not ('NativeProcessControl' -as [type])) {
+            Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class NativeProcessControl
+{
+    [DllImport("ntdll.dll")] public static extern int NtSuspendProcess(IntPtr processHandle);
+    [DllImport("ntdll.dll")] public static extern int NtResumeProcess(IntPtr processHandle);
+}
+'@
+        }
+        if ([NativeProcessControl]::NtSuspendProcess($lobby.Handle) -ne 0) {
+            throw 'Lobby process could not be suspended for the outage gate.'
+        }
+        $lobbySuspended = $true
+        [IO.Directory]::CreateDirectory($outboxDirectory) | Out-Null
+        $outboxPath = Join-Path $outboxDirectory "$($victim.serverInstanceId).json"
+        $outbox = @{
+            version = 1
+            matchId = $victimRoute.matchId
+            report = @{
+                roomId = $victimRoute.roomId
+                serverInstanceId = $victim.serverInstanceId
+                resultSequence = 1
+                completedRounds = 4
+                players = @(@{
+                    playerId = $victimRoute.playerId
+                    seatIndex = 0
+                    rank = 1
+                    totalScore = 16
+                })
+            }
+        } | ConvertTo-Json -Depth 6 -Compress
+        [IO.File]::WriteAllText($outboxPath, $outbox, [Text.UTF8Encoding]::new($false))
+        Start-Sleep -Milliseconds 1600
+        if (-not (Test-Path -LiteralPath $outboxPath)) {
+            throw 'Outbox must remain durable while Lobby is unavailable.'
+        }
+        if ([NativeProcessControl]::NtResumeProcess($lobby.Handle) -ne 0) {
+            throw 'Lobby process could not be resumed after the outage gate.'
+        }
+        $lobbySuspended = $false
+        for ($attempt = 0; $attempt -lt 80 -and (Test-Path -LiteralPath $outboxPath); $attempt++) {
+            Start-Sleep -Milliseconds 250
+        }
+        if (Test-Path -LiteralPath $outboxPath) {
+            throw 'Allocator did not replay and remove the durable settlement outbox.'
+        }
+        $outboxRecovered = $true
+    }
+
+    $thirdPlayerToken = New-PlayerToken 'integration-owner-2'
     $thirdRoom = Invoke-RestMethod `
         -Method Post `
         -Uri "http://127.0.0.1:$LobbyPort/v1/rooms" `
-        -Headers (New-Headers $playerToken 'integration-create-room-third-0001') `
+        -Headers (New-Headers $thirdPlayerToken 'integration-create-room-third-0001') `
         -ContentType 'application/json' `
         -Body (New-CreateRoomBody 7 29)
-    $thirdRoute = Wait-Route $thirdRoom $playerToken
+    $thirdRoute = Wait-Route $thirdRoom $thirdPlayerToken
     if ($thirdRoute.serverPort -ne $victim.port) {
         throw "Expected reclaimed port $($victim.port), got $($thirdRoute.serverPort)."
     }
@@ -223,11 +294,16 @@ try {
         HeartbeatingInstances = 2
         UniqueInitialPorts = 2
         FailedInstance = $victim.serverInstanceId
+        SettlementOutboxRecovered = $outboxRecovered
         ReclaimedPort = $thirdRoute.serverPort
         GameServerExecutable = $GameServerExecutablePath
     } | ConvertTo-Json -Compress
 }
 finally {
+    if ($lobbySuspended -and $lobby -and -not $lobby.HasExited) {
+        [NativeProcessControl]::NtResumeProcess($lobby.Handle) | Out-Null
+        $lobbySuspended = $false
+    }
     if ($allocator -and -not $allocator.HasExited) {
         try {
             $remainingResponse = Invoke-RestMethod `

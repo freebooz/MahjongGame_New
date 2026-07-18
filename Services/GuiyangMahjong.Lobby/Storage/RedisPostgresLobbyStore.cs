@@ -77,6 +77,24 @@ public sealed class RedisPostgresLobbyStore : ILobbyStore, IAsyncDisposable
     public Task<LobbyRoom?> GetRoomByIdAsync(string roomId, CancellationToken cancellationToken) =>
         GetRoomAsync("room_id", roomId, cancellationToken);
 
+    public async Task<LobbyRoom?> GetActiveRoomByPlayerAsync(
+        string playerId, CancellationToken cancellationToken)
+    {
+        await using var command = postgres.CreateCommand(
+            """
+            SELECT payload::text FROM lobby_rooms
+            WHERE lifecycle IN ('Allocating', 'Waiting', 'Playing', 'Settling')
+              AND payload->'playerIds' ? $1
+            ORDER BY updated_at_utc DESC LIMIT 1
+            """);
+        command.Parameters.AddWithValue(playerId);
+        var payload = await command.ExecuteScalarAsync(cancellationToken) as string;
+        if (payload is null) return null;
+        var room = JsonSerializer.Deserialize<LobbyRoom>(payload, JsonOptions);
+        if (room is not null) await CacheRoomAsync(room);
+        return room;
+    }
+
     public async Task<IReadOnlyList<LobbyRoom>> ListPublicRoomsAsync(CancellationToken cancellationToken)
     {
         await using var command = postgres.CreateCommand(
@@ -159,6 +177,61 @@ public sealed class RedisPostgresLobbyStore : ILobbyStore, IAsyncDisposable
         return true;
     }
 
+    public async Task<FinalizeMatchStatus> FinalizeMatchAsync(
+        LobbyRoom closedRoom, MatchResultReport report, CancellationToken cancellationToken)
+    {
+        var resultPayload = JsonSerializer.Serialize(report, JsonOptions);
+        await using var connection = await postgres.OpenConnectionAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await using var insert = new NpgsqlCommand(
+            """
+            INSERT INTO match_results(match_id, result_sequence, room_id, payload, created_at_utc)
+            VALUES ($1, $2, $3, $4::jsonb, $5)
+            ON CONFLICT (match_id, result_sequence) DO NOTHING
+            RETURNING result_sequence
+            """, connection, transaction);
+        insert.Parameters.AddWithValue(closedRoom.MatchId);
+        insert.Parameters.AddWithValue(report.ResultSequence);
+        insert.Parameters.AddWithValue(closedRoom.RoomId);
+        insert.Parameters.AddWithValue(resultPayload);
+        insert.Parameters.AddWithValue(closedRoom.UpdatedAtUtc);
+        var inserted = await insert.ExecuteScalarAsync(cancellationToken);
+        if (inserted is null)
+        {
+            await using var existing = new NpgsqlCommand(
+                "SELECT payload::text FROM match_results WHERE match_id=$1 AND result_sequence=$2",
+                connection, transaction);
+            existing.Parameters.AddWithValue(closedRoom.MatchId);
+            existing.Parameters.AddWithValue(report.ResultSequence);
+            var existingPayload = await existing.ExecuteScalarAsync(cancellationToken) as string;
+            await transaction.CommitAsync(cancellationToken);
+            if (existingPayload is null) return FinalizeMatchStatus.Conflict;
+            var existingReport = JsonSerializer.Deserialize<MatchResultReport>(existingPayload, JsonOptions);
+            return existingReport is not null && MatchResultsEqual(existingReport, report)
+                ? FinalizeMatchStatus.Duplicate
+                : FinalizeMatchStatus.Conflict;
+        }
+
+        await using var update = new NpgsqlCommand(
+            """
+            UPDATE lobby_rooms SET lifecycle=$1, state_sequence=$2, payload=$3::jsonb, updated_at_utc=$4
+            WHERE room_id=$5 AND state_sequence < $2
+            """, connection, transaction);
+        update.Parameters.AddWithValue(closedRoom.Lifecycle.ToString());
+        update.Parameters.AddWithValue(closedRoom.StateSequence);
+        update.Parameters.AddWithValue(JsonSerializer.Serialize(closedRoom, JsonOptions));
+        update.Parameters.AddWithValue(closedRoom.UpdatedAtUtc);
+        update.Parameters.AddWithValue(closedRoom.RoomId);
+        if (await update.ExecuteNonQueryAsync(cancellationToken) == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return FinalizeMatchStatus.Conflict;
+        }
+        await transaction.CommitAsync(cancellationToken);
+        await CacheRoomAsync(closedRoom);
+        return FinalizeMatchStatus.Accepted;
+    }
+
     private async Task<LobbyRoom?> GetRoomAsync(string column, string value, CancellationToken cancellationToken)
     {
         var database = redis.GetDatabase();
@@ -211,6 +284,13 @@ public sealed class RedisPostgresLobbyStore : ILobbyStore, IAsyncDisposable
     private string RoomCodeKey(string roomCode) => $"{options.RedisKeyPrefix}:room:code:{roomCode}";
     private string RoomIdKey(string roomId) => $"{options.RedisKeyPrefix}:room:id:{roomId}";
 
+    private static bool MatchResultsEqual(MatchResultReport left, MatchResultReport right) =>
+        left.RoomId == right.RoomId
+        && left.ServerInstanceId == right.ServerInstanceId
+        && left.ResultSequence == right.ResultSequence
+        && left.CompletedRounds == right.CompletedRounds
+        && left.Players.SequenceEqual(right.Players);
+
     public async ValueTask DisposeAsync()
     {
         await postgres.DisposeAsync();
@@ -218,4 +298,3 @@ public sealed class RedisPostgresLobbyStore : ILobbyStore, IAsyncDisposable
         redis.Dispose();
     }
 }
-

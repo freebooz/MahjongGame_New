@@ -113,6 +113,7 @@ USTRUCT(BlueprintType)
 struct GUIYANGMAHJONG_API FMahjongFinalPlayerResult
 {
     GENERATED_BODY()
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) FString PlayerId;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 Rank = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 SeatIndex = INDEX_NONE;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FString PlayerName;

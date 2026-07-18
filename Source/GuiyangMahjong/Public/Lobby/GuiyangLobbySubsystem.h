@@ -13,6 +13,10 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FGuiyangLobbyRequestFailed,
     const FString&, RequestId, EGuiyangLobbyErrorCode, ErrorCode, const FString&, ChineseMessage);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FGuiyangLobbyRequestSubmitted,
     const FString&, RequestId, EGuiyangLobbyBackendMode, BackendMode);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGuiyangLobbyBootstrapUpdated,
+    const FGuiyangLobbyBootstrap&, Bootstrap);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FGuiyangLobbyRouteReady,
+    const FGuiyangGameServerRoute&, Route);
 
 /**
  * 客户端大厅统一入口。当前默认 LocalLegacy；RemoteLobby 只有在后端完整配置后才允许启用。
@@ -29,7 +33,11 @@ public:
 
     UPROPERTY(BlueprintAssignable, Category="麻将|大厅") FGuiyangLobbyRequestFailed OnRequestFailed;
     UPROPERTY(BlueprintAssignable, Category="麻将|大厅") FGuiyangLobbyRequestSubmitted OnRequestSubmitted;
+    UPROPERTY(BlueprintAssignable, Category="麻将|大厅") FGuiyangLobbyBootstrapUpdated OnBootstrapUpdated;
+    UPROPERTY(BlueprintAssignable, Category="麻将|大厅") FGuiyangLobbyRouteReady OnRouteReady;
 
+    UFUNCTION(BlueprintCallable, Category="麻将|大厅")
+    FGuiyangLobbyOperationResult RequestBootstrap(APlayerController* PlayerController);
     UFUNCTION(BlueprintCallable, Category="麻将|大厅")
     FGuiyangLobbyOperationResult RequestQuickStart(APlayerController* PlayerController);
     UFUNCTION(BlueprintCallable, Category="麻将|大厅")
@@ -38,6 +46,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="麻将|大厅")
     FGuiyangLobbyOperationResult RequestJoinRoom(
         APlayerController* PlayerController, const FMahjongJoinRoomRequest& Request);
+    UFUNCTION(BlueprintCallable, Category="麻将|大厅")
+    FGuiyangLobbyOperationResult RequestReconnect(APlayerController* PlayerController);
 
     UFUNCTION(BlueprintPure, Category="麻将|大厅")
     EGuiyangLobbyBackendMode GetBackendMode() const { return BackendMode; }
@@ -48,11 +58,18 @@ public:
     static bool TryParseBackendMode(const FString& Value, EGuiyangLobbyBackendMode& OutMode);
     static const TCHAR* GetBackendModeName(EGuiyangLobbyBackendMode Mode);
 
+    void HandleRemoteBootstrap(const FGuiyangLobbyBootstrap& Bootstrap);
+    void HandleRemoteRouteReady(class AGuiyangMahjongPlayerController* PlayerController,
+        const FGuiyangGameServerRoute& Route);
+    void HandleRemoteFailure(const FString& RequestId, EGuiyangLobbyErrorCode ErrorCode,
+        const FString& ChineseMessage);
+
 private:
     EGuiyangLobbyBackendMode BackendMode = EGuiyangLobbyBackendMode::LocalLegacy;
-    TUniquePtr<ILobbyBackend> Backend;
+    TSharedPtr<ILobbyBackend> Backend;
 
     FString MakeRequestId() const;
     FGuiyangLobbyOperationResult RejectRequest(
         const FString& RequestId, EGuiyangLobbyErrorCode ErrorCode, const FString& ChineseMessage);
+    FGuiyangLobbyOperationResult FinalizeBackendResult(const FGuiyangLobbyOperationResult& Result);
 };

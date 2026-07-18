@@ -45,9 +45,12 @@ void AGuiyangMahjongGameMode::InitGame(const FString& MapName, const FString& Op
         const FString SigningKey = FPlatformMisc::GetEnvironmentVariable(TEXT("MAHJONG_JOIN_TICKET_SIGNING_KEY"));
         const FString RegistrationCredential =
             FPlatformMisc::GetEnvironmentVariable(TEXT("MAHJONG_REGISTRATION_CREDENTIAL"));
+        const FString MatchResultOutboxPath =
+            FPlatformMisc::GetEnvironmentVariable(TEXT("MAHJONG_MATCH_RESULT_OUTBOX_PATH"));
         FString ConfigError;
         if (!FGuiyangGameServerLaunchConfig::TryParse(
-            FCommandLine::Get(), SigningKey, RegistrationCredential, Config, ConfigError))
+            FCommandLine::Get(), SigningKey, RegistrationCredential, MatchResultOutboxPath,
+            Config, ConfigError))
         {
             ErrorMessage = ConfigError;
             UE_LOG(LogMahjongServer, Error, TEXT("Managed GameServer configuration rejected: %s"), *ConfigError);
@@ -643,6 +646,8 @@ void AGuiyangMahjongGameMode::PublishFinalSettlement(const FMahjongRoomState& Ro
 {
     if (RoomState.StateSequence == LastPublishedFinalRoomSequence) return;
     const FMahjongFinalSettlementResult Result = UGuiyangRoomManager::BuildFinalSettlement(RoomState);
+    if (bManagedGameServer && GameServerBridge)
+        GameServerBridge->QueueFinalSettlement(Result, RoomState.StateSequence);
     for (TActorIterator<AGuiyangMahjongPlayerController> It(GetWorld()); It; ++It)
         It->Client_ShowFinalSettlement(Result);
     if (IsFullMatchIntegrationEnabled())

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Auth/GuiyangLoginTypes.h"
+#include "Lobby/GuiyangLobbyTypes.h"
 #include "Network/MahjongNetworkTypes.h"
 #include "MobileRootHUDWidget.generated.h"
 
@@ -32,6 +33,9 @@ protected:
     UFUNCTION() void HandleRoomStateUpdated(const FMahjongRoomState& State);
     UFUNCTION() void HandleReconnectRestored(const FMahjongReconnectSnapshot& Snapshot);
     UFUNCTION() void HandleReconnectStateChanged(const FString& Status, int32 RemainingSeconds, bool bCanRetry);
+    UFUNCTION() void HandleLobbyRequestFailed(const FString& RequestId,
+        EGuiyangLobbyErrorCode ErrorCode, const FString& ChineseMessage);
+    UFUNCTION() void HandleLobbyBootstrapUpdated(const FGuiyangLobbyBootstrap& Bootstrap);
 
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowLogin();

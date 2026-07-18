@@ -2,7 +2,8 @@ param(
     [int]$LobbyPort = 28100,
     [int]$AllocatorPort = 28101,
     [int]$GameServerPortStart = 29100,
-    [string]$ServerExecutable = ''
+    [string]$ServerExecutable = '',
+    [switch]$VerifySettlementOutboxRecovery
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,4 +38,5 @@ $prefixArguments = @(
     -RegistrationTimeoutSeconds 120 `
     -HeartbeatTimeoutSeconds 8 `
     -RouteWaitAttempts 480 `
-    -FailureWaitAttempts 80
+    -FailureWaitAttempts 80 `
+    -VerifySettlementOutboxRecovery:$VerifySettlementOutboxRecovery

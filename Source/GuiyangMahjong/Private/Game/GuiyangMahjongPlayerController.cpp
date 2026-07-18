@@ -6,6 +6,7 @@
 #include "Game/GuiyangMahjongPlayerState.h"
 #include "Auth/GuiyangLoginSubsystem.h"
 #include "History/GuiyangMatchHistorySubsystem.h"
+#include "Lobby/GuiyangLobbySubsystem.h"
 #include "Network/GuiyangReconnectSubsystem.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformMisc.h"
@@ -151,6 +152,9 @@ void AGuiyangMahjongPlayerController::ConnectToAllocatedServer(const FGuiyangGam
     UE_LOG(LogMahjongNet, Log,
         TEXT("客户端准备连接已分配牌桌：InstanceId=%s RoomId=%s Endpoint=%s:%d"),
         *Route.ServerInstanceId, *Route.RoomId, *Route.ServerIP, Route.ServerPort);
+    if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>() : nullptr)
+        Reconnect->RememberRemoteRoute(Route.RoomId, Route.MatchId);
     ClientTravel(TravelURL, TRAVEL_Absolute);
 }
 
@@ -158,6 +162,21 @@ void AGuiyangMahjongPlayerController::RetryLastConnection()
 {
     UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()
         ? GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>() : nullptr;
+    UGuiyangLobbySubsystem* Lobby = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>() : nullptr;
+    if (Reconnect && Lobby && Lobby->GetBackendMode() == EGuiyangLobbyBackendMode::RemoteLobby)
+    {
+        if (!Reconnect->CanRetry())
+        {
+            Client_ShowErrorMessage(TEXT("重连保留时间已结束或牌桌标识不可用"));
+            return;
+        }
+        Reconnect->MarkRetrying();
+        UE_LOG(LogMahjongReconnect, Log, TEXT("客户端向远程大厅申请新的重连票据"));
+        const FGuiyangLobbyOperationResult Result = Lobby->RequestReconnect(this);
+        if (!Result.bAccepted) Reconnect->MarkRetryFailed(Result.ChineseMessage);
+        return;
+    }
     FString ServerIP;
     FString PlayerName;
     int32 ServerPort = 7777;
@@ -179,7 +198,30 @@ void AGuiyangMahjongPlayerController::ReturnToConnectScreen()
     {
         Reconnect->CancelReconnect();
     }
-    if (RootHUDInstance) RootHUDInstance->ShowConnectServer();
+    const UGuiyangLobbySubsystem* Lobby = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>() : nullptr;
+    if (RootHUDInstance)
+    {
+        if (Lobby && Lobby->GetBackendMode() == EGuiyangLobbyBackendMode::RemoteLobby)
+            RootHUDInstance->ShowLobby();
+        else
+            RootHUDInstance->ShowConnectServer();
+    }
+}
+
+void AGuiyangMahjongPlayerController::ReturnToLobby()
+{
+    const UGuiyangLobbySubsystem* Lobby = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>() : nullptr;
+    if (!Lobby || Lobby->GetBackendMode() == EGuiyangLobbyBackendMode::LocalLegacy)
+    {
+        Server_RequestLeaveRoom();
+        return;
+    }
+    if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>())
+        Reconnect->CancelReconnect();
+    UE_LOG(LogMahjongNet, Log, TEXT("客户端断开牌桌并返回远程大厅"));
+    ClientTravel(TEXT("/Engine/Maps/Entry"), TRAVEL_Absolute);
 }
 
 void AGuiyangMahjongPlayerController::RequestTableAction(const EMahjongActionType Type, const int32 TargetTileId)

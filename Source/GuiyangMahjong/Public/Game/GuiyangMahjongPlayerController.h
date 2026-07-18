@@ -39,6 +39,7 @@ public:
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void ConnectToServer(const FString& ServerIP, int32 Port, const FString& PlayerName);
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void RetryLastConnection();
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void ReturnToConnectScreen();
+    UFUNCTION(BlueprintCallable, Category="麻将|网络") void ReturnToLobby();
     UFUNCTION(BlueprintCallable, Category="麻将|牌桌") void RequestTableAction(EMahjongActionType Type, int32 TargetTileId);
 
     UFUNCTION(Server, Reliable) void Server_RequestCreateRoom();

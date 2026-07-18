@@ -344,3 +344,27 @@ flowchart LR
 验收结果：Lobby 17/17、Allocator 4/4、UE `GameServer.*` 4/4；WindowsServer Build/Cook/Stage 成功。真实两进程联调确认两桌拥有不同 RoomCode、MatchId 和 RuleHash，2/2 实例均在注册后心跳，崩溃实例进入 Failed，后续房间成功回收原端口。
 
 阶段 4 仍保留一项人工发布门禁：四个真实客户端从 Lobby 获取路由和票据，进入同一托管桌完成整局、重连与结算。架构隔离边界保持“一桌一 Dedicated Server 进程”，不实施单进程多桌。
+
+## 14. 阶段 5 第一执行切片（2026-07-18）
+
+UE 客户端远程大厅传输层和 UI 接线已实现：Lobby 启动信息、公开房间快速匹配、创建、加入、
+异步路由轮询、短期票据 `ClientTravel` 和返回大厅均经过统一 `UGuiyangLobbySubsystem`。
+生产配置仍保持 `LocalLegacy`，因为玩家 Token 必须由后续独立 Auth 应用签发，签名密钥不会进入客户端。
+
+验证结果：UE Server 构建成功，Lobby 契约自动化 3/3、Lobby 服务 17/17、Allocator 4/4、
+多进程控制面回归 `INTEGRATION_OK`。详细边界、配置和未关闭门禁见
+`claudedocs/phase5_remote_lobby_status.md`。Phase 6 才开始实现重新查询玩家所在牌桌并重签票据，
+不得把本切片的返回大厅逻辑误标记为断线重连完成。
+
+## 15. 阶段 6 自动化执行闭环（2026-07-18）
+
+重连与最终结算核心控制面已接通。RemoteLobby 重连以认证 PlayerId 的 Lobby 权威映射为准，
+客户端只保存非敏感房间提示并在每次重连时获取新 JoinTicket。GameServer 使用房间作用域结算凭据，
+通过非阻塞指数退避队列提交最终结果；提交前先把不含任何凭据的结果原子写入本地 outbox。
+Lobby 使用 `MatchId + ResultSequence` 原子去重，写入战绩、关闭房间后通知 Allocator 回收进程。
+若 Lobby 中断期间 GameServer 同时崩溃，Allocator 使用内部服务身份扫描并恢复补报遗留 outbox。
+
+验证结果：Lobby 22/22、Allocator 6/6、UE Lobby 3/3、UE GameServer 4/4；真实 UE
+Dedicated Server 多进程控制面及 Lobby 进程中断后的 outbox 恢复均为 `INTEGRATION_OK`。
+详细实现、故障边界和剩余外部/人工门禁见
+`claudedocs/phase6_reconnect_settlement_status.md`。

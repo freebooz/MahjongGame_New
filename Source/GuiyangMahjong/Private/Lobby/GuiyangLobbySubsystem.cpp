@@ -1,8 +1,10 @@
 #include "Lobby/GuiyangLobbySubsystem.h"
 
+#include "Auth/GuiyangLoginSubsystem.h"
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "GuiyangMahjong.h"
 #include "Lobby/GuiyangLobbyBackend.h"
+#include "Lobby/GuiyangRemoteLobbyBackend.h"
 #include "Misc/CommandLine.h"
 #include "Misc/ConfigCacheIni.h"
 #include "Misc/Parse.h"
@@ -17,6 +19,12 @@ namespace GuiyangLobbyPrivate
         virtual EGuiyangLobbyBackendMode GetMode() const override
         {
             return EGuiyangLobbyBackendMode::LocalLegacy;
+        }
+
+        virtual FGuiyangLobbyOperationResult Bootstrap(
+            AGuiyangMahjongPlayerController& PlayerController, const FString& RequestId) override
+        {
+            return MakeAccepted(RequestId);
         }
 
         virtual FGuiyangLobbyOperationResult QuickStart(
@@ -39,6 +47,12 @@ namespace GuiyangLobbyPrivate
             const FString& RequestId) override
         {
             PlayerController.Server_RequestJoinRoomByCode(Request);
+            return MakeAccepted(RequestId);
+        }
+
+        virtual FGuiyangLobbyOperationResult Reconnect(
+            AGuiyangMahjongPlayerController& PlayerController, const FString& RequestId) override
+        {
             return MakeAccepted(RequestId);
         }
 
@@ -80,15 +94,53 @@ void UGuiyangLobbySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
     if (BackendMode == EGuiyangLobbyBackendMode::LocalLegacy)
     {
-        Backend = MakeUnique<GuiyangLobbyPrivate::FLocalLegacyLobbyBackend>();
+        Backend = MakeShared<GuiyangLobbyPrivate::FLocalLegacyLobbyBackend>();
     }
     else
     {
-        // 阶段 1 只冻结协议边界；远程实现完成前必须明确拒绝，避免误连或静默降级。
-        Backend.Reset();
+        FString ConfiguredBaseUrl;
+        float RequestTimeoutSeconds = 10.0f;
+        float RoutePollIntervalSeconds = 0.25f;
+        int32 RoutePollMaxAttempts = 120;
+        if (GConfig)
+        {
+            GConfig->GetString(GuiyangLobbyPrivate::ConfigSection, TEXT("RemoteBaseUrl"), ConfiguredBaseUrl, GGameIni);
+            GConfig->GetFloat(GuiyangLobbyPrivate::ConfigSection, TEXT("RemoteRequestTimeoutSeconds"), RequestTimeoutSeconds, GGameIni);
+            GConfig->GetFloat(GuiyangLobbyPrivate::ConfigSection, TEXT("RemoteRoutePollIntervalSeconds"), RoutePollIntervalSeconds, GGameIni);
+            GConfig->GetInt(GuiyangLobbyPrivate::ConfigSection, TEXT("RemoteRoutePollMaxAttempts"), RoutePollMaxAttempts, GGameIni);
+        }
+        FString CommandLineBaseUrl;
+        if (FParse::Value(FCommandLine::Get(), TEXT("MahjongLobbyBaseUrl="), CommandLineBaseUrl))
+            ConfiguredBaseUrl = MoveTemp(CommandLineBaseUrl);
+        FGuiyangRemoteLobbySettings Settings;
+        if (FGuiyangRemoteLobbyCodec::NormalizeBaseUrl(ConfiguredBaseUrl, Settings.BaseUrl))
+        {
+            Settings.RequestTimeoutSeconds = FMath::Clamp(RequestTimeoutSeconds, 2.0f, 30.0f);
+            Settings.RoutePollIntervalSeconds = FMath::Clamp(RoutePollIntervalSeconds, 0.1f, 2.0f);
+            Settings.RoutePollMaxAttempts = FMath::Clamp(RoutePollMaxAttempts, 1, 600);
+            Backend = CreateRemoteLobbyBackend(*this, Settings);
+            UE_LOG(LogMahjongNet, Log, TEXT("RemoteLobby HTTP 后端已配置：BaseUrl=%s"), *Settings.BaseUrl);
+        }
+        else
+        {
+            Backend.Reset();
+            UE_LOG(LogMahjongNet, Error,
+                TEXT("RemoteLobby 地址无效或不安全；正式环境必须使用 HTTPS，本机开发仅允许 loopback HTTP"));
+        }
     }
 
     UE_LOG(LogMahjongNet, Log, TEXT("大厅子系统初始化完成：BackendMode=%s"), GetBackendModeName(BackendMode));
+}
+
+FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RequestBootstrap(APlayerController* PlayerController)
+{
+    const FString RequestId = MakeRequestId();
+    AGuiyangMahjongPlayerController* MahjongController = Cast<AGuiyangMahjongPlayerController>(PlayerController);
+    if (!MahjongController)
+        return RejectRequest(RequestId, EGuiyangLobbyErrorCode::InvalidRequest, TEXT("当前玩家控制器不可用"));
+    if (!Backend)
+        return RejectRequest(RequestId, EGuiyangLobbyErrorCode::BackendNotConfigured, TEXT("远程大厅尚未安全配置"));
+    return FinalizeBackendResult(Backend->Bootstrap(*MahjongController, RequestId));
 }
 
 void UGuiyangLobbySubsystem::Deinitialize()
@@ -111,9 +163,7 @@ FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RequestQuickStart(APlayerCo
             TEXT("远程大厅尚未配置，请切换到本地兼容模式"));
     }
 
-    FGuiyangLobbyOperationResult Result = Backend->QuickStart(*MahjongController, RequestId);
-    OnRequestSubmitted.Broadcast(RequestId, BackendMode);
-    return Result;
+    return FinalizeBackendResult(Backend->QuickStart(*MahjongController, RequestId));
 }
 
 FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RequestCreateRoom(
@@ -131,9 +181,7 @@ FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RequestCreateRoom(
             TEXT("远程大厅尚未配置，请切换到本地兼容模式"));
     }
 
-    FGuiyangLobbyOperationResult Result = Backend->CreateRoom(*MahjongController, Request, RequestId);
-    OnRequestSubmitted.Broadcast(RequestId, BackendMode);
-    return Result;
+    return FinalizeBackendResult(Backend->CreateRoom(*MahjongController, Request, RequestId));
 }
 
 FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RequestJoinRoom(
@@ -151,9 +199,20 @@ FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RequestJoinRoom(
             TEXT("远程大厅尚未配置，请切换到本地兼容模式"));
     }
 
-    FGuiyangLobbyOperationResult Result = Backend->JoinRoom(*MahjongController, Request, RequestId);
-    OnRequestSubmitted.Broadcast(RequestId, BackendMode);
-    return Result;
+    return FinalizeBackendResult(Backend->JoinRoom(*MahjongController, Request, RequestId));
+}
+
+FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RequestReconnect(APlayerController* PlayerController)
+{
+    const FString RequestId = MakeRequestId();
+    AGuiyangMahjongPlayerController* MahjongController = Cast<AGuiyangMahjongPlayerController>(PlayerController);
+    if (!MahjongController)
+        return RejectRequest(RequestId, EGuiyangLobbyErrorCode::InvalidRequest,
+            TEXT("当前玩家控制器不可用"));
+    if (!Backend || BackendMode != EGuiyangLobbyBackendMode::RemoteLobby)
+        return RejectRequest(RequestId, EGuiyangLobbyErrorCode::BackendNotConfigured,
+            TEXT("远程大厅重连尚未配置"));
+    return FinalizeBackendResult(Backend->Reconnect(*MahjongController, RequestId));
 }
 
 bool UGuiyangLobbySubsystem::TryParseBackendMode(const FString& Value, EGuiyangLobbyBackendMode& OutMode)
@@ -182,6 +241,55 @@ FString UGuiyangLobbySubsystem::MakeRequestId() const
     return FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphensLower);
 }
 
+void UGuiyangLobbySubsystem::HandleRemoteBootstrap(const FGuiyangLobbyBootstrap& Bootstrap)
+{
+    const UGuiyangLoginSubsystem* Login = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangLoginSubsystem>() : nullptr;
+    if (!Login || !Login->IsSessionValid() || Login->GetCurrentProfile().PlayerId != Bootstrap.PlayerId)
+    {
+        HandleRemoteFailure(Bootstrap.RequestId, EGuiyangLobbyErrorCode::SessionExpired,
+            TEXT("大厅身份与本地登录会话不匹配"));
+        return;
+    }
+    OnBootstrapUpdated.Broadcast(Bootstrap);
+    UE_LOG(LogMahjongNet, Log, TEXT("大厅启动信息已更新：RequestId=%s，PlayerId=%s，Online=%d"),
+        *Bootstrap.RequestId, *Bootstrap.PlayerId, Bootstrap.OnlinePlayerCount);
+}
+
+void UGuiyangLobbySubsystem::HandleRemoteRouteReady(
+    AGuiyangMahjongPlayerController* PlayerController, const FGuiyangGameServerRoute& Route)
+{
+    if (!PlayerController)
+    {
+        HandleRemoteFailure(Route.RequestId, EGuiyangLobbyErrorCode::Cancelled, TEXT("玩家控制器已失效"));
+        return;
+    }
+    OnRouteReady.Broadcast(Route);
+    PlayerController->ConnectToAllocatedServer(Route);
+}
+
+void UGuiyangLobbySubsystem::HandleRemoteFailure(const FString& RequestId,
+    const EGuiyangLobbyErrorCode ErrorCode, const FString& ChineseMessage)
+{
+    UE_LOG(LogMahjongNet, Warning, TEXT("RemoteLobby 请求失败：RequestId=%s，ErrorCode=%d，原因=%s"),
+        *RequestId, static_cast<int32>(ErrorCode), *ChineseMessage);
+    OnRequestFailed.Broadcast(RequestId, ErrorCode, ChineseMessage);
+}
+
+FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::FinalizeBackendResult(
+    const FGuiyangLobbyOperationResult& Result)
+{
+    if (Result.bAccepted)
+    {
+        OnRequestSubmitted.Broadcast(Result.RequestId, BackendMode);
+    }
+    else
+    {
+        OnRequestFailed.Broadcast(Result.RequestId, Result.ErrorCode, Result.ChineseMessage);
+    }
+    return Result;
+}
+
 FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RejectRequest(
     const FString& RequestId, const EGuiyangLobbyErrorCode ErrorCode, const FString& ChineseMessage)
 {
@@ -194,4 +302,3 @@ FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RejectRequest(
     OnRequestFailed.Broadcast(RequestId, ErrorCode, ChineseMessage);
     return Result;
 }
-

@@ -7,6 +7,7 @@
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "Game/GuiyangMahjongPlayerState.h"
 #include "GuiyangMahjong.h"
+#include "Lobby/GuiyangLobbySubsystem.h"
 #include "Network/GuiyangReconnectSubsystem.h"
 #include "UI/MobileErrorToastWidget.h"
 #include "UI/MahjongBackgroundMusicSubsystem.h"
@@ -206,6 +207,11 @@ void UMobileRootHUDWidget::NativeConstruct()
             HandleReconnectStateChanged(Reconnect->GetStatus(), Reconnect->GetRemainingSeconds(), Reconnect->CanRetry());
         }
     }
+    if (UGuiyangLobbySubsystem* Lobby = GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>())
+    {
+        Lobby->OnRequestFailed.AddUniqueDynamic(this, &ThisClass::HandleLobbyRequestFailed);
+        Lobby->OnBootstrapUpdated.AddUniqueDynamic(this, &ThisClass::HandleLobbyBootstrapUpdated);
+    }
     UE_LOG(LogMahjongUI, Log, TEXT("全局 RootHUD 创建完成"));
 }
 
@@ -228,6 +234,11 @@ void UMobileRootHUDWidget::NativeDestruct()
     if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>())
     {
         Reconnect->OnReconnectStateChanged.RemoveDynamic(this, &ThisClass::HandleReconnectStateChanged);
+    }
+    if (UGuiyangLobbySubsystem* Lobby = GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>())
+    {
+        Lobby->OnRequestFailed.RemoveDynamic(this, &ThisClass::HandleLobbyRequestFailed);
+        Lobby->OnBootstrapUpdated.RemoveDynamic(this, &ThisClass::HandleLobbyBootstrapUpdated);
     }
     Super::NativeDestruct();
 }
@@ -286,6 +297,11 @@ void UMobileRootHUDWidget::ShowLobby()
             const FGuiyangLoginProfile& Profile = Login->GetCurrentProfile();
             Lobby->RefreshPlayerInfo(Profile.DisplayName, Profile.PlayerId, 1);
         }
+    }
+    if (UGuiyangLobbySubsystem* LobbySubsystem = GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>();
+        LobbySubsystem && LobbySubsystem->GetBackendMode() == EGuiyangLobbyBackendMode::RemoteLobby)
+    {
+        LobbySubsystem->RequestBootstrap(GetOwningPlayer());
     }
 }
 
@@ -422,6 +438,18 @@ void UMobileRootHUDWidget::HandleReconnectStateChanged(const FString& Status, co
         return;
     }
     ShowReconnectOverlay(Status, RemainingSeconds, bCanRetry);
+}
+
+void UMobileRootHUDWidget::HandleLobbyRequestFailed(const FString& RequestId,
+    const EGuiyangLobbyErrorCode ErrorCode, const FString& ChineseMessage)
+{
+    ShowChineseError(ChineseMessage.IsEmpty() ? TEXT("大厅请求失败，请稍后重试") : ChineseMessage);
+}
+
+void UMobileRootHUDWidget::HandleLobbyBootstrapUpdated(const FGuiyangLobbyBootstrap& Bootstrap)
+{
+    if (UMobileLobbyWidget* Lobby = Cast<UMobileLobbyWidget>(CurrentScreen))
+        Lobby->RefreshPlayerInfo(Bootstrap.DisplayName, Bootstrap.PlayerId, Bootstrap.OnlinePlayerCount);
 }
 
 void UMobileRootHUDWidget::ShowReconnectOverlay(const FString& Status, const int32 RemainingSeconds,

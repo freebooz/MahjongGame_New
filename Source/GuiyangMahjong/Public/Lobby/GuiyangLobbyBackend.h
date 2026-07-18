@@ -17,6 +17,8 @@ public:
     virtual ~ILobbyBackend() = default;
 
     virtual EGuiyangLobbyBackendMode GetMode() const = 0;
+    virtual FGuiyangLobbyOperationResult Bootstrap(
+        AGuiyangMahjongPlayerController& PlayerController, const FString& RequestId) = 0;
     virtual FGuiyangLobbyOperationResult QuickStart(
         AGuiyangMahjongPlayerController& PlayerController, const FString& RequestId) = 0;
     virtual FGuiyangLobbyOperationResult CreateRoom(
@@ -25,5 +27,6 @@ public:
     virtual FGuiyangLobbyOperationResult JoinRoom(
         AGuiyangMahjongPlayerController& PlayerController, const FMahjongJoinRoomRequest& Request,
         const FString& RequestId) = 0;
+    virtual FGuiyangLobbyOperationResult Reconnect(
+        AGuiyangMahjongPlayerController& PlayerController, const FString& RequestId) = 0;
 };
-

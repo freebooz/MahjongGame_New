@@ -79,7 +79,11 @@ struct GUIYANGMAHJONG_API FGuiyangGameServerRoute
 
     bool HasValidEndpoint() const
     {
-        return !ServerIP.IsEmpty() && ServerPort >= 1 && ServerPort <= 65535;
+        return !ServerIP.IsEmpty() && ServerIP.Len() <= 255
+            && !ServerIP.Contains(TEXT("?")) && !ServerIP.Contains(TEXT("#"))
+            && !ServerIP.Contains(TEXT("/")) && !ServerIP.Contains(TEXT("\\"))
+            && !ServerIP.Contains(TEXT("@")) && !ServerIP.Contains(TEXT(" "))
+            && ServerPort >= 1 && ServerPort <= 65535;
     }
 };
 
@@ -94,4 +98,3 @@ struct GUIYANGMAHJONG_API FGuiyangLobbyOperationResult
     UPROPERTY(EditAnywhere, BlueprintReadWrite) EGuiyangLobbyErrorCode ErrorCode = EGuiyangLobbyErrorCode::None;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) FString ChineseMessage;
 };
-

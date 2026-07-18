@@ -16,6 +16,8 @@ public sealed class AllocatorOptions
     [Required] public string AdvertisedIp { get; init; } = "127.0.0.1";
     public string GameServerExecutablePath { get; init; } = string.Empty;
     public string[] GameServerPrefixArguments { get; init; } = [];
+    [Required] public string MatchResultOutboxDirectory { get; init; } = "match-result-outbox";
+    [Range(1, 300)] public int MatchResultRecoveryDelaySeconds { get; init; } = 15;
     [Required, Url] public string LobbyInternalUrl { get; init; } = "http://127.0.0.1:18080";
     [MinLength(32)] public string ServiceToken { get; init; } = string.Empty;
     [MinLength(32)] public string LobbyCallbackToken { get; init; } = string.Empty;

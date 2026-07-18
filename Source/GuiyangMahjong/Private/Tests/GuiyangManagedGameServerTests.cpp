@@ -24,6 +24,7 @@ namespace GuiyangManagedGameServerTests
         Config.MatchId = MatchId;
         Config.ServerInstanceId = InstanceId;
         Config.JoinTicketSigningKey = SigningKey;
+        Config.MatchResultOutboxPath = FString::Printf(TEXT("C:/mahjong-outbox/%s.json"), InstanceId);
         return Config;
     }
 
@@ -73,13 +74,17 @@ bool FGuiyangManagedLaunchConfigTest::RunTest(const FString& Parameters)
     FString Error;
     TestTrue(TEXT("完整托管启动参数应通过"), FGuiyangGameServerLaunchConfig::TryParse(
         *CommandLine, GuiyangManagedGameServerTests::SigningKey,
-        TEXT("registration-credential-which-is-long-enough"), Config, Error));
+        TEXT("registration-credential-which-is-long-enough"),
+        FString::Printf(TEXT("C:/mahjong-outbox/%s.json"), GuiyangManagedGameServerTests::InstanceId),
+        Config, Error));
     TestEqual(TEXT("端口必须保持"), Config.Port, 19000);
     TestEqual(TEXT("房间绑定必须保持"), Config.RoomId, FString(GuiyangManagedGameServerTests::RoomId));
 
     FGuiyangGameServerLaunchConfig Invalid;
     TestFalse(TEXT("缺少签名密钥必须拒绝"), FGuiyangGameServerLaunchConfig::TryParse(
-        *CommandLine, FString(), TEXT("registration-credential-which-is-long-enough"), Invalid, Error));
+        *CommandLine, FString(), TEXT("registration-credential-which-is-long-enough"),
+        FString::Printf(TEXT("C:/mahjong-outbox/%s.json"), GuiyangManagedGameServerTests::InstanceId),
+        Invalid, Error));
     return true;
 }
 

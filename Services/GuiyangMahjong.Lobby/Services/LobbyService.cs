@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Text;
 using GuiyangMahjong.Lobby.Domain;
 using GuiyangMahjong.Lobby.Options;
 using GuiyangMahjong.Lobby.Realtime;
@@ -46,6 +47,13 @@ public sealed class LobbyService
         CancellationToken cancellationToken)
     {
         ValidateCreateRequest(request);
+        if (await store.GetActiveRoomByPlayerAsync(player.PlayerId, cancellationToken) is not null)
+        {
+            throw new LobbyOperationException(
+                LobbyErrorCode.RequestInProgress,
+                "玩家已有未关闭的牌桌",
+                StatusCodes.Status409Conflict);
+        }
         var protectedPassword = request.PasswordProtected
             ? passwordService.Protect(request.Password!)
             : null;
@@ -140,6 +148,14 @@ public sealed class LobbyService
         var room = await store.GetRoomByCodeAsync(roomCode, cancellationToken)
             ?? throw new LobbyOperationException(
                 LobbyErrorCode.RoomNotFound, "房间不存在", StatusCodes.Status404NotFound);
+        var activeRoom = await store.GetActiveRoomByPlayerAsync(player.PlayerId, cancellationToken);
+        if (activeRoom is not null && activeRoom.RoomId != room.RoomId)
+        {
+            throw new LobbyOperationException(
+                LobbyErrorCode.RequestInProgress,
+                "玩家已在其他未关闭牌桌中",
+                StatusCodes.Status409Conflict);
+        }
 
         var passwordResult = passwordService.Verify(player.PlayerId, room.RoomId, room.Password, request.Password);
         switch (passwordResult.Status)
@@ -206,13 +222,16 @@ public sealed class LobbyService
         ReconnectRouteRequest request,
         CancellationToken cancellationToken)
     {
-        var room = await store.GetRoomByIdAsync(request.RoomId, cancellationToken)
+        var room = await store.GetActiveRoomByPlayerAsync(player.PlayerId, cancellationToken)
             ?? throw new LobbyOperationException(
                 LobbyErrorCode.RoomNotFound, "原房间不存在", StatusCodes.Status404NotFound);
-        if (!string.Equals(room.MatchId, request.MatchId, StringComparison.Ordinal))
-        {
-            throw Invalid("牌局标识与房间不匹配");
-        }
+        if ((!string.IsNullOrWhiteSpace(request.RoomId)
+                && !string.Equals(room.RoomId, request.RoomId, StringComparison.Ordinal))
+            || (!string.IsNullOrWhiteSpace(request.MatchId)
+                && !string.Equals(room.MatchId, request.MatchId, StringComparison.Ordinal)))
+            logger.LogInformation(
+                "重连提示已过期，使用大厅权威映射 RequestId={RequestId} PlayerId={PlayerId} RoomId={RoomId}",
+                requestId, player.PlayerId, room.RoomId);
         return GetAuthorizedRoute(requestId, player, room);
     }
 
@@ -247,6 +266,7 @@ public sealed class LobbyService
         var acknowledgement = await allocator.ConfirmRegistrationAsync(
             requestId, registration, cancellationToken);
         var now = timeProvider.GetUtcNow();
+        var resultCredential = CreateResultCredential();
         room = RoomStateMachine.Transition(room, RoomLifecycle.Waiting, timeProvider) with
         {
             PendingServerInstanceId = null,
@@ -259,7 +279,9 @@ public sealed class LobbyService
                 registration.ListenIp,
                 registration.ListenPort,
                 string.Empty,
-                now)
+                now),
+            LastServerInstanceId = registration.ServerInstanceId,
+            ResultCredentialHash = HashCredential(resultCredential)
         };
         if (!await store.UpdateRoomAsync(room, cancellationToken))
         {
@@ -275,6 +297,7 @@ public sealed class LobbyService
             acknowledgement.Accepted,
             acknowledgement.HeartbeatIntervalSeconds,
             acknowledgement.HeartbeatCredential,
+            resultCredential,
             new ManagedRoomBootstrap(
                 room.RoomId,
                 room.RoomCode,
@@ -288,12 +311,126 @@ public sealed class LobbyService
                 CloneRuleSnapshot(room.RuleSnapshot)));
     }
 
-    public Task RecordGameServerHeartbeatAsync(
+    public async Task RecordGameServerHeartbeatAsync(
         string requestId,
         string serverInstanceId,
         GameServerHeartbeat heartbeat,
-        CancellationToken cancellationToken) => allocator.RecordHeartbeatAsync(
-            requestId, serverInstanceId, heartbeat, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        await allocator.RecordHeartbeatAsync(requestId, serverInstanceId, heartbeat, cancellationToken);
+        var room = await store.GetRoomByIdAsync(heartbeat.RoomId, cancellationToken);
+        if (room is null || room.Route?.ServerInstanceId != serverInstanceId) return;
+        var reported = heartbeat.RoomLifecycle switch
+        {
+            "Playing" => RoomLifecycle.Playing,
+            "Settling" => RoomLifecycle.Settling,
+            _ => room.Lifecycle
+        };
+        if (reported == room.Lifecycle || !RoomStateMachine.CanTransition(room.Lifecycle, reported)) return;
+        room = RoomStateMachine.Transition(room, reported, timeProvider);
+        if (await store.UpdateRoomAsync(room, cancellationToken))
+            await events.PublishAsync(LobbyEventTypes.RoomUpdated, ToDirectoryItem(room), cancellationToken);
+    }
+
+    public async Task<MatchResultAck> SubmitMatchResultAsync(
+        string requestId,
+        string matchId,
+        string resultCredential,
+        MatchResultReport report,
+        CancellationToken cancellationToken) => await SubmitMatchResultCoreAsync(
+            requestId, matchId, resultCredential, report, trustedRecovery: false, cancellationToken);
+
+    public async Task<MatchResultAck> RecoverMatchResultAsync(
+        string requestId,
+        string matchId,
+        MatchResultReport report,
+        CancellationToken cancellationToken) => await SubmitMatchResultCoreAsync(
+            requestId, matchId, string.Empty, report, trustedRecovery: true, cancellationToken);
+
+    private async Task<MatchResultAck> SubmitMatchResultCoreAsync(
+        string requestId,
+        string matchId,
+        string resultCredential,
+        MatchResultReport report,
+        bool trustedRecovery,
+        CancellationToken cancellationToken)
+    {
+        ValidateMatchResult(matchId, report);
+        var room = await store.GetRoomByIdAsync(report.RoomId, cancellationToken)
+            ?? throw new LobbyOperationException(
+                LobbyErrorCode.RoomNotFound, "结算房间不存在", StatusCodes.Status404NotFound);
+        var authoritativeInstanceId = room.LastServerInstanceId ?? room.Route?.ServerInstanceId;
+        var scopeMatches = trustedRecovery
+            ? authoritativeInstanceId == report.ServerInstanceId
+            : room.Lifecycle == RoomLifecycle.Closed
+                ? authoritativeInstanceId is null || authoritativeInstanceId == report.ServerInstanceId
+                : room.Route?.ServerInstanceId == report.ServerInstanceId;
+        if (room.MatchId != matchId
+            || !scopeMatches
+            || (!trustedRecovery && !VerifyCredential(resultCredential, room.ResultCredentialHash)))
+        {
+            throw new LobbyOperationException(
+                LobbyErrorCode.SessionExpired,
+                "GameServer 结算凭据或作用域无效",
+                StatusCodes.Status401Unauthorized);
+        }
+        if (room.Lifecycle is not RoomLifecycle.Settling and not RoomLifecycle.Closed
+            && !(trustedRecovery && room.Lifecycle == RoomLifecycle.Failed))
+        {
+            throw new LobbyOperationException(
+                LobbyErrorCode.InvalidRequest,
+                "房间尚未进入最终结算阶段",
+                StatusCodes.Status409Conflict);
+        }
+        var expectedPlayers = room.PlayerIds.Order(StringComparer.Ordinal).ToArray();
+        var reportedPlayers = report.Players.Select(player => player.PlayerId).Order(StringComparer.Ordinal).ToArray();
+        if (report.CompletedRounds != room.RoundCount
+            || !expectedPlayers.SequenceEqual(reportedPlayers, StringComparer.Ordinal))
+        {
+            throw Invalid("结算局数或玩家集合与权威房间不一致");
+        }
+
+        var closedRoom = room.Lifecycle == RoomLifecycle.Closed
+            ? room
+            : RoomStateMachine.Transition(room, RoomLifecycle.Closed, timeProvider) with
+            {
+                Route = null,
+                PendingServerInstanceId = null,
+                LastServerInstanceId = authoritativeInstanceId ?? report.ServerInstanceId
+            };
+        var finalizeStatus = await store.FinalizeMatchAsync(closedRoom, report, cancellationToken);
+        if (finalizeStatus == FinalizeMatchStatus.Conflict)
+        {
+            throw new LobbyOperationException(
+                LobbyErrorCode.InvalidRequest,
+                "相同结算序号已提交不同结果",
+                StatusCodes.Status409Conflict);
+        }
+        var duplicate = finalizeStatus == FinalizeMatchStatus.Duplicate;
+        if (!duplicate)
+        {
+            logger.LogInformation(
+                "牌局结算已持久化 RequestId={RequestId} RoomId={RoomId} MatchId={MatchId} ResultSequence={ResultSequence}",
+                requestId, room.RoomId, matchId, report.ResultSequence);
+            await events.PublishAsync(LobbyEventTypes.RoomClosed, ToDirectoryItem(closedRoom), cancellationToken);
+        }
+        if (allocator.Enabled && !trustedRecovery)
+        {
+            try
+            {
+                await allocator.DrainAsync(requestId, report.ServerInstanceId, cancellationToken);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+            {
+                throw new LobbyOperationException(
+                    LobbyErrorCode.ServerUnavailable,
+                    "结算已保存，GameServer 回收暂未完成，请重试确认",
+                    StatusCodes.Status503ServiceUnavailable,
+                    1000);
+            }
+        }
+        return new MatchResultAck(requestId, matchId, report.ResultSequence, true, duplicate);
+    }
 
     public async Task MarkGameServerFailedAsync(
         GameServerFailure failure,
@@ -328,6 +465,11 @@ public sealed class LobbyService
         {
             throw new LobbyOperationException(
                 LobbyErrorCode.InvalidRequest, "玩家尚未加入该房间", StatusCodes.Status403Forbidden);
+        }
+        if (room.Lifecycle is RoomLifecycle.Closed or RoomLifecycle.Failed)
+        {
+            throw new LobbyOperationException(
+                LobbyErrorCode.RoomClosed, "房间已经关闭", StatusCodes.Status409Conflict);
         }
         if (room.Route is null)
         {
@@ -416,4 +558,44 @@ public sealed class LobbyService
 
     private static LobbyOperationException Invalid(string message) => new(
         LobbyErrorCode.InvalidRequest, message, StatusCodes.Status400BadRequest);
+
+    private static void ValidateMatchResult(string matchId, MatchResultReport report)
+    {
+        if (!Guid.TryParse(matchId, out _)
+            || !Guid.TryParse(report.RoomId, out _)
+            || !Guid.TryParse(report.ServerInstanceId, out _)
+            || report.ResultSequence < 1
+            || report.CompletedRounds is < 1 or > 16
+            || report.Players.Length is < 1 or > 4
+            || report.Players.Select(player => player.PlayerId).Distinct(StringComparer.Ordinal).Count()
+                != report.Players.Length
+            || report.Players.Select(player => player.SeatIndex).Distinct().Count() != report.Players.Length
+            || report.Players.Select(player => player.Rank).Distinct().Count() != report.Players.Length
+            || report.Players.Any(player => string.IsNullOrWhiteSpace(player.PlayerId)
+                || player.PlayerId.Length > 80
+                || player.SeatIndex is < 0 or > 3
+                || player.Rank is < 1 or > 4))
+        {
+            throw Invalid("结算结果格式无效");
+        }
+    }
+
+    private static string CreateResultCredential() =>
+        Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+    private static string HashCredential(string credential) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(credential)));
+
+    private static bool VerifyCredential(string supplied, string? expectedHash)
+    {
+        if (string.IsNullOrWhiteSpace(supplied) || supplied.Length > 256 || string.IsNullOrEmpty(expectedHash))
+            return false;
+        var suppliedHash = Encoding.ASCII.GetBytes(HashCredential(supplied.Trim()));
+        var expected = Encoding.ASCII.GetBytes(expectedHash);
+        var valid = suppliedHash.Length == expected.Length
+            && CryptographicOperations.FixedTimeEquals(suppliedHash, expected);
+        CryptographicOperations.ZeroMemory(suppliedHash);
+        return valid;
+    }
 }

@@ -1,7 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using GuiyangMahjong.Lobby.Domain;
+using GuiyangMahjong.Lobby.Storage;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GuiyangMahjong.Lobby.Tests;
 
@@ -103,6 +108,117 @@ public sealed class LobbyApiTests(LobbyWebApplicationFactory factory)
         Assert.Contains("openapi: 3.1.0", text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task MatchResultEndpoint_AuthenticatesAndAcknowledgesDuplicate()
+    {
+        const string resultCredential = "test-result-credential-which-is-long-enough";
+        var store = factory.Services.GetRequiredService<ILobbyStore>();
+        var matchId = Guid.NewGuid().ToString();
+        var room = new LobbyRoom
+        {
+            RoomId = Guid.NewGuid().ToString(),
+            RoomCode = Random.Shared.Next(0, 1_000_000).ToString("D6"),
+            OwnerPlayerId = "result-api-owner",
+            RoundCount = 4,
+            PublicRoom = false,
+            AutoStart = true,
+            MaximumPlayers = 4,
+            RuleSnapshot = new Dictionary<string, object?> { ["ruleId"] = "GuiyangMainstreamV1" },
+            Lifecycle = RoomLifecycle.Settling,
+            PlayerIds = ["result-api-owner"],
+            Route = new GameServerRoute(
+                Guid.NewGuid().ToString(), string.Empty, string.Empty,
+                Guid.NewGuid().ToString(), matchId, "127.0.0.1", 19000, string.Empty, DateTimeOffset.UtcNow),
+            ResultCredentialHash = Convert.ToHexStringLower(
+                SHA256.HashData(Encoding.UTF8.GetBytes(resultCredential))),
+            MatchId = matchId,
+            StateSequence = 5,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
+        room = room with { Route = room.Route! with { RoomId = room.RoomId } };
+        Assert.True(await store.TryCreateRoomAsync(room, CancellationToken.None));
+        var report = new MatchResultReport(
+            room.RoomId, room.Route.ServerInstanceId, 7, 4,
+            [new MatchPlayerResult("result-api-owner", 0, 1, 12)]);
+        using var client = factory.CreateClient();
+
+        async Task<MatchResultAck?> SubmitAsync(string key)
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post, $"/internal/matches/{matchId}/result")
+            {
+                Content = JsonContent.Create(report)
+            };
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", resultCredential);
+            LobbyWebApplicationFactory.AddRequestHeaders(request, key);
+            var response = await client.SendAsync(request);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            return await response.Content.ReadFromJsonAsync<MatchResultAck>();
+        }
+
+        var first = await SubmitAsync("match-result-api-first-0001");
+        var duplicate = await SubmitAsync("match-result-api-second-0001");
+        Assert.False(first?.Duplicate);
+        Assert.True(duplicate?.Duplicate);
+    }
+
+    [Fact]
+    public async Task MatchResultRecovery_RequiresInternalTokenAndClosesFailedRoom()
+    {
+        const string internalToken = "test-only-internal-service-token-which-is-long-enough";
+        var store = factory.Services.GetRequiredService<ILobbyStore>();
+        var matchId = Guid.NewGuid().ToString();
+        var instanceId = Guid.NewGuid().ToString();
+        var room = new LobbyRoom
+        {
+            RoomId = Guid.NewGuid().ToString(),
+            RoomCode = Random.Shared.Next(0, 1_000_000).ToString("D6"),
+            OwnerPlayerId = "recovery-owner",
+            RoundCount = 4,
+            PublicRoom = false,
+            AutoStart = true,
+            MaximumPlayers = 4,
+            RuleSnapshot = new Dictionary<string, object?> { ["ruleId"] = "GuiyangMainstreamV1" },
+            Lifecycle = RoomLifecycle.Failed,
+            PlayerIds = ["recovery-owner"],
+            LastServerInstanceId = instanceId,
+            MatchId = matchId,
+            StateSequence = 7,
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            UpdatedAtUtc = DateTimeOffset.UtcNow
+        };
+        Assert.True(await store.TryCreateRoomAsync(room, CancellationToken.None));
+        var report = new MatchResultReport(
+            room.RoomId, instanceId, 11, 4,
+            [new MatchPlayerResult("recovery-owner", 0, 1, 20)]);
+        using var client = factory.CreateClient();
+
+        using var unauthorized = new HttpRequestMessage(
+            HttpMethod.Post, $"/internal/matches/{matchId}/result/recovery")
+        {
+            Content = JsonContent.Create(report)
+        };
+        unauthorized.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "wrong-token");
+        LobbyWebApplicationFactory.AddRequestHeaders(unauthorized, "match-recovery-unauthorized-0001");
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.SendAsync(unauthorized)).StatusCode);
+
+        using var authorized = new HttpRequestMessage(
+            HttpMethod.Post, $"/internal/matches/{matchId}/result/recovery")
+        {
+            Content = JsonContent.Create(report)
+        };
+        authorized.Headers.Authorization = new AuthenticationHeaderValue("Bearer", internalToken);
+        LobbyWebApplicationFactory.AddRequestHeaders(authorized, "match-recovery-authorized-0001");
+        var response = await client.SendAsync(authorized);
+        var acknowledgement = await response.Content.ReadFromJsonAsync<MatchResultAck>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(acknowledgement?.Accepted);
+        Assert.Equal(RoomLifecycle.Closed,
+            (await store.GetRoomByIdAsync(room.RoomId, CancellationToken.None))?.Lifecycle);
+    }
+
     private static CreateRoomRequest NewCreateRequest(bool protectedRoom, string? password) => new(
         4,
         true,
@@ -121,4 +237,3 @@ public sealed class LobbyApiTests(LobbyWebApplicationFactory factory)
         return request;
     }
 }
-

@@ -20,7 +20,7 @@ void UMobileRoomWidget::HandleReady()
 
 void UMobileRoomWidget::HandleReturnLobby()
 {
-    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer())) PC->Server_RequestLeaveRoom();
+    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer())) PC->ReturnToLobby();
 }
 
 void UMobileRoomWidget::RefreshRoomState(const FMahjongRoomState& State, const int32 LocalSeat)

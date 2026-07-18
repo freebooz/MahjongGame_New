@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using GuiyangMahjong.Lobby.Domain;
 
 namespace GuiyangMahjong.Lobby.Storage;
@@ -9,6 +10,7 @@ public sealed class InMemoryLobbyStore : ILobbyStore
     private readonly ConcurrentDictionary<string, LobbyRoom> roomsByCode = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, string> codeById = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, object> roomLocks = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, string> matchResults = new(StringComparer.Ordinal);
 
     public Task InitializeAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
@@ -44,6 +46,18 @@ public sealed class InMemoryLobbyStore : ILobbyStore
             return Task.FromResult<LobbyRoom?>(room);
         }
         return Task.FromResult<LobbyRoom?>(null);
+    }
+
+    public Task<LobbyRoom?> GetActiveRoomByPlayerAsync(string playerId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var room = roomsByCode.Values
+            .Where(candidate => candidate.Lifecycle is RoomLifecycle.Allocating or RoomLifecycle.Waiting
+                or RoomLifecycle.Playing or RoomLifecycle.Settling)
+            .Where(candidate => candidate.PlayerIds.Contains(playerId, StringComparer.Ordinal))
+            .OrderByDescending(candidate => candidate.UpdatedAtUtc)
+            .FirstOrDefault();
+        return Task.FromResult(room);
     }
 
     public Task<IReadOnlyList<LobbyRoom>> ListPublicRoomsAsync(CancellationToken cancellationToken)
@@ -107,5 +121,32 @@ public sealed class InMemoryLobbyStore : ILobbyStore
             return Task.FromResult(true);
         }
     }
-}
 
+    public Task<FinalizeMatchStatus> FinalizeMatchAsync(
+        LobbyRoom closedRoom, MatchResultReport report, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var resultKey = $"{closedRoom.MatchId}:{report.ResultSequence}";
+        var payload = JsonSerializer.Serialize(report);
+        var gate = roomLocks.GetOrAdd(closedRoom.RoomCode, _ => new object());
+        lock (gate)
+        {
+            if (matchResults.TryGetValue(resultKey, out var existing))
+            {
+                return Task.FromResult(existing == payload
+                    ? FinalizeMatchStatus.Duplicate
+                    : FinalizeMatchStatus.Conflict);
+            }
+            if (!roomsByCode.TryGetValue(closedRoom.RoomCode, out var current)
+                || current.MatchId != closedRoom.MatchId
+                || current.StateSequence >= closedRoom.StateSequence)
+            {
+                return Task.FromResult(FinalizeMatchStatus.Conflict);
+            }
+            matchResults[resultKey] = payload;
+            roomsByCode[closedRoom.RoomCode] = closedRoom;
+            codeById[closedRoom.RoomId] = closedRoom.RoomCode;
+            return Task.FromResult(FinalizeMatchStatus.Accepted);
+        }
+    }
+}

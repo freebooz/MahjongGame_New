@@ -9,7 +9,8 @@ public sealed record GameServerLaunchSpec(
     string RegistrationCredential,
     string JoinTicketSigningKey,
     string BuildVersion,
-    string AdvertisedIp);
+    string AdvertisedIp,
+    string MatchResultOutboxPath);
 
 public interface IManagedGameServerProcess
 {

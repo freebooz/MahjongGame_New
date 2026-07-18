@@ -210,6 +210,28 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/MatchResultAck' }
         default: { $ref: '#/components/responses/Error' }
+  /internal/matches/{matchId}/result/recovery:
+    post:
+      tags: [InternalMatches]
+      operationId: recoverMatchResult
+      description: Allocator replays a credential-free durable GameServer outbox after process failure.
+      security: [{ serviceBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MatchResultReport' }
+      responses:
+        '200':
+          description: The durable result was accepted or acknowledged as an exact duplicate.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchResultAck' }
+        default: { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     playerBearer:
@@ -295,7 +317,7 @@ components:
       required: [clientProtocolVersion]
     ReconnectRouteRequest:
       type: object
-      required: [roomId, matchId]
+      description: 房间与牌局标识仅作为客户端提示；Lobby 始终按已认证 PlayerId 查询权威映射
       properties:
         roomId: { type: string, minLength: 1, maxLength: 80 }
         matchId: { type: string, format: uuid }
@@ -359,12 +381,17 @@ components:
         registrationCredential: { type: string, minLength: 32, writeOnly: true }
     GameServerRegistrationAck:
       type: object
-      required: [requestId, accepted, heartbeatIntervalSeconds, heartbeatCredential, roomBootstrap]
+      required: [requestId, accepted, heartbeatIntervalSeconds, heartbeatCredential, resultCredential, roomBootstrap]
       properties:
         requestId: { type: string, format: uuid }
         accepted: { type: boolean }
         heartbeatIntervalSeconds: { type: integer, minimum: 2, maximum: 60 }
         heartbeatCredential: { type: string, minLength: 32, writeOnly: true }
+        resultCredential:
+          type: string
+          minLength: 32
+          writeOnly: true
+          description: 仅用于当前 GameServer 向 Lobby 幂等补报最终结算
         roomBootstrap: { $ref: '#/components/schemas/ManagedRoomBootstrap' }
     ManagedRoomBootstrap:
       type: object

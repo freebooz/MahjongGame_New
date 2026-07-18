@@ -49,6 +49,39 @@ public static class LobbyEndpoints
             return Results.NoContent();
         });
 
+        app.MapPost("/internal/matches/{matchId}/result", async (
+            string matchId,
+            HttpContext context,
+            MatchResultReport report,
+            LobbyService lobbyService,
+            CancellationToken cancellationToken) =>
+        {
+            RequireIdempotencyKey(context);
+            return Results.Ok(await lobbyService.SubmitMatchResultAsync(
+                    RequestIdMiddleware.GetRequestId(context),
+                    matchId,
+                    GetBearerCredential(context),
+                    report,
+                    cancellationToken));
+        });
+
+        app.MapPost("/internal/matches/{matchId}/result/recovery", async (
+            string matchId,
+            HttpContext context,
+            MatchResultReport report,
+            LobbyService lobbyService,
+            IOptions<LobbyOptions> options,
+            CancellationToken cancellationToken) =>
+        {
+            RequireIdempotencyKey(context);
+            if (!HasInternalCredential(context, options.Value.InternalServiceToken))
+            {
+                return Results.Unauthorized();
+            }
+            return Results.Ok(await lobbyService.RecoverMatchResultAsync(
+                RequestIdMiddleware.GetRequestId(context), matchId, report, cancellationToken));
+        });
+
         app.MapGet("/openapi/v1.yaml", async (HttpContext context) =>
         {
             var path = Path.Combine(AppContext.BaseDirectory, "OpenAPI", "lobby-v1.openapi.yaml");
@@ -177,5 +210,12 @@ public static class LobbyEndpoints
             && CryptographicOperations.FixedTimeEquals(supplied, expected);
         CryptographicOperations.ZeroMemory(supplied);
         return valid;
+    }
+
+    private static string GetBearerCredential(HttpContext context)
+    {
+        var authorization = context.Request.Headers.Authorization.ToString();
+        if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return string.Empty;
+        return authorization[7..].Trim();
     }
 }

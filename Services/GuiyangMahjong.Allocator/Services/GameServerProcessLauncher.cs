@@ -21,6 +21,8 @@ public sealed class GameServerProcessLauncher(
         {
             throw new InvalidOperationException("GameServerExecutablePath is not configured.");
         }
+        Directory.CreateDirectory(Path.GetDirectoryName(spec.MatchResultOutboxPath)
+            ?? throw new InvalidOperationException("MatchResultOutboxPath has no parent directory."));
 
         var startInfo = new ProcessStartInfo
         {
@@ -40,6 +42,7 @@ public sealed class GameServerProcessLauncher(
         startInfo.ArgumentList.Add($"-AdvertisedIp={spec.AdvertisedIp}");
         startInfo.Environment["MAHJONG_REGISTRATION_CREDENTIAL"] = spec.RegistrationCredential;
         startInfo.Environment["MAHJONG_JOIN_TICKET_SIGNING_KEY"] = spec.JoinTicketSigningKey;
+        startInfo.Environment["MAHJONG_MATCH_RESULT_OUTBOX_PATH"] = spec.MatchResultOutboxPath;
 
         var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("GameServer process failed to start.");

@@ -82,7 +82,8 @@ public sealed class GameServerInstanceManager
                     registration.Plaintext,
                     options.JoinTicketSigningKey,
                     request.BuildVersion,
-                    instance.AdvertisedIp), cancellationToken);
+                    instance.AdvertisedIp,
+                    MatchResultOutboxPaths.GetInstancePath(options, instance.ServerInstanceId)), cancellationToken);
             }
             catch
             {

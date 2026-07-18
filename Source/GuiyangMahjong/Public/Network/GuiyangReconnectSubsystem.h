@@ -28,9 +28,12 @@ public:
     UFUNCTION(BlueprintCallable, Category="麻将|重连")
     void RememberConnection(const FString& ServerIP, int32 ServerPort, const FString& PlayerName);
     UFUNCTION(BlueprintCallable, Category="麻将|重连")
+    void RememberRemoteRoute(const FString& RoomId, const FString& MatchId);
+    UFUNCTION(BlueprintCallable, Category="麻将|重连")
     void BeginReconnectWindow(const FString& Status, int32 TimeoutSeconds);
     UFUNCTION(BlueprintCallable, Category="麻将|重连") void MarkRetrying();
     UFUNCTION(BlueprintCallable, Category="麻将|重连") void MarkRestored();
+    UFUNCTION(BlueprintCallable, Category="麻将|重连") void MarkRetryFailed(const FString& Status);
     UFUNCTION(BlueprintCallable, Category="麻将|重连") void CancelReconnect();
 
     UFUNCTION(BlueprintPure, Category="麻将|重连") bool IsReconnectPending() const { return bReconnectPending; }
@@ -39,6 +42,7 @@ public:
     UFUNCTION(BlueprintPure, Category="麻将|重连") const FString& GetStatus() const { return ReconnectStatus; }
 
     bool GetLastConnection(FString& OutServerIP, int32& OutServerPort, FString& OutPlayerName) const;
+    bool GetLastRemoteRoute(FString& OutRoomId, FString& OutMatchId) const;
     static int32 ClampReconnectTimeoutSeconds(int32 TimeoutSeconds);
 
 private:
@@ -52,6 +56,8 @@ private:
     UPROPERTY() FString LastServerIP;
     UPROPERTY() FString LastPlayerName;
     UPROPERTY() FString ReconnectStatus;
+    UPROPERTY() FString LastRemoteRoomId;
+    UPROPERTY() FString LastRemoteMatchId;
     int32 LastServerPort = 7777;
     double ReconnectDeadlineSeconds = 0.0;
     bool bReconnectPending = false;
