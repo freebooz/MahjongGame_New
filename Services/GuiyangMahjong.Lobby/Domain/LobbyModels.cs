@@ -94,7 +94,20 @@ public sealed record GameServerRegistrationAck(
     string RequestId,
     bool Accepted,
     int HeartbeatIntervalSeconds,
-    string HeartbeatCredential);
+    string HeartbeatCredential,
+    ManagedRoomBootstrap RoomBootstrap);
+
+public sealed record ManagedRoomBootstrap(
+    string RoomId,
+    string RoomCode,
+    string MatchId,
+    string OwnerPlayerId,
+    int RoundCount,
+    int MaximumPlayers,
+    bool PublicRoom,
+    bool AutoStart,
+    bool PasswordProtected,
+    Dictionary<string, object?> RuleSnapshot);
 
 public sealed record GameServerHeartbeat(
     string RoomId,

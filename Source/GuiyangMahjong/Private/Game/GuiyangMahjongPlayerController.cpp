@@ -16,6 +16,7 @@
 #include "TimerManager.h"
 #include "UnrealClient.h"
 #include "Engine/NetConnection.h"
+#include "GenericPlatform/GenericPlatformHttp.h"
 
 namespace
 {
@@ -130,6 +131,26 @@ void AGuiyangMahjongPlayerController::ConnectToServer(const FString& ServerIP, c
     }
     const FString TravelURL = FString::Printf(TEXT("%s:%d"), *CleanIP, Port);
     UE_LOG(LogMahjongNet, Log, TEXT("客户端准备连接服务器：地址=%s，玩家=%s"), *TravelURL, *CleanName);
+    ClientTravel(TravelURL, TRAVEL_Absolute);
+}
+
+void AGuiyangMahjongPlayerController::ConnectToAllocatedServer(const FGuiyangGameServerRoute& Route)
+{
+    const FString PlayerId = Route.PlayerId.TrimStartAndEnd();
+    if (!Route.HasValidEndpoint() || PlayerId.IsEmpty() || PlayerId.Len() > 80
+        || Route.JoinTicket.Len() < 32 || Route.JoinTicket.Len() > 4096
+        || Route.TicketExpireAtUtc <= FDateTime::UtcNow())
+    {
+        Client_ShowErrorMessage(TEXT("牌桌路由或入场票据无效"));
+        return;
+    }
+    const FString TravelURL = FString::Printf(TEXT("%s:%d?PlayerId=%s?JoinTicket=%s"),
+        *Route.ServerIP, Route.ServerPort,
+        *FGenericPlatformHttp::UrlEncode(PlayerId),
+        *FGenericPlatformHttp::UrlEncode(Route.JoinTicket));
+    UE_LOG(LogMahjongNet, Log,
+        TEXT("客户端准备连接已分配牌桌：InstanceId=%s RoomId=%s Endpoint=%s:%d"),
+        *Route.ServerInstanceId, *Route.RoomId, *Route.ServerIP, Route.ServerPort);
     ClientTravel(TravelURL, TRAVEL_Absolute);
 }
 

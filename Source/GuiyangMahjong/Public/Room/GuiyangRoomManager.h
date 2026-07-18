@@ -5,6 +5,8 @@
 #include "UObject/Object.h"
 #include "GuiyangRoomManager.generated.h"
 
+struct FGuiyangManagedRoomDefinition;
+
 /** Dedicated Server 持有的房间领域服务；客户端不得创建该对象或直接改写房间记录。 */
 UCLASS()
 class GUIYANGMAHJONG_API UGuiyangRoomManager : public UObject
@@ -12,6 +14,10 @@ class GUIYANGMAHJONG_API UGuiyangRoomManager : public UObject
     GENERATED_BODY()
 
 public:
+    bool CreateManagedRoom(const FGuiyangManagedRoomDefinition& Definition,
+        FMahjongRoomState& OutState, EMahjongRoomError& OutError);
+    bool AdmitManagedPlayer(const FString& RoomCode, const FString& PlayerId, const FString& DisplayName,
+        FMahjongRoomState& OutState, EMahjongRoomError& OutError);
     bool CreateRoom(const FString& PlayerId, const FString& DisplayName, const FMahjongCreateRoomRequest& Request,
         FMahjongRoomState& OutState, EMahjongRoomError& OutError);
     bool QuickStart(const FString& PlayerId, const FString& DisplayName,
@@ -46,6 +52,7 @@ private:
         FString PasswordDigest;
         TMap<FString, FPasswordAttemptState> PasswordAttemptsByPlayer;
         TMap<FString, FDateTime> DisconnectedAtUtcByPlayer;
+        bool bManagedAuthority = false;
     };
 
     TMap<FString, FRoomRecord> Rooms;

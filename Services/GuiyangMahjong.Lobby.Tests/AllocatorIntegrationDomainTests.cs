@@ -31,14 +31,60 @@ public sealed class AllocatorIntegrationDomainTests
             19000,
             "test",
             "one-time-registration-credential");
-        await fixture.Service.RegisterGameServerAsync(
+        var acknowledgement = await fixture.Service.RegisterGameServerAsync(
             Guid.NewGuid().ToString(), registration, CancellationToken.None);
+
+        Assert.Equal(created.RoomCode, acknowledgement.RoomBootstrap.RoomCode);
+        Assert.Equal(room.RoomId, acknowledgement.RoomBootstrap.RoomId);
+        Assert.Equal(room.MatchId, acknowledgement.RoomBootstrap.MatchId);
+        Assert.Equal(owner.PlayerId, acknowledgement.RoomBootstrap.OwnerPlayerId);
+        Assert.Equal(4, acknowledgement.RoomBootstrap.RoundCount);
+        Assert.Equal("GuiyangMainstreamV1", acknowledgement.RoomBootstrap.RuleSnapshot["ruleId"]!.ToString());
 
         var route = await fixture.Service.GetRouteAsync(
             Guid.NewGuid().ToString(), owner, created.RoomCode, CancellationToken.None);
         Assert.Equal(fixture.Allocator.ServerInstanceId, route.ServerInstanceId);
         Assert.NotEmpty(route.JoinTicket);
         Assert.True(route.TicketExpireAtUtc > fixture.Time.GetUtcNow());
+    }
+
+    [Fact]
+    public async Task RegistrationBootstrap_UsesImmutableAuthoritativeRuleSnapshot()
+    {
+        var fixture = CreateFixture();
+        var requestedRules = new Dictionary<string, object?>
+        {
+            ["ruleId"] = "GuiyangMainstreamV1",
+            ["baseScore"] = 3,
+            ["turnTimeoutSeconds"] = 21
+        };
+        var request = new CreateRoomRequest(8, false, false, false, null, requestedRules);
+        var created = await fixture.Service.CreateRoomAsync(
+            Guid.NewGuid().ToString(),
+            new PlayerIdentity("owner-bootstrap", "Owner", "Guest"),
+            request,
+            CancellationToken.None);
+        requestedRules["baseScore"] = 99;
+
+        var room = await fixture.Store.GetRoomByIdAsync(created.RoomId, CancellationToken.None);
+        Assert.NotNull(room);
+        var acknowledgement = await fixture.Service.RegisterGameServerAsync(
+            Guid.NewGuid().ToString(),
+            new GameServerRegistration(
+                fixture.Allocator.ServerInstanceId,
+                room.RoomId,
+                room.MatchId,
+                "127.0.0.1",
+                19000,
+                "test",
+                "credential"),
+            CancellationToken.None);
+
+        Assert.Equal(created.RoomCode, acknowledgement.RoomBootstrap.RoomCode);
+        Assert.Equal(8, acknowledgement.RoomBootstrap.RoundCount);
+        Assert.False(acknowledgement.RoomBootstrap.PublicRoom);
+        Assert.Equal("3", acknowledgement.RoomBootstrap.RuleSnapshot["baseScore"]!.ToString());
+        Assert.Equal("21", acknowledgement.RoomBootstrap.RuleSnapshot["turnTimeoutSeconds"]!.ToString());
     }
 
     [Fact]

@@ -4,13 +4,18 @@
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "Game/GuiyangMahjongPlayerState.h"
 #include "GuiyangMahjong.h"
+#include "Room/GuiyangManagedRoomDefinition.h"
 #include "Room/GuiyangRoomManager.h"
+#include "Server/GuiyangGameServerBridge.h"
 #include "Table/MahjongTableEngine.h"
 #include "HAL/PlatformTime.h"
 #include "EngineUtils.h"
 #include "Misc/SecureHash.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "HAL/PlatformMisc.h"
+#include "GenericPlatform/GenericPlatformHttp.h"
+#include "Kismet/GameplayStatics.h"
 
 namespace
 {
@@ -32,6 +37,94 @@ void AGuiyangMahjongGameMode::InitGame(const FString& MapName, const FString& Op
 {
     Super::InitGame(MapName, Options, ErrorMessage);
     RoomManager = NewObject<UGuiyangRoomManager>(this);
+    bManagedGameServer = IsRunningDedicatedServer()
+        && FParse::Param(FCommandLine::Get(), TEXT("MahjongManagedGameServer"));
+    if (bManagedGameServer)
+    {
+        FGuiyangGameServerLaunchConfig Config;
+        const FString SigningKey = FPlatformMisc::GetEnvironmentVariable(TEXT("MAHJONG_JOIN_TICKET_SIGNING_KEY"));
+        const FString RegistrationCredential =
+            FPlatformMisc::GetEnvironmentVariable(TEXT("MAHJONG_REGISTRATION_CREDENTIAL"));
+        FString ConfigError;
+        if (!FGuiyangGameServerLaunchConfig::TryParse(
+            FCommandLine::Get(), SigningKey, RegistrationCredential, Config, ConfigError))
+        {
+            ErrorMessage = ConfigError;
+            UE_LOG(LogMahjongServer, Error, TEXT("Managed GameServer configuration rejected: %s"), *ConfigError);
+            return;
+        }
+        GameServerBridge = NewObject<UGuiyangGameServerBridge>(this);
+        if (!GameServerBridge->Initialize(GetWorld(), Config, ConfigError))
+        {
+            ErrorMessage = ConfigError;
+            GameServerBridge = nullptr;
+            UE_LOG(LogMahjongServer, Error, TEXT("Managed GameServer bridge failed: %s"), *ConfigError);
+        }
+    }
+}
+
+void AGuiyangMahjongGameMode::PreLogin(const FString& Options, const FString& Address,
+    const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+    Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+    if (!ErrorMessage.IsEmpty() || !bManagedGameServer) return;
+    if (!GameServerBridge)
+    {
+        ErrorMessage = TEXT("GAMESERVER_CONFIGURATION_INVALID");
+        return;
+    }
+    if (!GameServerBridge->IsRegistered())
+    {
+        ErrorMessage = TEXT("GAMESERVER_NOT_REGISTERED");
+        return;
+    }
+
+    const FString PlayerId = FGenericPlatformHttp::UrlDecode(
+        UGameplayStatics::ParseOption(Options, TEXT("PlayerId")));
+    const FString JoinTicket = FGenericPlatformHttp::UrlDecode(
+        UGameplayStatics::ParseOption(Options, TEXT("JoinTicket")));
+    FGuiyangJoinTicketClaims Claims;
+    if (!GameServerBridge->ValidateAndConsumeJoinTicket(JoinTicket, PlayerId, Claims, ErrorMessage))
+    {
+        UE_LOG(LogMahjongServer, Warning,
+            TEXT("Managed player rejected before login InstanceId=%s Reason=%s"),
+            *GameServerBridge->GetConfig().ServerInstanceId, *ErrorMessage);
+        return;
+    }
+    const int64 NowUnixSeconds = FDateTime::UtcNow().ToUnixTimestamp();
+    for (auto It = PendingTicketExpiryByDigest.CreateIterator(); It; ++It)
+    {
+        if (It.Value() <= NowUnixSeconds)
+        {
+            PendingAuthorizedPlayersByTicketDigest.Remove(It.Key());
+            It.RemoveCurrent();
+        }
+    }
+    const FString TicketDigest = HashJoinTicket(JoinTicket);
+    PendingAuthorizedPlayersByTicketDigest.Add(TicketDigest, Claims.PlayerId);
+    PendingTicketExpiryByDigest.Add(TicketDigest, Claims.ExpiresAtUnixSeconds);
+}
+
+FString AGuiyangMahjongGameMode::InitNewPlayer(APlayerController* NewPlayerController,
+    const FUniqueNetIdRepl& UniqueId, const FString& Options, const FString& Portal)
+{
+    const FString Result = Super::InitNewPlayer(NewPlayerController, UniqueId, Options, Portal);
+    if (!Result.IsEmpty() || !bManagedGameServer) return Result;
+    if (!GameServerBridge) return TEXT("GAMESERVER_CONFIGURATION_INVALID");
+    const FString JoinTicket = FGenericPlatformHttp::UrlDecode(
+        UGameplayStatics::ParseOption(Options, TEXT("JoinTicket")));
+    const FString TicketDigest = HashJoinTicket(JoinTicket);
+    FString PlayerId;
+    int64 TicketExpiry = 0;
+    const bool bHasPlayerBinding = PendingAuthorizedPlayersByTicketDigest.RemoveAndCopyValue(TicketDigest, PlayerId);
+    const bool bHasExpiry = PendingTicketExpiryByDigest.RemoveAndCopyValue(TicketDigest, TicketExpiry);
+    if (!bHasPlayerBinding || !bHasExpiry || TicketExpiry <= FDateTime::UtcNow().ToUnixTimestamp()
+        || PlayerId.IsEmpty() || !NewPlayerController)
+    {
+        return TEXT("JOIN_TICKET_BINDING_FAILED");
+    }
+    AuthorizedPlayerIdsByController.Add(NewPlayerController, MoveTemp(PlayerId));
+    return FString();
 }
 
 void AGuiyangMahjongGameMode::PostLogin(APlayerController* NewPlayer)
@@ -59,7 +152,42 @@ void AGuiyangMahjongGameMode::Logout(AController* Exiting)
             HandleLeaveRoom(Controller);
         }
     }
+    AuthorizedPlayerIdsByController.Remove(Cast<APlayerController>(Exiting));
     Super::Logout(Exiting);
+}
+
+void AGuiyangMahjongGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (GameServerBridge) GameServerBridge->Shutdown();
+    PendingAuthorizedPlayersByTicketDigest.Reset();
+    PendingTicketExpiryByDigest.Reset();
+    AuthorizedPlayerIdsByController.Reset();
+    ManagedRoomCode.Reset();
+    Super::EndPlay(EndPlayReason);
+}
+
+bool AGuiyangMahjongGameMode::InitializeManagedRoomAuthority(
+    const FGuiyangManagedRoomDefinition& Definition, FString& OutError)
+{
+    OutError.Reset();
+    if (!bManagedGameServer || !RoomManager || !ManagedRoomCode.IsEmpty())
+    {
+        OutError = TEXT("ROOM_AUTHORITY_STATE_INVALID");
+        return false;
+    }
+    FMahjongRoomState State;
+    EMahjongRoomError Error;
+    if (!RoomManager->CreateManagedRoom(Definition, State, Error))
+    {
+        OutError = TEXT("ROOM_AUTHORITY_INITIALIZATION_FAILED");
+        return false;
+    }
+    ManagedRoomCode = Definition.RoomCode;
+    PublishRoomState(State);
+    UE_LOG(LogMahjongServer, Display,
+        TEXT("Managed room initialized BackendRoomId=%s RoomCode=%s MatchId=%s RuleHash=%s"),
+        *Definition.BackendRoomId, *Definition.RoomCode, *Definition.MatchId, *Definition.RuleSnapshot.RuleHash);
+    return true;
 }
 
 void AGuiyangMahjongGameMode::HandleAuthenticateSession(AGuiyangMahjongPlayerController* Controller,
@@ -70,6 +198,15 @@ void AGuiyangMahjongGameMode::HandleAuthenticateSession(AGuiyangMahjongPlayerCon
     const FString CleanDisplayName = DisplayName.TrimStartAndEnd();
     const bool bProviderAllowed = Provider == EGuiyangLoginProvider::Guest
         || Provider == EGuiyangLoginProvider::SimulatedWechat;
+    if (bManagedGameServer)
+    {
+        const FString* AuthorizedPlayerId = AuthorizedPlayerIdsByController.Find(Controller);
+        if (!AuthorizedPlayerId || *AuthorizedPlayerId != CleanPlayerId)
+        {
+            if (Controller) Controller->Client_ShowErrorMessage(TEXT("入场票据与玩家身份不匹配"));
+            return;
+        }
+    }
     if (!Controller || CleanPlayerId.IsEmpty() || CleanPlayerId.Len() > 80
         || CleanDisplayName.IsEmpty() || CleanDisplayName.Len() > 24
         || SessionToken.Len() < 16 || SessionToken.Len() > 256 || !bProviderAllowed)
@@ -116,7 +253,35 @@ void AGuiyangMahjongGameMode::HandleAuthenticateSession(AGuiyangMahjongPlayerCon
     }
 
     FString RoomCode;
-    if (!RoomManager || !RoomManager->GetPlayerRoomCode(CleanPlayerId, RoomCode)) return;
+    if (!RoomManager)
+    {
+        Controller->Client_ShowErrorMessage(TEXT("房间服务尚未就绪"));
+        return;
+    }
+    if (bManagedGameServer && !RoomManager->GetPlayerRoomCode(CleanPlayerId, RoomCode))
+    {
+        if (ManagedRoomCode.IsEmpty())
+        {
+            Controller->Client_ShowErrorMessage(TEXT("托管房间尚未就绪"));
+            return;
+        }
+        FMahjongRoomState AdmittedState;
+        EMahjongRoomError AdmitError;
+        if (!RoomManager->AdmitManagedPlayer(ManagedRoomCode, CleanPlayerId, CleanDisplayName,
+            AdmittedState, AdmitError))
+        {
+            Controller->Client_ShowErrorMessage(ErrorToMessage(AdmitError));
+            return;
+        }
+        const FMahjongSeatInfo* AdmittedSeat = AdmittedState.Seats.FindByPredicate(
+            [&CleanPlayerId](const FMahjongSeatInfo& Item) { return Item.PlayerId == CleanPlayerId; });
+        Player->EnterRoomServer(AdmittedState.RoomInfo.RoomId,
+            AdmittedSeat ? AdmittedSeat->SeatIndex : INDEX_NONE,
+            AdmittedSeat ? AdmittedSeat->bReady : false);
+        PublishRoomState(AdmittedState);
+        return;
+    }
+    if (!RoomManager->GetPlayerRoomCode(CleanPlayerId, RoomCode)) return;
     FMahjongRoomState State;
     EMahjongRoomError Error;
     int32 RemainingSeconds = 0;
@@ -136,6 +301,11 @@ void AGuiyangMahjongGameMode::HandleAuthenticateSession(AGuiyangMahjongPlayerCon
 
 void AGuiyangMahjongGameMode::HandleCreateRoom(AGuiyangMahjongPlayerController* Controller, const FMahjongCreateRoomRequest& Request)
 {
+    if (bManagedGameServer)
+    {
+        if (Controller) Controller->Client_ShowErrorMessage(TEXT("托管房间不能在牌桌服务器内创建"));
+        return;
+    }
     AGuiyangMahjongPlayerState* Player = nullptr;
     if (!ResolvePlayer(Controller, Player)) return;
     FMahjongRoomState State;
@@ -158,6 +328,11 @@ void AGuiyangMahjongGameMode::HandleCreateRoom(AGuiyangMahjongPlayerController* 
 
 void AGuiyangMahjongGameMode::HandleQuickStart(AGuiyangMahjongPlayerController* Controller)
 {
+    if (bManagedGameServer)
+    {
+        if (Controller) Controller->Client_ShowErrorMessage(TEXT("请从大厅进行快速开始"));
+        return;
+    }
     AGuiyangMahjongPlayerState* Player = nullptr;
     if (!ResolvePlayer(Controller, Player)) return;
     FMahjongRoomState State;
@@ -177,6 +352,11 @@ void AGuiyangMahjongGameMode::HandleQuickStart(AGuiyangMahjongPlayerController* 
 
 void AGuiyangMahjongGameMode::HandleJoinRoom(AGuiyangMahjongPlayerController* Controller, const FMahjongJoinRoomRequest& Request)
 {
+    if (bManagedGameServer)
+    {
+        if (Controller) Controller->Client_ShowErrorMessage(TEXT("请从大厅选择房间并获取入场票据"));
+        return;
+    }
     AGuiyangMahjongPlayerState* Player = nullptr;
     if (!ResolvePlayer(Controller, Player)) return;
     FMahjongRoomState State;
@@ -481,6 +661,11 @@ FString AGuiyangMahjongGameMode::HashSessionToken(const FString& SessionToken)
     uint8 Digest[FSHA1::DigestSize];
     FSHA1::HashBuffer(Utf8.Get(), Utf8.Length(), Digest);
     return BytesToHex(Digest, UE_ARRAY_COUNT(Digest)).ToLower();
+}
+
+FString AGuiyangMahjongGameMode::HashJoinTicket(const FString& JoinTicket)
+{
+    return HashSessionToken(JoinTicket);
 }
 
 bool AGuiyangMahjongGameMode::ConstantTimeDigestEquals(const FString& Left, const FString& Right)

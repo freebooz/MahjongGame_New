@@ -10,7 +10,7 @@ public class GuiyangMahjong : ModuleRules
         {
             "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput",
             "UMG", "Slate", "SlateCore", "Networking", "Sockets", "NetCore",
-            "OnlineSubsystem", "Json", "JsonUtilities", "ApplicationCore"
+            "OnlineSubsystem", "Json", "JsonUtilities", "ApplicationCore", "HTTP"
         });
 
         if (Target.bBuildEditor)

@@ -1,7 +1,13 @@
 param(
     [int]$LobbyPort = 28080,
     [int]$AllocatorPort = 28081,
-    [int]$GameServerPortStart = 29000
+    [int]$GameServerPortStart = 29000,
+    [string]$GameServerExecutablePath = 'dotnet',
+    [string[]]$GameServerPrefixArguments = @(),
+    [int]$RegistrationTimeoutSeconds = 10,
+    [int]$HeartbeatTimeoutSeconds = 3,
+    [int]$RouteWaitAttempts = 40,
+    [int]$FailureWaitAttempts = 40
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,6 +21,9 @@ $root = Split-Path -Parent $PSScriptRoot
 $lobbyDll = Join-Path $root 'Services/GuiyangMahjong.Lobby/bin/Release/net10.0/GuiyangMahjong.Lobby.dll'
 $allocatorDll = Join-Path $root 'Services/GuiyangMahjong.Allocator/bin/Release/net10.0/GuiyangMahjong.Allocator.dll'
 $fakeDll = Join-Path $root 'Services/GuiyangMahjong.FakeGameServer/bin/Release/net10.0/GuiyangMahjong.FakeGameServer.dll'
+if ($GameServerExecutablePath -eq 'dotnet' -and $GameServerPrefixArguments.Count -eq 0) {
+    $GameServerPrefixArguments = @($fakeDll)
+}
 
 function Wait-Health([string]$Url) {
     for ($attempt = 0; $attempt -lt 40; $attempt++) {
@@ -51,7 +60,7 @@ function ConvertTo-Items([object]$Response) {
 }
 
 function Wait-Route([object]$Room, [string]$PlayerToken) {
-    for ($attempt = 0; $attempt -lt 40; $attempt++) {
+    for ($attempt = 0; $attempt -lt $RouteWaitAttempts; $attempt++) {
         try {
             return Invoke-RestMethod `
                 -Uri "http://127.0.0.1:$LobbyPort/v1/rooms/$($Room.roomCode)/route" `
@@ -62,6 +71,40 @@ function Wait-Route([object]$Room, [string]$PlayerToken) {
         }
     }
     throw "Route was not published for room $($Room.roomId)"
+}
+
+function New-CreateRoomBody([int]$BaseScore, [int]$TurnTimeoutSeconds) {
+    @{
+        roundCount = 4
+        publicRoom = $true
+        autoStart = $true
+        passwordProtected = $false
+        password = $null
+        ruleSnapshot = @{
+            ruleId = 'GuiyangMainstreamV1'
+            baseScore = $BaseScore
+            turnTimeoutSeconds = $TurnTimeoutSeconds
+        }
+    } | ConvertTo-Json -Depth 5
+}
+
+function Wait-AuthoritativeHeartbeats([string[]]$ServerInstanceIds) {
+    for ($attempt = 0; $attempt -lt $RouteWaitAttempts; $attempt++) {
+        $response = Invoke-RestMethod `
+            -Uri "http://127.0.0.1:$AllocatorPort/internal/instances" `
+            -Headers (New-Headers $serviceToken)
+        $instances = @(ConvertTo-Items $response)
+        $matching = @($instances | Where-Object { $ServerInstanceIds -contains $_.serverInstanceId })
+        $heartbeating = @($matching | Where-Object {
+            $_.registeredAtUtc -and $_.lastHeartbeatAtUtc -and
+            [DateTimeOffset]$_.lastHeartbeatAtUtc -gt [DateTimeOffset]$_.registeredAtUtc
+        })
+        if ($matching.Count -eq $ServerInstanceIds.Count -and $heartbeating.Count -eq $ServerInstanceIds.Count) {
+            return $matching
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    throw 'Not every GameServer produced a heartbeat after applying its authoritative room bootstrap.'
 }
 
 try {
@@ -85,18 +128,21 @@ try {
         "--urls=http://127.0.0.1:$AllocatorPort",
         "--Allocator:PortStart=$GameServerPortStart",
         "--Allocator:PortEnd=$($GameServerPortStart + 2)",
-        '--Allocator:HeartbeatTimeoutSeconds=3',
+        "--Allocator:HeartbeatTimeoutSeconds=$HeartbeatTimeoutSeconds",
         '--Allocator:HeartbeatIntervalSeconds=1',
         '--Allocator:MonitorIntervalMilliseconds=200',
-        '--Allocator:RegistrationTimeoutSeconds=10',
+        "--Allocator:RegistrationTimeoutSeconds=$RegistrationTimeoutSeconds",
         '--Allocator:DrainGraceSeconds=0',
         '--Allocator:AdvertisedIp=127.0.0.1',
-        '--Allocator:GameServerExecutablePath=dotnet',
-        "--Allocator:GameServerPrefixArguments:0=$fakeDll",
+        "--Allocator:GameServerExecutablePath=$GameServerExecutablePath",
         "--Allocator:LobbyInternalUrl=http://127.0.0.1:$LobbyPort",
         "--Allocator:ServiceToken=$serviceToken",
-        "--Allocator:LobbyCallbackToken=$lobbyToken"
+        "--Allocator:LobbyCallbackToken=$lobbyToken",
+        "--Allocator:JoinTicketSigningKey=$joinKey"
     )
+    for ($index = 0; $index -lt $GameServerPrefixArguments.Count; $index++) {
+        $allocatorArguments += "--Allocator:GameServerPrefixArguments:$index=$($GameServerPrefixArguments[$index])"
+    }
     $allocator = Start-Process -FilePath 'dotnet' -ArgumentList $allocatorArguments -WindowStyle Hidden -PassThru
     Wait-Health "http://127.0.0.1:$AllocatorPort/health/ready"
 
@@ -116,17 +162,9 @@ try {
         $hmac.Dispose()
     }
     $playerToken = "$tokenPayload.$tokenSignature"
-    $createBody = @{
-        roundCount = 4
-        publicRoom = $true
-        autoStart = $true
-        passwordProtected = $false
-        password = $null
-        ruleSnapshot = @{ ruleId = 'GuiyangMainstreamV1' }
-    } | ConvertTo-Json -Depth 5
-
     $rooms = @()
     for ($index = 0; $index -lt 2; $index++) {
+        $createBody = if ($index -eq 0) { New-CreateRoomBody 2 17 } else { New-CreateRoomBody 5 23 }
         $rooms += Invoke-RestMethod `
             -Method Post `
             -Uri "http://127.0.0.1:$LobbyPort/v1/rooms" `
@@ -135,6 +173,8 @@ try {
             -Body $createBody
     }
     $routes = @($rooms | ForEach-Object { Wait-Route $_ $playerToken })
+
+    $null = Wait-AuthoritativeHeartbeats @($routes.serverInstanceId)
 
     $instancesResponse = Invoke-RestMethod `
         -Uri "http://127.0.0.1:$AllocatorPort/internal/instances" `
@@ -153,7 +193,7 @@ try {
     $victim = $instancesBefore | Sort-Object port | Select-Object -First 1
     Stop-Process -Id $victim.processId -Force
     $failed = $null
-    for ($attempt = 0; $attempt -lt 40 -and $null -eq $failed; $attempt++) {
+    for ($attempt = 0; $attempt -lt $FailureWaitAttempts -and $null -eq $failed; $attempt++) {
         Start-Sleep -Milliseconds 250
         $currentResponse = Invoke-RestMethod `
             -Uri "http://127.0.0.1:$AllocatorPort/internal/instances" `
@@ -170,7 +210,7 @@ try {
         -Uri "http://127.0.0.1:$LobbyPort/v1/rooms" `
         -Headers (New-Headers $playerToken 'integration-create-room-third-0001') `
         -ContentType 'application/json' `
-        -Body $createBody
+        -Body (New-CreateRoomBody 7 29)
     $thirdRoute = Wait-Route $thirdRoom $playerToken
     if ($thirdRoute.serverPort -ne $victim.port) {
         throw "Expected reclaimed port $($victim.port), got $($thirdRoute.serverPort)."
@@ -180,9 +220,11 @@ try {
         Status = 'INTEGRATION_OK'
         RoomsCreated = 3
         InitialInstances = 2
+        HeartbeatingInstances = 2
         UniqueInitialPorts = 2
         FailedInstance = $victim.serverInstanceId
         ReclaimedPort = $thirdRoute.serverPort
+        GameServerExecutable = $GameServerExecutablePath
     } | ConvertTo-Json -Compress
 }
 finally {

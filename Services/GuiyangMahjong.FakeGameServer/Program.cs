@@ -16,7 +16,12 @@ var matchId = Required("MatchId");
 var serverInstanceId = Required("ServerInstanceId");
 var port = int.Parse(Required("Port"));
 var lobbyInternalUrl = Required("LobbyInternalUrl").TrimEnd('/');
-var registrationCredential = Required("RegistrationCredential");
+var registrationCredential = Environment.GetEnvironmentVariable("MAHJONG_REGISTRATION_CREDENTIAL");
+if (string.IsNullOrWhiteSpace(registrationCredential))
+{
+    throw new InvalidOperationException("MAHJONG_REGISTRATION_CREDENTIAL is required.");
+}
+Environment.SetEnvironmentVariable("MAHJONG_REGISTRATION_CREDENTIAL", null);
 var buildVersion = Required("BuildVersion");
 var advertisedIp = Required("AdvertisedIp");
 
@@ -51,6 +56,13 @@ registrationResponse.EnsureSuccessStatusCode();
 var registration = await registrationResponse.Content.ReadFromJsonAsync<GameServerRegistrationAck>(
     cancellationToken: shutdown.Token)
     ?? throw new InvalidOperationException("Lobby returned an empty registration response.");
+if (registration.RoomBootstrap is null
+    || registration.RoomBootstrap.RoomId != roomId
+    || registration.RoomBootstrap.MatchId != matchId
+    || registration.RoomBootstrap.RoomCode.Length != 6)
+{
+    throw new InvalidOperationException("Lobby returned an invalid authoritative room bootstrap.");
+}
 registrationCredential = string.Empty;
 
 Console.WriteLine($"FakeGameServer registered InstanceId={serverInstanceId}");
@@ -98,7 +110,20 @@ internal sealed record GameServerRegistrationAck(
     string RequestId,
     bool Accepted,
     int HeartbeatIntervalSeconds,
-    string HeartbeatCredential);
+    string HeartbeatCredential,
+    ManagedRoomBootstrap? RoomBootstrap);
+
+internal sealed record ManagedRoomBootstrap(
+    string RoomId,
+    string RoomCode,
+    string MatchId,
+    string OwnerPlayerId,
+    int RoundCount,
+    int MaximumPlayers,
+    bool PublicRoom,
+    bool AutoStart,
+    bool PasswordProtected,
+    Dictionary<string, object?> RuleSnapshot);
 
 internal sealed record GameServerHeartbeat(
     string RoomId,

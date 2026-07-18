@@ -23,7 +23,22 @@
     {
       "Name": "EditorScriptingUtilities",
       "Enabled": true
+    },
+    {
+      "Name": "Landmass",
+      "Enabled": false
+    },
+    {
+      "Name": "Water",
+      "Enabled": false
+    },
+    {
+      "Name": "Volumetrics",
+      "Enabled": false
     }
   ],
-  "TargetPlatforms": ["Windows", "Android"]
+  "TargetPlatforms": [
+    "Windows",
+    "Android"
+  ]
 }

@@ -7,6 +7,7 @@ public sealed record GameServerLaunchSpec(
     int Port,
     string LobbyInternalUrl,
     string RegistrationCredential,
+    string JoinTicketSigningKey,
     string BuildVersion,
     string AdvertisedIp);
 

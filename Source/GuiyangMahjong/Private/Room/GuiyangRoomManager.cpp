@@ -1,5 +1,6 @@
 #include "Room/GuiyangRoomManager.h"
 
+#include "Room/GuiyangManagedRoomDefinition.h"
 #include "HAL/PlatformTime.h"
 #include "HAL/PlatformProcess.h"
 #include "GuiyangMahjong.h"
@@ -11,6 +12,107 @@ THIRD_PARTY_INCLUDES_START
 #undef UI
 THIRD_PARTY_INCLUDES_END
 #endif
+
+bool UGuiyangRoomManager::CreateManagedRoom(const FGuiyangManagedRoomDefinition& Definition,
+    FMahjongRoomState& OutState, EMahjongRoomError& OutError)
+{
+    OutError = EMahjongRoomError::None;
+    if (Rooms.Num() != 0 || Definition.RoomCode.Len() != 6 || !Definition.RoomCode.IsNumeric()
+        || Definition.RoundCount < 1 || Definition.RoundCount > 16 || Definition.MaximumPlayers != 4
+        || Definition.OwnerPlayerId.IsEmpty()
+        || !UGuiyangRuleSnapshotLibrary::VerifySnapshot(Definition.RuleSnapshot))
+    {
+        OutError = EMahjongRoomError::InvalidRequest;
+        return false;
+    }
+
+    FRoomRecord Record;
+    Record.bManagedAuthority = true;
+    Record.PublicState.RoomInfo.MatchId = Definition.MatchId;
+    Record.PublicState.RoomInfo.RoomId = Definition.RoomCode;
+    Record.PublicState.RoomInfo.OwnerPlayerId = Definition.OwnerPlayerId;
+    Record.PublicState.RoomInfo.RoundCount = Definition.RoundCount;
+    Record.PublicState.RoomInfo.MaxPlayers = Definition.MaximumPlayers;
+    Record.PublicState.RoomInfo.BaseScore = Definition.RuleSnapshot.Config.BaseScore;
+    Record.PublicState.RoomInfo.bPublicRoom = Definition.bPublicRoom;
+    Record.PublicState.RoomInfo.bAutoStart = Definition.bAutoStart;
+    Record.PublicState.RoomInfo.bPasswordProtected = Definition.bPasswordProtected;
+    Record.PublicState.RuleSnapshot = Definition.RuleSnapshot;
+    Record.PublicState.RoomInfo.RuleSummary = FString::Printf(TEXT("%s · %d张 · %d局"),
+        *Definition.RuleSnapshot.Config.RuleId.ToString(), Definition.RuleSnapshot.GetTileCount(), Definition.RoundCount);
+    Record.PublicState.Lifecycle = EMahjongRoomLifecycle::WaitingForPlayers;
+    Record.PublicState.Seats.SetNum(Definition.MaximumPlayers);
+    for (int32 SeatIndex = 0; SeatIndex < Record.PublicState.Seats.Num(); ++SeatIndex)
+        Record.PublicState.Seats[SeatIndex].SeatIndex = SeatIndex;
+    ++Record.PublicState.StateSequence;
+    Rooms.Add(Definition.RoomCode, MoveTemp(Record));
+    OutState = Rooms[Definition.RoomCode].PublicState;
+    return true;
+}
+
+bool UGuiyangRoomManager::AdmitManagedPlayer(const FString& RoomCode, const FString& PlayerId,
+    const FString& DisplayName, FMahjongRoomState& OutState, EMahjongRoomError& OutError)
+{
+    OutError = EMahjongRoomError::None;
+    if (!ValidateIdentity(PlayerId, DisplayName))
+    {
+        OutError = EMahjongRoomError::InvalidRequest;
+        return false;
+    }
+    if (const FString* ExistingRoomCode = PlayerRoomCodes.Find(PlayerId))
+    {
+        if (*ExistingRoomCode != RoomCode)
+        {
+            OutError = EMahjongRoomError::AlreadyInRoom;
+            return false;
+        }
+        FRoomRecord* ExistingRecord = Rooms.Find(RoomCode);
+        FMahjongSeatInfo* ExistingSeat = ExistingRecord ? FindSeat(ExistingRecord->PublicState, PlayerId) : nullptr;
+        if (!ExistingRecord || !ExistingRecord->bManagedAuthority || !ExistingSeat)
+        {
+            OutError = EMahjongRoomError::NotInRoom;
+            return false;
+        }
+        ExistingSeat->bOnline = true;
+        ExistingRecord->DisconnectedAtUtcByPlayer.Remove(PlayerId);
+        ++ExistingRecord->PublicState.StateSequence;
+        OutState = ExistingRecord->PublicState;
+        return true;
+    }
+
+    FRoomRecord* Record = Rooms.Find(RoomCode);
+    if (!Record || !Record->bManagedAuthority)
+    {
+        OutError = EMahjongRoomError::RoomNotFound;
+        return false;
+    }
+    if (Record->PublicState.Lifecycle != EMahjongRoomLifecycle::WaitingForPlayers
+        && Record->PublicState.Lifecycle != EMahjongRoomLifecycle::ReadyCheck)
+    {
+        OutError = EMahjongRoomError::GameAlreadyStarted;
+        return false;
+    }
+    FMahjongSeatInfo* EmptySeat = Record->PublicState.Seats.FindByPredicate(
+        [](const FMahjongSeatInfo& Seat) { return !Seat.bOccupied; });
+    if (!EmptySeat)
+    {
+        OutError = EMahjongRoomError::RoomFull;
+        return false;
+    }
+    EmptySeat->PlayerId = PlayerId;
+    EmptySeat->PlayerName = DisplayName.TrimStartAndEnd();
+    EmptySeat->bOwner = PlayerId == Record->PublicState.RoomInfo.OwnerPlayerId;
+    EmptySeat->bOccupied = true;
+    EmptySeat->bOnline = true;
+    EmptySeat->bReady = false;
+    PlayerRoomCodes.Add(PlayerId, RoomCode);
+    RefreshLifecycle(Record->PublicState);
+    ++Record->PublicState.StateSequence;
+    OutState = Record->PublicState;
+    UE_LOG(LogMahjongServer, Log, TEXT("托管玩家入座：Room=%s，Player=%s，Seat=%d"),
+        *RoomCode, *PlayerId, EmptySeat->SeatIndex);
+    return true;
+}
 
 bool UGuiyangRoomManager::CreateRoom(const FString& PlayerId, const FString& DisplayName,
     const FMahjongCreateRoomRequest& Request, FMahjongRoomState& OutState, EMahjongRoomError& OutError)
@@ -42,6 +144,7 @@ bool UGuiyangRoomManager::CreateRoom(const FString& PlayerId, const FString& Dis
     Record.PublicState.RoomInfo.RoundCount = Request.RoundCount;
     Record.PublicState.RoomInfo.BaseScore = Request.Rules.BaseScore;
     Record.PublicState.RoomInfo.bPublicRoom = Request.bPublicRoom;
+    Record.PublicState.RoomInfo.bAutoStart = Request.bAutoStart;
     Record.PublicState.RoomInfo.bPasswordProtected = Request.bEnablePassword;
     Record.PublicState.RuleSnapshot = UGuiyangRuleSnapshotLibrary::CreateSnapshot(Request.Rules);
     Record.PublicState.RoomInfo.BaseScore = Record.PublicState.RuleSnapshot.Config.BaseScore;
@@ -267,6 +370,15 @@ bool UGuiyangRoomManager::LeaveRoom(const FString& PlayerId, FMahjongRoomState& 
     }
     if (OccupiedCount == 0)
     {
+        if (Record->bManagedAuthority)
+        {
+            Record->PublicState.Lifecycle = EMahjongRoomLifecycle::WaitingForPlayers;
+            Record->PublicState.bGameStarting = false;
+            ++Record->PublicState.StateSequence;
+            OutState = Record->PublicState;
+            UE_LOG(LogMahjongServer, Log, TEXT("托管房间已清空并保留：Room=%s"), *RoomCode);
+            return true;
+        }
         OutState = Record->PublicState;
         OutState.Lifecycle = EMahjongRoomLifecycle::Closed;
         ++OutState.StateSequence;
@@ -274,7 +386,7 @@ bool UGuiyangRoomManager::LeaveRoom(const FString& PlayerId, FMahjongRoomState& 
         UE_LOG(LogMahjongServer, Log, TEXT("最后一名玩家离开，房间销毁：Room=%s"), *RoomCode);
         return true;
     }
-    if (bWasOwner)
+    if (bWasOwner && !Record->bManagedAuthority)
     {
         FMahjongSeatInfo* NewOwner = Record->PublicState.Seats.FindByPredicate(
             [](const FMahjongSeatInfo& Item) { return Item.bOccupied; });

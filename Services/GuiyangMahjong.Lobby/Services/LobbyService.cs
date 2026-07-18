@@ -62,7 +62,7 @@ public sealed class LobbyService
                 PublicRoom = request.PublicRoom,
                 AutoStart = request.AutoStart,
                 MaximumPlayers = options.MaximumPlayersPerRoom,
-                RuleSnapshot = request.RuleSnapshot,
+                RuleSnapshot = CloneRuleSnapshot(request.RuleSnapshot),
                 Lifecycle = RoomLifecycle.Allocating,
                 PlayerIds = [player.PlayerId],
                 Password = protectedPassword,
@@ -274,7 +274,18 @@ public sealed class LobbyService
             requestId,
             acknowledgement.Accepted,
             acknowledgement.HeartbeatIntervalSeconds,
-            acknowledgement.HeartbeatCredential);
+            acknowledgement.HeartbeatCredential,
+            new ManagedRoomBootstrap(
+                room.RoomId,
+                room.RoomCode,
+                room.MatchId,
+                room.OwnerPlayerId,
+                room.RoundCount,
+                room.MaximumPlayers,
+                room.PublicRoom,
+                room.AutoStart,
+                room.Password is not null,
+                CloneRuleSnapshot(room.RuleSnapshot)));
     }
 
     public Task RecordGameServerHeartbeatAsync(
@@ -367,6 +378,14 @@ public sealed class LobbyService
     {
         if (request.RoundCount is < 1 or > 16) throw Invalid("局数必须为 1 到 16");
         if (request.RuleSnapshot is null) throw Invalid("缺少规则快照");
+        if (request.RuleSnapshot.Count is < 1 or > 64
+            || System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(request.RuleSnapshot).Length > 16 * 1024
+            || !request.RuleSnapshot.TryGetValue("ruleId", out var ruleIdValue)
+            || !TryReadRuleId(ruleIdValue, out var ruleId)
+            || ruleId.Length > 64)
+        {
+            throw Invalid("规则快照格式无效");
+        }
         if (request.PasswordProtected && (request.Password is null || request.Password.Length is < 6 or > 12))
         {
             throw Invalid("房间密码必须为 6 到 12 个字符");
@@ -375,6 +394,24 @@ public sealed class LobbyService
         {
             throw Invalid("非密码房不得提交密码");
         }
+    }
+
+    private static Dictionary<string, object?> CloneRuleSnapshot(Dictionary<string, object?> snapshot) =>
+        System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(
+            System.Text.Json.JsonSerializer.Serialize(snapshot))
+        ?? throw new InvalidOperationException("Rule snapshot could not be cloned.");
+
+    private static bool TryReadRuleId(object? value, out string ruleId)
+    {
+        ruleId = value switch
+        {
+            string text => text.Trim(),
+            System.Text.Json.JsonElement { ValueKind: System.Text.Json.JsonValueKind.String } element =>
+                element.GetString()?.Trim() ?? string.Empty,
+            _ => string.Empty
+        };
+        return ruleId.Length > 0 && ruleId.All(character =>
+            char.IsAsciiLetterOrDigit(character) || character is '-' or '_' or '.');
     }
 
     private static LobbyOperationException Invalid(string message) => new(

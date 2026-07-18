@@ -80,6 +80,7 @@ public sealed class GameServerInstanceManager
                     instance.Port,
                     options.LobbyInternalUrl,
                     registration.Plaintext,
+                    options.JoinTicketSigningKey,
                     request.BuildVersion,
                     instance.AdvertisedIp), cancellationToken);
             }

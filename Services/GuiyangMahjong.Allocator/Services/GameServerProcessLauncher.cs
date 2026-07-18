@@ -30,14 +30,16 @@ public sealed class GameServerProcessLauncher(
             WorkingDirectory = AppContext.BaseDirectory
         };
         foreach (var argument in options.GameServerPrefixArguments) startInfo.ArgumentList.Add(argument);
+        startInfo.ArgumentList.Add("-MahjongManagedGameServer");
         startInfo.ArgumentList.Add($"-RoomId={spec.RoomId}");
         startInfo.ArgumentList.Add($"-MatchId={spec.MatchId}");
         startInfo.ArgumentList.Add($"-ServerInstanceId={spec.ServerInstanceId}");
         startInfo.ArgumentList.Add($"-Port={spec.Port}");
         startInfo.ArgumentList.Add($"-LobbyInternalUrl={spec.LobbyInternalUrl}");
-        startInfo.ArgumentList.Add($"-RegistrationCredential={spec.RegistrationCredential}");
         startInfo.ArgumentList.Add($"-BuildVersion={spec.BuildVersion}");
         startInfo.ArgumentList.Add($"-AdvertisedIp={spec.AdvertisedIp}");
+        startInfo.Environment["MAHJONG_REGISTRATION_CREDENTIAL"] = spec.RegistrationCredential;
+        startInfo.Environment["MAHJONG_JOIN_TICKET_SIGNING_KEY"] = spec.JoinTicketSigningKey;
 
         var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException("GameServer process failed to start.");

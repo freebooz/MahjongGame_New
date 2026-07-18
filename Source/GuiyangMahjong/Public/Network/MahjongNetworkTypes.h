@@ -93,6 +93,7 @@ struct GUIYANGMAHJONG_API FMahjongRoomInfo
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 DealerSeat = 0;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) int32 BaseScore = 1;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bPublicRoom = true;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bAutoStart = true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite) bool bPasswordProtected = false;
 };
 

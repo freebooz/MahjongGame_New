@@ -121,7 +121,8 @@ public sealed class GameServerInstanceManagerTests
             AdvertisedIp = "127.0.0.1",
             LobbyInternalUrl = "http://127.0.0.1:18080",
             ServiceToken = "test-only-allocator-service-token-long-enough",
-            LobbyCallbackToken = "test-only-lobby-callback-token-long-enough"
+            LobbyCallbackToken = "test-only-lobby-callback-token-long-enough",
+            JoinTicketSigningKey = "test-only-join-ticket-signing-key-long-enough"
         });
         var ports = new PortLeasePool(allocatorOptions);
         var launcher = new FakeProcessLauncher();

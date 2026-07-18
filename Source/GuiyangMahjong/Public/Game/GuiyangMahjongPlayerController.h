@@ -5,6 +5,7 @@
 #include "Core/MahjongTypes.h"
 #include "Auth/GuiyangLoginTypes.h"
 #include "Network/MahjongNetworkTypes.h"
+#include "Lobby/GuiyangLobbyTypes.h"
 #include "GuiyangMahjongPlayerController.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongPrivateHandUpdated, const FMahjongPrivatePlayerState&, State);
@@ -24,6 +25,9 @@ class GUIYANGMAHJONG_API AGuiyangMahjongPlayerController : public APlayerControl
 {
     GENERATED_BODY()
 public:
+    UFUNCTION(BlueprintCallable, Category="Mahjong|Network")
+    void ConnectToAllocatedServer(const FGuiyangGameServerRoute& Route);
+
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongPrivateHandUpdated OnPrivateHandUpdated;
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongAvailableActionsUpdated OnAvailableActionsUpdated;
     UPROPERTY(BlueprintAssignable, Category="麻将|UI") FMahjongSettlementShown OnSettlementShown;

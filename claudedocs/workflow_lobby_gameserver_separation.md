@@ -49,7 +49,8 @@ flowchart LR
 | 账号、登录会话、封禁状态 | Auth/大厅服务 | PostgreSQL/安全缓存 | UE 客户端不得生成正式身份 |
 | 公告、在线人数、服务器状态 | 大厅服务 | Redis + 可选数据库 | 不进入单桌 `GameState` |
 | 房间号、服务器端点、生命周期 | 大厅服务/分配器 | Redis，关键事件落库 | 客户端不得指定服务器实例 |
-| 房间规则快照、座位、准备状态（第一阶段） | UE GameServer | 进程内存，必要时快照 | 大厅不得直接修改局内状态 |
+| 房间号、房间属性、初始规则定义 | 大厅服务 | Redis/数据库 | UE 不得重生成房号，客户端不得改写规则 |
+| 规范化规则快照、座位、准备状态 | UE GameServer | 进程内存，必要时快照 | 只能从大厅初始定义生成；开局后不得修改 |
 | 密码入场 | 生产目标由大厅 HTTPS 校验 | 仅保存盐化摘要 | 密码、盐、摘要不得进入日志和票据 |
 | 牌墙、手牌、回合、操作窗口 | UE GameServer | 进程内存/局内快照 | 不进入大厅、客户端公共状态 |
 | 最终结算与战绩 | UE 产生，大厅幂等接收 | PostgreSQL | 客户端结算不得作为权威来源 |
@@ -312,3 +313,34 @@ flowchart LR
 剩余外部门禁：当前机器未安装 Docker、Redis 或 PostgreSQL，因此尚未执行真实外部存储的进程
 重启恢复测试。该门禁不能用内存测试替代；配置 `RedisPostgres` 模式并完成真实恢复验证后，才允许
 将阶段 2 标记为生产验收通过。阶段 3 可以继续开发，但不得以此绕过生产发布门禁。
+
+## 12. 阶段 4 第一执行切片（2026-07-18）
+
+本切片把分配器的 Fake GameServer 启动契约替换为真实 UE Dedicated Server 可消费的托管契约：
+
+- `GuiyangMahjongServer` 读取房间、牌局、实例、端口、Lobby 地址、构建版本和一次性注册凭据。
+- 长期 JoinTicket HMAC 密钥只通过 `MAHJONG_JOIN_TICKET_SIGNING_KEY` 进程环境变量注入。
+- UE Server 完成 Lobby 注册、周期心跳，并在注册成功前保持登录关闭。
+- `PreLogin` 验证票据签名、玩家、房间、牌局、实例、有效期和 nonce；nonce 只允许消费一次。
+- `InitNewPlayer` 把已验证 PlayerId 绑定到 PlayerController，后续会话 RPC 不得切换身份。
+- 客户端提供 `ConnectToAllocatedServer`，使用 URL 编码后的 PlayerId 与 JoinTicket 执行 `ClientTravel`；
+  Server 两个消费点显式 URL 解码。
+- 托管配置无效或桥接初始化失败时保持失败关闭；未带托管标志的 `LocalLegacy` 行为不变。
+
+本切片不把阶段 4 标记为全部验收完成。后续切片仍需把大厅签名的权威规则快照和 RoomCode
+引导进 `UGuiyangRoomManager`，并执行两桌隔离与一服四客户端完整对局门禁。
+
+## 13. 阶段 4 第二执行切片（2026-07-18）
+
+本切片完成了 Lobby 到 UE 单桌实例的权威房间引导：
+
+- `GameServerRegistrationAck` 新增 `roomBootstrap`，包含 RoomId、固定六位 RoomCode、MatchId、房主、局数、四人容量、公开/自动开始/密码属性和规则对象。
+- Lobby 在建房时深拷贝规则字典，校验规则对象大小与 `ruleId`，注册时只下发持久化权威副本。
+- UE 严格解析已知规则字段并生成可校验的 `FGuiyangRuleSnapshot`；范围、类型、房号或容量错误时保持失败关闭。
+- `UGuiyangRoomManager` 支持创建固定房号的托管房间和票据认证后的玩家入座；最后玩家离开时保留托管房间，不破坏 Lobby 路由。
+- 每个 UE 进程只允许初始化一个托管房间；本地创建、快速开始和按房号加入接口在托管模式下关闭。
+- 只有 GameMode 完成权威房间初始化后 Bridge 才标记注册成功并启动心跳。
+
+验收结果：Lobby 17/17、Allocator 4/4、UE `GameServer.*` 4/4；WindowsServer Build/Cook/Stage 成功。真实两进程联调确认两桌拥有不同 RoomCode、MatchId 和 RuleHash，2/2 实例均在注册后心跳，崩溃实例进入 Failed，后续房间成功回收原端口。
+
+阶段 4 仍保留一项人工发布门禁：四个真实客户端从 Lobby 获取路由和票据，进入同一托管桌完成整局、重连与结算。架构隔离边界保持“一桌一 Dedicated Server 进程”，不实施单进程多桌。

@@ -359,12 +359,32 @@ components:
         registrationCredential: { type: string, minLength: 32, writeOnly: true }
     GameServerRegistrationAck:
       type: object
-      required: [requestId, accepted, heartbeatIntervalSeconds, heartbeatCredential]
+      required: [requestId, accepted, heartbeatIntervalSeconds, heartbeatCredential, roomBootstrap]
       properties:
         requestId: { type: string, format: uuid }
         accepted: { type: boolean }
         heartbeatIntervalSeconds: { type: integer, minimum: 2, maximum: 60 }
         heartbeatCredential: { type: string, minLength: 32, writeOnly: true }
+        roomBootstrap: { $ref: '#/components/schemas/ManagedRoomBootstrap' }
+    ManagedRoomBootstrap:
+      type: object
+      required: [roomId, roomCode, matchId, ownerPlayerId, roundCount, maximumPlayers, publicRoom, autoStart, passwordProtected, ruleSnapshot]
+      properties:
+        roomId: { type: string, format: uuid }
+        roomCode: { type: string, pattern: '^[0-9]{6}$' }
+        matchId: { type: string, format: uuid }
+        ownerPlayerId: { type: string, minLength: 1, maxLength: 80 }
+        roundCount: { type: integer, minimum: 1, maximum: 16 }
+        maximumPlayers: { type: integer, const: 4 }
+        publicRoom: { type: boolean }
+        autoStart: { type: boolean }
+        passwordProtected: { type: boolean }
+        ruleSnapshot:
+          type: object
+          minProperties: 1
+          maxProperties: 64
+          required: [ruleId]
+          additionalProperties: true
     GameServerHeartbeat:
       type: object
       required: [roomId, heartbeatCredential, roomLifecycle, connectedPlayers, roundId, buildVersion, sentAtUtc]
