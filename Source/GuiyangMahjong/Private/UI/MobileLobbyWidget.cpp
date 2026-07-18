@@ -1,8 +1,9 @@
 #include "UI/MobileLobbyWidget.h"
-#include "Game/GuiyangMahjongPlayerController.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
+#include "Engine/GameInstance.h"
 #include "GuiyangMahjong.h"
+#include "Lobby/GuiyangLobbySubsystem.h"
 #include "UI/MobileCreateRoomDialogWidget.h"
 #include "UI/MobileJoinRoomDialogWidget.h"
 #include "UI/MobileSettingsWidget.h"
@@ -74,8 +75,18 @@ void UMobileLobbyWidget::HandleSetting()
 
 void UMobileLobbyWidget::HandleQuickStart()
 {
-    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
-        PC->Server_RequestQuickStart();
+    UGuiyangLobbySubsystem* Lobby = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>() : nullptr;
+    if (!Lobby)
+    {
+        UE_LOG(LogMahjongUI, Error, TEXT("快速开始失败：大厅服务尚未初始化"));
+        return;
+    }
+    const FGuiyangLobbyOperationResult Result = Lobby->RequestQuickStart(GetOwningPlayer());
+    if (!Result.bAccepted)
+    {
+        UE_LOG(LogMahjongUI, Warning, TEXT("快速开始被拒绝：%s"), *Result.ChineseMessage);
+    }
 }
 
 void UMobileLobbyWidget::RefreshPlayerInfo(const FString& PlayerName, const FString& PlayerId, const int32 OnlineCount)

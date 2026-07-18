@@ -4,8 +4,9 @@
 #include "Components/CheckBox.h"
 #include "Components/EditableTextBox.h"
 #include "Components/TextBlock.h"
-#include "Game/GuiyangMahjongPlayerController.h"
+#include "Engine/GameInstance.h"
 #include "GuiyangMahjong.h"
+#include "Lobby/GuiyangLobbySubsystem.h"
 #include "UI/MobileRuleConfigWidget.h"
 #include "UI/MobileRuleSummaryWidget.h"
 
@@ -51,14 +52,26 @@ void UMobileCreateRoomDialogWidget::HandleCreate()
         return;
     }
 
-    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
+    UGuiyangLobbySubsystem* Lobby = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>() : nullptr;
+    if (!Lobby)
     {
-        PC->Server_RequestCreateRoomWithConfig(Request);
-        UE_LOG(LogMahjongUI, Log, TEXT("创建房间参数已提交：局数=%d，公开房=%s，密码房=%s"),
-            Request.RoundCount, Request.bPublicRoom ? TEXT("是") : TEXT("否"),
-            Request.bEnablePassword ? TEXT("是") : TEXT("否"));
-        RemoveFromParent();
+        Txt_Status->SetText(FText::FromString(TEXT("大厅服务尚未初始化，请稍后重试")));
+        return;
     }
+
+    const FGuiyangLobbyOperationResult Result = Lobby->RequestCreateRoom(GetOwningPlayer(), Request);
+    if (!Result.bAccepted)
+    {
+        Txt_Status->SetText(FText::FromString(Result.ChineseMessage));
+        return;
+    }
+
+    UE_LOG(LogMahjongUI, Log,
+        TEXT("创建房间参数已提交：RequestId=%s，局数=%d，公开房=%s，密码房=%s"),
+        *Result.RequestId, Request.RoundCount, Request.bPublicRoom ? TEXT("是") : TEXT("否"),
+        Request.bEnablePassword ? TEXT("是") : TEXT("否"));
+    RemoveFromParent();
 }
 
 void UMobileCreateRoomDialogWidget::HandleCancel()

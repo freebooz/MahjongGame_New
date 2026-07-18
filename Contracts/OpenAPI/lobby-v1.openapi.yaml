@@ -1,0 +1,443 @@
+openapi: 3.1.0
+info:
+  title: Guiyang Mahjong Lobby API
+  version: 1.0.0
+  description: |
+    贵阳捉鸡麻将大厅控制面契约。大厅负责房间目录、GameServer 分配和路由；
+    洗牌、手牌、操作裁决与结算计算仍由 UE Dedicated Server 权威执行。
+servers:
+  - url: https://lobby.example.invalid
+    description: 部署时替换；客户端不得把默认地址用于生产环境
+tags:
+  - name: Lobby
+  - name: Rooms
+  - name: Reconnect
+  - name: InternalGameServers
+  - name: InternalMatches
+paths:
+  /v1/lobby/bootstrap:
+    get:
+      tags: [Lobby]
+      operationId: getLobbyBootstrap
+      security: [{ playerBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: 大厅启动信息
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LobbyBootstrap' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/rooms:
+    get:
+      tags: [Rooms]
+      operationId: listPublicRooms
+      security: [{ playerBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: 当前可加入的公开房间目录
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 100
+                items: { $ref: '#/components/schemas/RoomDirectoryItem' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Rooms]
+      operationId: createRoom
+      security: [{ playerBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateRoomRequest' }
+      responses:
+        '202':
+          description: 创建请求已接受，服务器分配可异步完成
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoomOperation' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/rooms/{roomCode}/join:
+    post:
+      tags: [Rooms]
+      operationId: joinRoom
+      security: [{ playerBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RoomCode'
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/JoinRoomRequest' }
+      responses:
+        '200':
+          description: 入场校验通过并返回短期路由
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameServerRoute' }
+        '202':
+          description: 服务器仍在分配中
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoomOperation' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/rooms/{roomCode}/route:
+    get:
+      tags: [Rooms]
+      operationId: getRoomRoute
+      security: [{ playerBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RoomCode'
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: 为当前玩家签发的新短期路由
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameServerRoute' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/reconnect/route:
+    post:
+      tags: [Reconnect]
+      operationId: getReconnectRoute
+      security: [{ playerBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReconnectRouteRequest' }
+      responses:
+        '200':
+          description: 重连路由与新票据
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameServerRoute' }
+        default: { $ref: '#/components/responses/Error' }
+  /v1/events:
+    get:
+      tags: [Lobby]
+      operationId: connectLobbyEvents
+      description: |
+        使用 WebSocket Upgrade 建立大厅事件连接。事件类型固定为
+        lobby.updated、room.updated、server.assigned、room.closed。
+      security: [{ playerBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '101': { description: WebSocket 协议切换成功 }
+        default: { $ref: '#/components/responses/Error' }
+  /internal/gameservers/register:
+    post:
+      tags: [InternalGameServers]
+      operationId: registerGameServer
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GameServerRegistration' }
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GameServerRegistrationAck' }
+        default: { $ref: '#/components/responses/Error' }
+  /internal/gameservers/{serverInstanceId}/heartbeat:
+    post:
+      tags: [InternalGameServers]
+      operationId: heartbeatGameServer
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/ServerInstanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GameServerHeartbeat' }
+      responses:
+        '204': { description: 心跳已接受 }
+        default: { $ref: '#/components/responses/Error' }
+  /internal/gameservers/failure:
+    post:
+      tags: [InternalGameServers]
+      operationId: reportGameServerFailure
+      security: [{ serviceBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GameServerFailure' }
+      responses:
+        '204': { description: Failure accepted and room route revoked. }
+        default: { $ref: '#/components/responses/Error' }
+  /internal/matches/{matchId}/result:
+    post:
+      tags: [InternalMatches]
+      operationId: submitMatchResult
+      security: [{ serviceBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/MatchId'
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MatchResultReport' }
+      responses:
+        '200':
+          description: 结算结果已幂等接收
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MatchResultAck' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    playerBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    serviceBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: short-lived-service-token
+  parameters:
+    RequestId:
+      name: X-Request-Id
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 128 }
+    RoomCode:
+      name: roomCode
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[0-9]{6}$' }
+    MatchId:
+      name: matchId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ServerInstanceId:
+      name: serverInstanceId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Error:
+      description: 统一错误响应
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+  schemas:
+    LobbyBootstrap:
+      type: object
+      required: [requestId, playerId, displayName, onlinePlayerCount, announcements, protocolVersion]
+      properties:
+        requestId: { type: string, format: uuid }
+        playerId: { type: string, minLength: 1, maxLength: 80 }
+        displayName: { type: string, minLength: 1, maxLength: 24 }
+        onlinePlayerCount: { type: integer, minimum: 0 }
+        announcements:
+          type: array
+          items: { type: string, maxLength: 500 }
+        protocolVersion: { type: integer, const: 1 }
+    CreateRoomRequest:
+      type: object
+      required: [roundCount, publicRoom, autoStart, passwordProtected, ruleSnapshot]
+      properties:
+        roundCount: { type: integer, minimum: 1, maximum: 16 }
+        publicRoom: { type: boolean }
+        autoStart: { type: boolean }
+        passwordProtected: { type: boolean }
+        password:
+          type: string
+          minLength: 6
+          maxLength: 12
+          writeOnly: true
+          description: 仅通过 TLS 传输，不得写日志或返回
+        ruleSnapshot:
+          type: object
+          additionalProperties: true
+          description: 由大厅验证并签名，GameServer 不接受客户端直接覆盖
+    JoinRoomRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          minLength: 6
+          maxLength: 12
+          writeOnly: true
+        clientProtocolVersion: { type: integer, const: 1 }
+      required: [clientProtocolVersion]
+    ReconnectRouteRequest:
+      type: object
+      required: [roomId, matchId]
+      properties:
+        roomId: { type: string, minLength: 1, maxLength: 80 }
+        matchId: { type: string, format: uuid }
+    RoomOperation:
+      type: object
+      required: [requestId, roomId, roomCode, lifecycle]
+      properties:
+        requestId: { type: string, format: uuid }
+        roomId: { type: string, minLength: 1, maxLength: 80 }
+        roomCode: { type: string, pattern: '^[0-9]{6}$' }
+        lifecycle: { $ref: '#/components/schemas/RoomLifecycle' }
+        retryAfterMilliseconds: { type: integer, minimum: 0, maximum: 30000 }
+    RoomDirectoryItem:
+      type: object
+      required: [roomCode, lifecycle, playerCount, maximumPlayers, passwordProtected, roundCount]
+      properties:
+        roomCode: { type: string, pattern: '^[0-9]{6}$' }
+        lifecycle: { $ref: '#/components/schemas/RoomLifecycle' }
+        playerCount: { type: integer, minimum: 0, maximum: 4 }
+        maximumPlayers: { type: integer, minimum: 1, maximum: 4 }
+        passwordProtected: { type: boolean }
+        roundCount: { type: integer, minimum: 1, maximum: 16 }
+    LobbyEventEnvelope:
+      type: object
+      required: [type, sequence, occurredAtUtc, data]
+      properties:
+        type:
+          type: string
+          enum: [lobby.updated, room.updated, server.assigned, room.closed]
+        sequence: { type: integer, minimum: 1 }
+        occurredAtUtc: { type: string, format: date-time }
+        data: { type: object }
+    GameServerRoute:
+      type: object
+      required: [requestId, playerId, roomId, serverInstanceId, matchId, serverIp, serverPort, joinTicket, ticketExpireAtUtc]
+      properties:
+        requestId: { type: string, format: uuid }
+        playerId: { type: string, minLength: 1, maxLength: 80 }
+        roomId: { type: string, minLength: 1, maxLength: 80 }
+        serverInstanceId: { type: string, format: uuid }
+        matchId: { type: string, format: uuid }
+        serverIp: { type: string, minLength: 1, maxLength: 255 }
+        serverPort: { type: integer, minimum: 1, maximum: 65535 }
+        joinTicket:
+          type: string
+          minLength: 32
+          maxLength: 4096
+          readOnly: true
+          description: 短期票据，禁止日志记录
+        ticketExpireAtUtc: { type: string, format: date-time }
+    GameServerRegistration:
+      type: object
+      required: [serverInstanceId, roomId, matchId, listenIp, listenPort, buildVersion, registrationCredential]
+      properties:
+        serverInstanceId: { type: string, format: uuid }
+        roomId: { type: string, minLength: 1, maxLength: 80 }
+        matchId: { type: string, format: uuid }
+        listenIp: { type: string, minLength: 1, maxLength: 255 }
+        listenPort: { type: integer, minimum: 1, maximum: 65535 }
+        buildVersion: { type: string, minLength: 1, maxLength: 80 }
+        registrationCredential: { type: string, minLength: 32, writeOnly: true }
+    GameServerRegistrationAck:
+      type: object
+      required: [requestId, accepted, heartbeatIntervalSeconds, heartbeatCredential]
+      properties:
+        requestId: { type: string, format: uuid }
+        accepted: { type: boolean }
+        heartbeatIntervalSeconds: { type: integer, minimum: 2, maximum: 60 }
+        heartbeatCredential: { type: string, minLength: 32, writeOnly: true }
+    GameServerHeartbeat:
+      type: object
+      required: [roomId, heartbeatCredential, roomLifecycle, connectedPlayers, roundId, buildVersion, sentAtUtc]
+      properties:
+        roomId: { type: string, minLength: 1, maxLength: 80 }
+        heartbeatCredential: { type: string, minLength: 32, writeOnly: true }
+        roomLifecycle: { type: string }
+        connectedPlayers: { type: integer, minimum: 0, maximum: 4 }
+        roundId: { type: integer, minimum: 0 }
+        buildVersion: { type: string, minLength: 1, maxLength: 80 }
+        sentAtUtc: { type: string, format: date-time }
+    GameServerFailure:
+      type: object
+      required: [serverInstanceId, roomId, reason]
+      properties:
+        serverInstanceId: { type: string, format: uuid }
+        roomId: { type: string, minLength: 1, maxLength: 80 }
+        reason: { type: string, minLength: 1, maxLength: 200 }
+    MatchResultReport:
+      type: object
+      required: [roomId, serverInstanceId, resultSequence, completedRounds, players]
+      properties:
+        roomId: { type: string, minLength: 1, maxLength: 80 }
+        serverInstanceId: { type: string, format: uuid }
+        resultSequence: { type: integer, minimum: 1 }
+        completedRounds: { type: integer, minimum: 1, maximum: 16 }
+        players:
+          type: array
+          minItems: 1
+          maxItems: 4
+          items:
+            type: object
+            required: [playerId, seatIndex, rank, totalScore]
+            properties:
+              playerId: { type: string, minLength: 1, maxLength: 80 }
+              seatIndex: { type: integer, minimum: 0, maximum: 3 }
+              rank: { type: integer, minimum: 1, maximum: 4 }
+              totalScore: { type: integer }
+    MatchResultAck:
+      type: object
+      required: [requestId, matchId, resultSequence, accepted, duplicate]
+      properties:
+        requestId: { type: string, format: uuid }
+        matchId: { type: string, format: uuid }
+        resultSequence: { type: integer, minimum: 1 }
+        accepted: { type: boolean }
+        duplicate: { type: boolean }
+    RoomLifecycle:
+      type: string
+      enum: [Creating, Allocating, Waiting, Playing, Settling, Closed, Failed]
+    ApiError:
+      type: object
+      required: [requestId, code, message]
+      properties:
+        requestId: { type: string, format: uuid }
+        code:
+          type: string
+          enum:
+            - INVALID_REQUEST
+            - SESSION_EXPIRED
+            - REQUEST_IN_PROGRESS
+            - ROOM_NOT_FOUND
+            - ROOM_FULL
+            - ROOM_CLOSED
+            - PASSWORD_REQUIRED
+            - WRONG_PASSWORD
+            - RATE_LIMITED
+            - SERVER_UNAVAILABLE
+            - TICKET_EXPIRED
+            - VERSION_MISMATCH
+            - TIMEOUT
+            - CANCELLED
+            - BACKEND_NOT_CONFIGURED
+            - INTERNAL_ERROR
+        message: { type: string, maxLength: 200 }
+        retryAfterMilliseconds: { type: integer, minimum: 0, maximum: 30000 }

@@ -21,7 +21,7 @@ namespace
 {
     bool GIntegrationDisconnectTriggered = false;
 
-    bool IsFullMatchIntegrationEnabled()
+    bool IsClientFullMatchIntegrationEnabled()
     {
         return FParse::Param(FCommandLine::Get(), TEXT("MahjongEnableIntegrationHooks"))
             && FParse::Param(FCommandLine::Get(), TEXT("MahjongIntegrationFullMatch"));
@@ -346,7 +346,7 @@ void AGuiyangMahjongPlayerController::Client_ShowFinalSettlement_Implementation(
     UE_LOG(LogMahjongUI, Log, TEXT("最终大结算已显示：Room=%s，Rounds=%d"),
         *Result.RoomId, Result.CompletedRounds);
 #if !UE_BUILD_SHIPPING
-    if (IntegrationClientIndex != INDEX_NONE && IsFullMatchIntegrationEnabled())
+    if (IntegrationClientIndex != INDEX_NONE && IsClientFullMatchIntegrationEnabled())
     {
         UE_LOG(LogMahjongNet, Display,
             TEXT("MAHJONG_INTEGRATION_FINAL_SETTLEMENT Client=%d Room=%s Rounds=%d Players=%d"),
@@ -432,7 +432,7 @@ void AGuiyangMahjongPlayerController::PollIntegrationClient()
         if (!bIntegrationQuickStartRequested)
         {
             bIntegrationQuickStartRequested = true;
-            if (IntegrationClientIndex == 0 && IsFullMatchIntegrationEnabled())
+            if (IntegrationClientIndex == 0 && IsClientFullMatchIntegrationEnabled())
             {
                 // 完整对局集成只跑一局；牌桌动作仍由服务端权威托管推进。
                 FMahjongCreateRoomRequest Request;
@@ -471,7 +471,7 @@ void AGuiyangMahjongPlayerController::HandleIntegrationPrivateState(const FMahjo
     UE_LOG(LogMahjongNet, Display, TEXT("MAHJONG_INTEGRATION_PRIVATE_STATE Client=%d Seat=%d Hand=%d Round=%d"),
         IntegrationClientIndex, PrivateState.SeatIndex, PrivateState.Hand.Tiles.Num(), PrivateState.RoundId);
     if (IntegrationClientIndex == 0 && !GIntegrationDisconnectTriggered
-        && !IsFullMatchIntegrationEnabled())
+        && !IsClientFullMatchIntegrationEnabled())
     {
         GIntegrationDisconnectTriggered = true;
         Server_RequestIntegrationDisconnect();

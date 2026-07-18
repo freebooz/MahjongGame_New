@@ -1,0 +1,181 @@
+using GuiyangMahjong.Lobby.Domain;
+using GuiyangMahjong.Lobby.Options;
+using GuiyangMahjong.Lobby.Realtime;
+using GuiyangMahjong.Lobby.Security;
+using GuiyangMahjong.Lobby.Services;
+using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Text;
+
+namespace GuiyangMahjong.Lobby.Api;
+
+public static class LobbyEndpoints
+{
+    public static void MapLobbyEndpoints(this WebApplication app)
+    {
+        app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
+        app.MapGet("/health/ready", () => Results.Ok(new { status = "ready" }));
+
+        var internalApi = app.MapGroup("/internal/gameservers");
+        internalApi.MapPost("/register", async (
+            HttpContext context,
+            GameServerRegistration request,
+            LobbyService lobbyService,
+            CancellationToken cancellationToken) => Results.Ok(await lobbyService.RegisterGameServerAsync(
+                RequestIdMiddleware.GetRequestId(context), request, cancellationToken)));
+        internalApi.MapPost("/{serverInstanceId}/heartbeat", async (
+            string serverInstanceId,
+            HttpContext context,
+            GameServerHeartbeat request,
+            LobbyService lobbyService,
+            CancellationToken cancellationToken) =>
+        {
+            await lobbyService.RecordGameServerHeartbeatAsync(
+                RequestIdMiddleware.GetRequestId(context), serverInstanceId, request, cancellationToken);
+            return Results.NoContent();
+        });
+        internalApi.MapPost("/failure", async (
+            HttpContext context,
+            GameServerFailure request,
+            LobbyService lobbyService,
+            IOptions<LobbyOptions> options,
+            CancellationToken cancellationToken) =>
+        {
+            if (!HasInternalCredential(context, options.Value.InternalServiceToken))
+            {
+                return Results.Unauthorized();
+            }
+            await lobbyService.MarkGameServerFailedAsync(request, cancellationToken);
+            return Results.NoContent();
+        });
+
+        app.MapGet("/openapi/v1.yaml", async (HttpContext context) =>
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "OpenAPI", "lobby-v1.openapi.yaml");
+            context.Response.ContentType = "application/yaml; charset=utf-8";
+            await context.Response.SendFileAsync(path, context.RequestAborted);
+        });
+
+        var v1 = app.MapGroup("/v1");
+
+        v1.MapGet("/lobby/bootstrap", (
+            HttpContext context,
+            IOptions<LobbyOptions> options,
+            OnlinePresenceService presence) =>
+        {
+            var player = PlayerAuthenticationMiddleware.GetPlayer(context);
+            presence.Touch(player.PlayerId);
+            return Results.Ok(new LobbyBootstrapResponse(
+                RequestIdMiddleware.GetRequestId(context),
+                player.PlayerId,
+                player.DisplayName,
+                presence.GetOnlineCount(),
+                options.Value.Announcements,
+                options.Value.ProtocolVersion));
+        });
+
+        v1.MapGet("/rooms", async (
+            CancellationToken cancellationToken,
+            LobbyService lobbyService) => Results.Ok(await lobbyService.ListRoomsAsync(cancellationToken)));
+
+        v1.MapPost("/rooms", async (
+            HttpContext context,
+            CreateRoomRequest request,
+            LobbyService lobbyService,
+            InMemoryIdempotencyStore idempotency,
+            CancellationToken cancellationToken) =>
+        {
+            var key = RequireIdempotencyKey(context);
+            var player = PlayerAuthenticationMiddleware.GetPlayer(context);
+            var result = await idempotency.ExecuteAsync(
+                $"create:{player.PlayerId}:{key}",
+                () => lobbyService.CreateRoomAsync(
+                    RequestIdMiddleware.GetRequestId(context), player, request, cancellationToken));
+            return Results.Accepted(value: result);
+        });
+
+        v1.MapPost("/rooms/{roomCode}/join", async (
+            string roomCode,
+            HttpContext context,
+            JoinRoomRequest request,
+            LobbyService lobbyService,
+            InMemoryIdempotencyStore idempotency,
+            CancellationToken cancellationToken) =>
+        {
+            var key = RequireIdempotencyKey(context);
+            var player = PlayerAuthenticationMiddleware.GetPlayer(context);
+            var result = await idempotency.ExecuteAsync(
+                $"join:{player.PlayerId}:{roomCode}:{key}",
+                () => lobbyService.JoinRoomAsync(
+                    RequestIdMiddleware.GetRequestId(context), player, roomCode, request, cancellationToken));
+            return result is GameServerRoute
+                ? Results.Ok(result)
+                : Results.Accepted(value: result);
+        });
+
+        v1.MapGet("/rooms/{roomCode}/route", async (
+            string roomCode,
+            HttpContext context,
+            LobbyService lobbyService,
+            CancellationToken cancellationToken) => Results.Ok(await lobbyService.GetRouteAsync(
+                RequestIdMiddleware.GetRequestId(context),
+                PlayerAuthenticationMiddleware.GetPlayer(context),
+                roomCode,
+                cancellationToken)));
+
+        v1.MapPost("/reconnect/route", async (
+            HttpContext context,
+            ReconnectRouteRequest request,
+            LobbyService lobbyService,
+            CancellationToken cancellationToken) =>
+        {
+            RequireIdempotencyKey(context);
+            return Results.Ok(await lobbyService.GetReconnectRouteAsync(
+                RequestIdMiddleware.GetRequestId(context),
+                PlayerAuthenticationMiddleware.GetPlayer(context),
+                request,
+                cancellationToken));
+        });
+
+        v1.MapGet("/events", async (
+            HttpContext context,
+            LobbyEventHub hub) =>
+        {
+            if (!context.WebSockets.IsWebSocketRequest)
+            {
+                throw new LobbyOperationException(
+                    LobbyErrorCode.InvalidRequest,
+                    "该端点需要 WebSocket 连接",
+                    StatusCodes.Status400BadRequest);
+            }
+            var socket = await context.WebSockets.AcceptWebSocketAsync();
+            await hub.HandleClientAsync(
+                PlayerAuthenticationMiddleware.GetPlayer(context), socket, context.RequestAborted);
+        });
+    }
+
+    private static string RequireIdempotencyKey(HttpContext context)
+    {
+        var key = context.Request.Headers["Idempotency-Key"].ToString().Trim();
+        if (key.Length is < 16 or > 128)
+        {
+            throw new LobbyOperationException(
+                LobbyErrorCode.InvalidRequest,
+                "Idempotency-Key 长度必须为 16 到 128",
+                StatusCodes.Status400BadRequest);
+        }
+        return key;
+    }
+
+    private static bool HasInternalCredential(HttpContext context, string expectedToken)
+    {
+        var authorization = context.Request.Headers.Authorization.ToString();
+        if (!authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return false;
+        var supplied = Encoding.UTF8.GetBytes(authorization[7..].Trim());
+        var expected = Encoding.UTF8.GetBytes(expectedToken);
+        var valid = supplied.Length == expected.Length
+            && CryptographicOperations.FixedTimeEquals(supplied, expected);
+        CryptographicOperations.ZeroMemory(supplied);
+        return valid;
+    }
+}

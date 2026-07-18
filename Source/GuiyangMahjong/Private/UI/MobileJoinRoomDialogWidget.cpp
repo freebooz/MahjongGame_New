@@ -3,8 +3,9 @@
 #include "Components/Button.h"
 #include "Components/EditableTextBox.h"
 #include "Components/TextBlock.h"
-#include "Game/GuiyangMahjongPlayerController.h"
+#include "Engine/GameInstance.h"
 #include "GuiyangMahjong.h"
+#include "Lobby/GuiyangLobbySubsystem.h"
 
 void UMobileJoinRoomDialogWidget::NativeConstruct()
 {
@@ -26,12 +27,24 @@ void UMobileJoinRoomDialogWidget::HandleJoin()
     FMahjongJoinRoomRequest Request;
     Request.RoomCode = RoomCode;
     Request.Password = Txt_Password->GetText().ToString();
-    if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
+    UGuiyangLobbySubsystem* Lobby = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>() : nullptr;
+    if (!Lobby)
     {
-        PC->Server_RequestJoinRoomByCode(Request);
-        UE_LOG(LogMahjongUI, Log, TEXT("加入房间请求已提交：Room=%s"), *RoomCode);
-        RemoveFromParent();
+        Txt_Status->SetText(FText::FromString(TEXT("大厅服务尚未初始化，请稍后重试")));
+        return;
     }
+
+    const FGuiyangLobbyOperationResult Result = Lobby->RequestJoinRoom(GetOwningPlayer(), Request);
+    if (!Result.bAccepted)
+    {
+        Txt_Status->SetText(FText::FromString(Result.ChineseMessage));
+        return;
+    }
+
+    UE_LOG(LogMahjongUI, Log, TEXT("加入房间请求已提交：RequestId=%s，Room=%s"),
+        *Result.RequestId, *RoomCode);
+    RemoveFromParent();
 }
 
 void UMobileJoinRoomDialogWidget::HandleCancel()

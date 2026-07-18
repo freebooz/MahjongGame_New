@@ -7,6 +7,7 @@
 #include "Components/WidgetComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
+#include "GuiyangMahjong.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Widgets/Images/SImage.h"
@@ -196,7 +197,15 @@ void AMahjong3DTableActor::AddTileFace(const FMahjongTile* Tile, const bool bFac
         Face->SetRelativeRotation(FRotator(90.0f, Rotation.Yaw, 0.0f));
     }
 
-    UMahjong3DTileFaceWidget* FaceWidget = NewObject<UMahjong3DTileFaceWidget>(Face);
+    // UUserWidget 必须通过 CreateWidget 初始化 WidgetTree；直接 NewObject 会在
+    // UWidgetComponent 首次重建 Slate 控件时访问空 WidgetTree 并导致客户端崩溃。
+    UMahjong3DTileFaceWidget* FaceWidget = CreateWidget<UMahjong3DTileFaceWidget>(
+        GetWorld(), UMahjong3DTileFaceWidget::StaticClass());
+    if (!FaceWidget)
+    {
+        UE_LOG(LogMahjongUI, Error, TEXT("三维麻将牌面 Widget 创建失败，已跳过该牌面"));
+        return;
+    }
     FaceWidget->SetTileFace(Tile, bFaceUp);
     Face->SetWidget(FaceWidget);
     AddInstanceComponent(Face);

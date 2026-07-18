@@ -21,3 +21,9 @@ Build/Android/src/
 *.log
 *.tmp
 *.bak
+
+# .NET 大厅服务生成目录
+**/bin/
+**/obj/
+*.user
+TestResults/
