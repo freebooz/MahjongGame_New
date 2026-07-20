@@ -10,7 +10,7 @@ public sealed class PlayerAuthenticationMiddleware(RequestDelegate next)
     public async Task InvokeAsync(
         HttpContext context,
         IPlayerTokenValidator tokenValidator,
-        OnlinePresenceService presence)
+        IOnlinePresenceService presence)
     {
         if (!context.Request.Path.StartsWithSegments("/v1"))
         {
@@ -33,7 +33,7 @@ public sealed class PlayerAuthenticationMiddleware(RequestDelegate next)
         }
 
         context.Items[PlayerItemKey] = result.Player;
-        presence.Touch(result.Player.PlayerId);
+        await presence.TouchAsync(result.Player.PlayerId, context.RequestAborted);
         await next(context);
     }
 

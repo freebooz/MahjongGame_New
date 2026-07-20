@@ -96,6 +96,90 @@ public sealed class GameServerInstanceManagerTests
         Assert.True(fixture.Launcher.Processes[first.ServerInstanceId].HasExited);
     }
 
+    [Fact]
+    public async Task Restart_ReattachesLiveProcess_ReservesPort_AndKeepsHeartbeatCredential()
+    {
+        var fixture = CreateFixture(19300, 19300);
+        var allocation = await AllocateAsync(fixture, "room-restart");
+        var launch = fixture.Launcher.Specs[allocation.ServerInstanceId];
+        var registration = await fixture.Manager.ConfirmRegistrationAsync(
+            Guid.NewGuid().ToString(),
+            allocation.ServerInstanceId,
+            NewRegistration(launch, launch.RegistrationCredential),
+            CancellationToken.None);
+
+        var restartedPorts = new PortLeasePool(fixture.Options);
+        var restartedManager = new GameServerInstanceManager(
+            restartedPorts,
+            new InstanceCredentialService(),
+            fixture.Launcher,
+            fixture.Notifier,
+            fixture.StateStore,
+            fixture.Options,
+            fixture.Time,
+            NullLogger<GameServerInstanceManager>.Instance);
+        await restartedManager.InitializeAsync(CancellationToken.None);
+
+        Assert.True(restartedManager.IsInitialized);
+        Assert.Equal(0, restartedPorts.AvailableCount);
+        Assert.Equal(GameServerInstanceState.Allocated,
+            restartedManager.Get(allocation.ServerInstanceId)?.State);
+        await restartedManager.RecordHeartbeatAsync(
+            allocation.ServerInstanceId,
+            new InstanceHeartbeatRequest(
+                launch.RoomId,
+                registration.HeartbeatCredential,
+                1,
+                "Waiting",
+                0,
+                launch.BuildVersion,
+                fixture.Time.GetUtcNow()),
+            CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task Restart_MissingProcess_FailsInstanceAndReleasesPort()
+    {
+        var fixture = CreateFixture(19400, 19400);
+        var allocation = await AllocateAsync(fixture, "room-missing-process");
+        fixture.Launcher.Processes[allocation.ServerInstanceId].Exit();
+        var restartedPorts = new PortLeasePool(fixture.Options);
+        var restartedManager = new GameServerInstanceManager(
+            restartedPorts,
+            new InstanceCredentialService(),
+            fixture.Launcher,
+            fixture.Notifier,
+            fixture.StateStore,
+            fixture.Options,
+            fixture.Time,
+            NullLogger<GameServerInstanceManager>.Instance);
+
+        await restartedManager.InitializeAsync(CancellationToken.None);
+
+        Assert.Equal(GameServerInstanceState.Failed,
+            restartedManager.Get(allocation.ServerInstanceId)?.State);
+        Assert.Equal(1, restartedPorts.AvailableCount);
+        Assert.Contains(fixture.Notifier.Failures,
+            failure => failure.ServerInstanceId == allocation.ServerInstanceId);
+    }
+
+    [Fact]
+    public async Task FailureNotification_IsPersistedAndRetriedAfterTransientError()
+    {
+        var fixture = CreateFixture(19500, 19500);
+        var allocation = await AllocateAsync(fixture, "room-notification-retry");
+        fixture.Notifier.FailuresRemaining = 1;
+        fixture.Time.Advance(TimeSpan.FromSeconds(31));
+
+        await fixture.Manager.MonitorAsync(CancellationToken.None);
+        Assert.Empty(fixture.Notifier.Failures);
+        fixture.Time.Advance(TimeSpan.FromSeconds(5));
+        await fixture.Manager.MonitorAsync(CancellationToken.None);
+
+        Assert.Single(fixture.Notifier.Failures,
+            failure => failure.ServerInstanceId == allocation.ServerInstanceId);
+    }
+
     private static Task<AllocationResponse> AllocateAsync(Fixture fixture, string roomId) =>
         fixture.Manager.AllocateAsync(
             Guid.NewGuid().ToString(),
@@ -127,16 +211,18 @@ public sealed class GameServerInstanceManagerTests
         var ports = new PortLeasePool(allocatorOptions);
         var launcher = new FakeProcessLauncher();
         var notifier = new RecordingFailureNotifier();
+        var stateStore = new InMemoryAllocatorStateStore();
         var time = new MutableTimeProvider(DateTimeOffset.Parse("2026-07-18T00:00:00Z"));
         var manager = new GameServerInstanceManager(
             ports,
             new InstanceCredentialService(),
             launcher,
             notifier,
+            stateStore,
             allocatorOptions,
             time,
             NullLogger<GameServerInstanceManager>.Instance);
-        return new Fixture(manager, ports, launcher, notifier, time);
+        return new Fixture(manager, ports, launcher, notifier, stateStore, allocatorOptions, time);
     }
 
     private sealed record Fixture(
@@ -144,6 +230,8 @@ public sealed class GameServerInstanceManagerTests
         PortLeasePool Ports,
         FakeProcessLauncher Launcher,
         RecordingFailureNotifier Notifier,
+        InMemoryAllocatorStateStore StateStore,
+        IOptions<AllocatorOptions> Options,
         MutableTimeProvider Time);
 
     private sealed class FakeProcessLauncher : IGameServerProcessLauncher
@@ -160,12 +248,27 @@ public sealed class GameServerInstanceManagerTests
             Processes[spec.ServerInstanceId] = process;
             return Task.FromResult<IManagedGameServerProcess>(process);
         }
+
+        public Task<IManagedGameServerProcess?> TryAttachAsync(
+            int processId,
+            DateTimeOffset expectedStartedAtUtc,
+            CancellationToken cancellationToken)
+        {
+            var process = Processes.Values.FirstOrDefault(candidate =>
+                candidate.ProcessId == processId
+                && candidate.StartedAtUtc == expectedStartedAtUtc
+                && !candidate.HasExited);
+            return Task.FromResult<IManagedGameServerProcess?>(process);
+        }
     }
 
     private sealed class FakeManagedProcess(int processId) : IManagedGameServerProcess
     {
         public int ProcessId { get; } = processId;
+        public DateTimeOffset StartedAtUtc { get; } = DateTimeOffset.UtcNow;
         public bool HasExited { get; private set; }
+
+        public void Exit() => HasExited = true;
 
         public ValueTask StopAsync(TimeSpan gracePeriod, CancellationToken cancellationToken)
         {
@@ -174,11 +277,31 @@ public sealed class GameServerInstanceManagerTests
         }
     }
 
+    private sealed class InMemoryAllocatorStateStore : IAllocatorStateStore
+    {
+        private AllocatorStateDocument state = new(1, DateTimeOffset.MinValue, []);
+
+        public Task<AllocatorStateDocument> LoadAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(state);
+
+        public Task SaveAsync(AllocatorStateDocument state, CancellationToken cancellationToken)
+        {
+            this.state = state;
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class RecordingFailureNotifier : IInstanceFailureNotifier
     {
         public List<InstanceFailureNotification> Failures { get; } = [];
+        public int FailuresRemaining { get; set; }
         public Task NotifyAsync(InstanceFailureNotification notification, CancellationToken cancellationToken)
         {
+            if (FailuresRemaining > 0)
+            {
+                FailuresRemaining--;
+                throw new HttpRequestException("Simulated callback outage.");
+            }
             Failures.Add(notification);
             return Task.CompletedTask;
         }

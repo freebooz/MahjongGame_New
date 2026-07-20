@@ -23,6 +23,7 @@ public sealed record AllocatorRegistrationAck(
 public interface IAllocatorClient
 {
     bool Enabled { get; }
+    Task<bool> CheckReadinessAsync(CancellationToken cancellationToken);
     Task<AllocatorAllocation> AllocateAsync(
         string requestId,
         string roomId,
@@ -43,6 +44,7 @@ public interface IAllocatorClient
 public sealed class DisabledAllocatorClient : IAllocatorClient
 {
     public bool Enabled => false;
+    public Task<bool> CheckReadinessAsync(CancellationToken cancellationToken) => Task.FromResult(true);
 
     public Task<AllocatorAllocation> AllocateAsync(
         string requestId, string roomId, string matchId, CancellationToken cancellationToken) =>
@@ -68,6 +70,19 @@ public sealed class HttpAllocatorClient(
 {
     private readonly AllocatorClientOptions options = options.Value.Allocator;
     public bool Enabled => options.Enabled;
+
+    public async Task<bool> CheckReadinessAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var response = await Client().GetAsync("/health/ready", cancellationToken);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            return false;
+        }
+    }
 
     public async Task<AllocatorAllocation> AllocateAsync(
         string requestId,

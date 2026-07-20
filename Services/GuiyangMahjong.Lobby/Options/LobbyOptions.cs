@@ -13,9 +13,12 @@ public sealed class LobbyOptions
     [Range(1, 20)] public int PasswordFailureLimit { get; init; } = 5;
     [Range(30, 3600)] public int PasswordFailureWindowSeconds { get; init; } = 300;
     [Range(15, 600)] public int PresenceTimeoutSeconds { get; init; } = 90;
+    [Range(60, 604800)] public int IdempotencyTtlSeconds { get; init; } = 86400;
+    [Range(5, 120)] public int IdempotencyLockSeconds { get; init; } = 30;
     [MinLength(32)] public string TokenSigningKey { get; init; } = string.Empty;
     [MinLength(32)] public string JoinTicketSigningKey { get; init; } = string.Empty;
     [MinLength(32)] public string InternalServiceToken { get; init; } = string.Empty;
+    public bool EnableHttpsRedirection { get; init; }
     public string[] Announcements { get; init; } = [];
     [Required] public LobbyPersistenceOptions Persistence { get; init; } = new();
     [Required] public AllocatorClientOptions Allocator { get; init; } = new();

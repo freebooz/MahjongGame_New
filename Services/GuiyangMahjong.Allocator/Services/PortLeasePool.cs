@@ -39,6 +39,16 @@ public sealed class PortLeasePool
         }
     }
 
+    public bool TryReserve(int port)
+    {
+        lock (gate)
+        {
+            if (!available.Remove(port)) return false;
+            leased.Add(port);
+            return true;
+        }
+    }
+
     public int AvailableCount
     {
         get { lock (gate) return available.Count; }

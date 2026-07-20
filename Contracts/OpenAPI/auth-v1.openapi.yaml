@@ -1,0 +1,71 @@
+openapi: 3.1.0
+info:
+  title: Guiyang Mahjong Auth API
+  version: 1.0.0
+paths:
+  /v1/auth/guest:
+    post:
+      summary: Create or resume a guest identity and issue a session
+      operationId: loginGuest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/GuestLoginRequest'}
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSession'}
+  /v1/auth/refresh:
+    post:
+      summary: Rotate a single-use refresh token
+      operationId: refreshSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefreshRequest'}
+      responses:
+        '200':
+          description: Rotated session
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/AuthSession'}
+        '401': {description: Refresh token invalid, expired, revoked, or reused}
+  /v1/auth/logout:
+    post:
+      summary: Revoke a refresh token
+      operationId: logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/RefreshRequest'}
+      responses:
+        '204': {description: Logged out or already logged out}
+components:
+  schemas:
+    GuestLoginRequest:
+      type: object
+      required: [installationId]
+      properties:
+        installationId: {type: string, minLength: 16, maxLength: 128, pattern: '^[A-Za-z0-9._-]+$'}
+        displayName: {type: [string, 'null'], minLength: 2, maxLength: 24}
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: {type: string, minLength: 70, maxLength: 256, writeOnly: true}
+    AuthSession:
+      type: object
+      required: [playerId, displayName, provider, accessToken, accessTokenExpiresAtUtc, refreshToken, refreshTokenExpiresAtUtc]
+      properties:
+        playerId: {type: string, maxLength: 80}
+        displayName: {type: string, maxLength: 24}
+        provider: {type: string, const: Guest}
+        accessToken: {type: string, writeOnly: true}
+        accessTokenExpiresAtUtc: {type: string, format: date-time}
+        refreshToken: {type: string, writeOnly: true}
+        refreshTokenExpiresAtUtc: {type: string, format: date-time}

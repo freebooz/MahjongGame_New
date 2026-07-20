@@ -5,8 +5,6 @@ using GuiyangMahjong.Lobby.Security;
 using GuiyangMahjong.Lobby.Services;
 using GuiyangMahjong.Lobby.Storage;
 using Microsoft.Extensions.Options;
-using Npgsql;
-using StackExchange.Redis;
 using System.Text;
 
 Console.OutputEncoding = Encoding.UTF8;
@@ -48,10 +46,20 @@ builder.Services.AddSingleton<IAllocatorClient>(provider =>
     provider.GetRequiredService<IOptions<LobbyOptions>>().Value.Allocator.Enabled
         ? ActivatorUtilities.CreateInstance<HttpAllocatorClient>(provider)
         : new DisabledAllocatorClient());
+builder.Services.AddSingleton<LobbyPersistenceConnections>();
+builder.Services.AddSingleton<IOnlinePresenceService>(provider =>
+    provider.GetRequiredService<IOptions<LobbyOptions>>().Value.Persistence.Mode
+        .Equals("RedisPostgres", StringComparison.OrdinalIgnoreCase)
+        ? ActivatorUtilities.CreateInstance<RedisOnlinePresenceService>(provider)
+        : ActivatorUtilities.CreateInstance<InMemoryOnlinePresenceService>(provider));
+builder.Services.AddSingleton<IIdempotencyStore>(provider =>
+    provider.GetRequiredService<IOptions<LobbyOptions>>().Value.Persistence.Mode
+        .Equals("RedisPostgres", StringComparison.OrdinalIgnoreCase)
+        ? ActivatorUtilities.CreateInstance<RedisIdempotencyStore>(provider)
+        : ActivatorUtilities.CreateInstance<InMemoryIdempotencyStore>(provider));
 builder.Services.AddSingleton<LobbyEventHub>();
 builder.Services.AddSingleton<ILobbyEventPublisher>(provider => provider.GetRequiredService<LobbyEventHub>());
-builder.Services.AddSingleton<OnlinePresenceService>();
-builder.Services.AddSingleton<InMemoryIdempotencyStore>();
+builder.Services.AddHostedService(provider => provider.GetRequiredService<LobbyEventHub>());
 builder.Services.AddSingleton<LobbyService>();
 builder.Services.AddSingleton<ILobbyStore>(provider =>
 {
@@ -62,19 +70,14 @@ builder.Services.AddSingleton<ILobbyStore>(provider =>
         return new InMemoryLobbyStore();
     }
 
-    var redis = ConnectionMultiplexer.Connect(persistence.RedisConnectionString);
-    var postgres = NpgsqlDataSource.Create(persistence.PostgresConnectionString);
-    return new RedisPostgresLobbyStore(
-        lobbyOptions,
-        redis,
-        postgres,
-        provider.GetRequiredService<ILogger<RedisPostgresLobbyStore>>());
+    return ActivatorUtilities.CreateInstance<RedisPostgresLobbyStore>(provider);
 });
 builder.Services.AddHostedService<LobbyStoreInitializer>();
 
 var app = builder.Build();
 
-if (!app.Environment.IsDevelopment()) app.UseHttpsRedirection();
+if (app.Services.GetRequiredService<IOptions<LobbyOptions>>().Value.EnableHttpsRedirection)
+    app.UseHttpsRedirection();
 app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20) });
 app.UseMiddleware<RequestIdMiddleware>();
 app.UseMiddleware<LobbyExceptionMiddleware>();

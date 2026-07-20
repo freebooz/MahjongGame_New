@@ -1,0 +1,16 @@
+.git
+.github
+.vs
+Binaries
+DerivedDataCache
+Intermediate
+Saved
+Build
+Content
+Source
+**/bin
+**/obj
+**/TestResults
+Deploy
+claudedocs
+Docs

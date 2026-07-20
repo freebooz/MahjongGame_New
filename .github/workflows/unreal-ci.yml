@@ -1,0 +1,50 @@
+name: Unreal CI
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "Source/**"
+      - "Config/**"
+      - "GuiyangMahjong.uproject"
+      - ".github/workflows/unreal-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  win64-build-and-tests:
+    runs-on: [self-hosted, Windows, X64, unreal-5.8]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Win64 game
+        shell: powershell
+        run: >-
+          & "$env:UE_ROOT\Engine\Build\BatchFiles\Build.bat"
+          GuiyangMahjong Win64 Development
+          "-Project=$env:GITHUB_WORKSPACE\GuiyangMahjong.uproject"
+          -WaitMutex -NoHotReloadFromIDE
+      - name: Build Win64 dedicated server
+        shell: powershell
+        run: >-
+          & "$env:UE_ROOT\Engine\Build\BatchFiles\Build.bat"
+          GuiyangMahjongServer Win64 Development
+          "-Project=$env:GITHUB_WORKSPACE\GuiyangMahjong.uproject"
+          -WaitMutex -NoHotReloadFromIDE
+      - name: Run automation tests
+        shell: powershell
+        run: >-
+          & "$env:UE_ROOT\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
+          "$env:GITHUB_WORKSPACE\GuiyangMahjong.uproject"
+          -unattended -nop4 -nosplash -NullRHI
+          "-ExecCmds=Automation RunTests GuiyangMahjong.;Quit"
+          "-ReportExportPath=$env:GITHUB_WORKSPACE\Saved\Automation\CI"
+          -TestExit="Automation Test Queue Empty"
+      - name: Upload Unreal automation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unreal-automation-report
+          path: Saved/Automation/CI
+          if-no-files-found: warn

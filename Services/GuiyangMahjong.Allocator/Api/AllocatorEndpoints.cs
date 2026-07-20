@@ -1,5 +1,7 @@
 using GuiyangMahjong.Allocator.Domain;
 using GuiyangMahjong.Allocator.Services;
+using GuiyangMahjong.Allocator.Options;
+using Microsoft.Extensions.Options;
 
 namespace GuiyangMahjong.Allocator.Api;
 
@@ -8,7 +10,25 @@ public static class AllocatorEndpoints
     public static void MapAllocatorEndpoints(this WebApplication app)
     {
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
-        app.MapGet("/health/ready", () => Results.Ok(new { status = "ready" }));
+        app.MapGet("/health/ready", (
+            GameServerInstanceManager manager,
+            IOptions<AllocatorOptions> options) =>
+        {
+            var executablePath = Path.IsPathRooted(options.Value.GameServerExecutablePath)
+                ? options.Value.GameServerExecutablePath
+                : Path.Combine(AppContext.BaseDirectory, options.Value.GameServerExecutablePath);
+            var executableReady = File.Exists(executablePath);
+            return manager.IsInitialized && executableReady
+                ? Results.Ok(new { status = "ready", stateReconciled = true, gameServerExecutable = "ready" })
+                : Results.Json(
+                    new
+                    {
+                        status = "not-ready",
+                        stateReconciled = manager.IsInitialized,
+                        gameServerExecutable = executableReady ? "ready" : "missing"
+                    },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+        });
         app.MapGet("/openapi/v1.yaml", async (HttpContext context) =>
         {
             var path = Path.Combine(AppContext.BaseDirectory, "OpenAPI", "allocator-v1.openapi.yaml");

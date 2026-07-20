@@ -1,0 +1,42 @@
+name: Services CI
+
+on:
+  push:
+    paths:
+      - "Services/**"
+      - "Contracts/OpenAPI/**"
+      - ".github/workflows/services-ci.yml"
+  pull_request:
+    paths:
+      - "Services/**"
+      - "Contracts/OpenAPI/**"
+      - ".github/workflows/services-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: Services
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore GuiyangMahjong.Services.slnx
+      - name: Build
+        run: dotnet build GuiyangMahjong.Services.slnx --configuration Release --no-restore
+      - name: Test
+        run: dotnet test GuiyangMahjong.Services.slnx --configuration Release --no-build --logger "trx;LogFileName=services.trx"
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: services-test-results
+          path: "Services/**/TestResults/*.trx"
+          if-no-files-found: error

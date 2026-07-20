@@ -15,6 +15,7 @@ public sealed record GameServerLaunchSpec(
 public interface IManagedGameServerProcess
 {
     int ProcessId { get; }
+    DateTimeOffset StartedAtUtc { get; }
     bool HasExited { get; }
     ValueTask StopAsync(TimeSpan gracePeriod, CancellationToken cancellationToken);
 }
@@ -23,5 +24,10 @@ public interface IGameServerProcessLauncher
 {
     Task<IManagedGameServerProcess> LaunchAsync(
         GameServerLaunchSpec spec,
+        CancellationToken cancellationToken);
+
+    Task<IManagedGameServerProcess?> TryAttachAsync(
+        int processId,
+        DateTimeOffset expectedStartedAtUtc,
         CancellationToken cancellationToken);
 }

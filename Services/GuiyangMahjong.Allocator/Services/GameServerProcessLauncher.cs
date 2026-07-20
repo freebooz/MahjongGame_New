@@ -55,9 +55,58 @@ public sealed class GameServerProcessLauncher(
         return Task.FromResult<IManagedGameServerProcess>(new ManagedGameServerProcess(process));
     }
 
+    public Task<IManagedGameServerProcess?> TryAttachAsync(
+        int processId,
+        DateTimeOffset expectedStartedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        try
+        {
+            var process = Process.GetProcessById(processId);
+            var managed = new ManagedGameServerProcess(process);
+            if (managed.HasExited
+                || Math.Abs((managed.StartedAtUtc - expectedStartedAtUtc).TotalSeconds) > 2)
+            {
+                process.Dispose();
+                return Task.FromResult<IManagedGameServerProcess?>(null);
+            }
+
+            try
+            {
+                var configured = Path.GetFullPath(options.GameServerExecutablePath);
+                var actual = process.MainModule?.FileName;
+                if (!string.IsNullOrWhiteSpace(actual)
+                    && !string.Equals(configured, Path.GetFullPath(actual), StringComparison.OrdinalIgnoreCase))
+                {
+                    process.Dispose();
+                    return Task.FromResult<IManagedGameServerProcess?>(null);
+                }
+            }
+            catch (Exception exception) when (exception is System.ComponentModel.Win32Exception
+                                               or InvalidOperationException
+                                               or NotSupportedException)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Could not verify recovered GameServer executable path ProcessId={ProcessId}",
+                    processId);
+            }
+
+            return Task.FromResult<IManagedGameServerProcess?>(managed);
+        }
+        catch (Exception exception) when (exception is ArgumentException
+                                           or InvalidOperationException
+                                           or System.ComponentModel.Win32Exception)
+        {
+            return Task.FromResult<IManagedGameServerProcess?>(null);
+        }
+    }
+
     private sealed class ManagedGameServerProcess(Process process) : IManagedGameServerProcess
     {
         public int ProcessId => process.Id;
+        public DateTimeOffset StartedAtUtc => process.StartTime.ToUniversalTime();
 
         public bool HasExited
         {

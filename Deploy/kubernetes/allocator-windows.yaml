@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mahjong-allocator
+  namespace: guiyang-mahjong
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: mahjong-allocator}}
+  template:
+    metadata: {labels: {app: mahjong-allocator}}
+    spec:
+      nodeSelector:
+        kubernetes.io/os: windows
+      hostNetwork: true
+      securityContext:
+        windowsOptions:
+          hostProcess: true
+          runAsUserName: 'NT AUTHORITY\SYSTEM'
+      containers:
+        - name: allocator
+          image: ghcr.io/freebooz/guiyang-mahjong-allocator:ltsc2022
+          ports: [{name: http, containerPort: 8080}]
+          envFrom:
+            - configMapRef: {name: mahjong-services}
+            - secretRef: {name: mahjong-secrets}
+          env:
+            - name: Allocator__AdvertisedIp
+              valueFrom: {fieldRef: {fieldPath: status.hostIP}}
+          volumeMounts:
+            - {name: server-build, mountPath: 'C:\mahjong\server', readOnly: true}
+            - {name: allocator-data, mountPath: 'C:\mahjong\state'}
+            - {name: match-outbox, mountPath: 'C:\mahjong\outbox'}
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 15
+          resources:
+            requests: {cpu: "1", memory: 2Gi}
+            limits: {cpu: "8", memory: 16Gi}
+      volumes:
+        - name: server-build
+          hostPath: {path: 'C:\MahjongServer', type: Directory}
+        - name: allocator-data
+          hostPath: {path: 'C:\MahjongAllocator\state', type: DirectoryOrCreate}
+        - name: match-outbox
+          hostPath: {path: 'C:\MahjongAllocator\outbox', type: DirectoryOrCreate}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mahjong-allocator
+  namespace: guiyang-mahjong
+spec:
+  selector: {app: mahjong-allocator}
+  ports: [{name: http, port: 8080, targetPort: http}]

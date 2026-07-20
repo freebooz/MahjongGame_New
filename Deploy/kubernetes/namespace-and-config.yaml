@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: guiyang-mahjong
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mahjong-services
+  namespace: guiyang-mahjong
+data:
+  Auth__PersistenceMode: Postgres
+  Auth__PostgresConnectionString: Host=postgres.database.svc;Port=5432;Database=mahjong;Username=mahjong
+  Lobby__Persistence__Mode: RedisPostgres
+  Lobby__Persistence__RedisConnectionString: redis.cache.svc:6379,abortConnect=false
+  Lobby__Persistence__PostgresConnectionString: Host=postgres.database.svc;Port=5432;Database=mahjong;Username=mahjong
+  Lobby__Allocator__Enabled: "true"
+  Lobby__Allocator__BaseUrl: http://mahjong-allocator:8080
+  Allocator__LobbyInternalUrl: http://mahjong-lobby:8080
+  Allocator__AdvertisedIp: 0.0.0.0
+  Allocator__StateFilePath: C:/mahjong/state/instances.json
+  Allocator__MatchResultOutboxDirectory: C:/mahjong/outbox
+  Allocator__GameServerExecutablePath: C:/mahjong/server/GuiyangMahjongServer.exe

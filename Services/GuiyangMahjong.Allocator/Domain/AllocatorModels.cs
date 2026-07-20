@@ -80,7 +80,10 @@ internal sealed class GameServerInstance
     public required string BuildVersion { get; init; }
     public GameServerInstanceState State { get; set; } = GameServerInstanceState.Starting;
     public IManagedGameServerProcess? Process { get; set; }
+    public DateTimeOffset? ProcessStartedAtUtc { get; set; }
     public string? FailureReason { get; set; }
+    public bool FailureNotified { get; set; }
+    public DateTimeOffset? FailureNotificationAttemptedAtUtc { get; set; }
     public bool PortReleased { get; set; }
 
     public GameServerInstanceSnapshot Snapshot() => new(
@@ -102,4 +105,3 @@ public sealed class AllocatorOperationException(string message, int statusCode) 
 {
     public int StatusCode { get; } = statusCode;
 }
-

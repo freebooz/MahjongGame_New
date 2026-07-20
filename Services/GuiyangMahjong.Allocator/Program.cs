@@ -28,8 +28,10 @@ builder.Services.AddSingleton<PortLeasePool>();
 builder.Services.AddSingleton<InstanceCredentialService>();
 builder.Services.AddSingleton<IGameServerProcessLauncher, GameServerProcessLauncher>();
 builder.Services.AddSingleton<IInstanceFailureNotifier, LobbyInstanceFailureNotifier>();
+builder.Services.AddSingleton<IAllocatorStateStore, JsonAllocatorStateStore>();
 builder.Services.AddSingleton<MatchResultOutboxRecovery>();
 builder.Services.AddSingleton<GameServerInstanceManager>();
+builder.Services.AddHostedService<AllocatorStateInitializer>();
 builder.Services.AddHostedService<InstanceMonitorService>();
 builder.Services.AddHostedService<MatchResultOutboxRecoveryService>();
 

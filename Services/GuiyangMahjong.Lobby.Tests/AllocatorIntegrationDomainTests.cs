@@ -314,6 +314,7 @@ public sealed class AllocatorIntegrationDomainTests
         public int DrainCount { get; private set; }
         public int DrainFailuresRemaining { get; set; }
         public bool Enabled => true;
+        public Task<bool> CheckReadinessAsync(CancellationToken cancellationToken) => Task.FromResult(true);
 
         public Task<AllocatorAllocation> AllocateAsync(
             string requestId, string roomId, string matchId, CancellationToken cancellationToken) =>

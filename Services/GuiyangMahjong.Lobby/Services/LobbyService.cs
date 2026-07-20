@@ -80,7 +80,15 @@ public sealed class LobbyService
                 UpdatedAtUtc = now
             };
 
-            if (!await store.TryCreateRoomAsync(room, cancellationToken)) continue;
+            var createResult = await store.TryCreateRoomAsync(room, cancellationToken);
+            if (createResult.Status == CreateRoomStatus.RoomCodeConflict) continue;
+            if (createResult.Status == CreateRoomStatus.PlayerAlreadyActive)
+            {
+                throw new LobbyOperationException(
+                    LobbyErrorCode.RequestInProgress,
+                    "玩家已有未关闭的牌桌",
+                    StatusCodes.Status409Conflict);
+            }
 
             logger.LogInformation(
                 "房间创建请求已接受 RequestId={RequestId} RoomId={RoomId} PlayerId={PlayerId} PasswordProtected={PasswordProtected}",
@@ -193,6 +201,11 @@ public sealed class LobbyService
             case AddPlayerStatus.RoomFull:
                 throw new LobbyOperationException(
                     LobbyErrorCode.RoomFull, "房间人数已满", StatusCodes.Status409Conflict);
+            case AddPlayerStatus.AlreadyInAnotherRoom:
+                throw new LobbyOperationException(
+                    LobbyErrorCode.RequestInProgress,
+                    "玩家已在其他未关闭牌桌中",
+                    StatusCodes.Status409Conflict);
         }
 
         logger.LogInformation(

@@ -1,0 +1,15 @@
+# escape=`
+FROM mcr.microsoft.com/dotnet/sdk:10.0-nanoserver-ltsc2022 AS build
+WORKDIR C:\src
+COPY Services\GuiyangMahjong.Allocator\GuiyangMahjong.Allocator.csproj Services\GuiyangMahjong.Allocator\
+RUN dotnet restore Services\GuiyangMahjong.Allocator\GuiyangMahjong.Allocator.csproj
+COPY Contracts\ Contracts\
+COPY Services\GuiyangMahjong.Allocator\ Services\GuiyangMahjong.Allocator\
+RUN dotnet publish Services\GuiyangMahjong.Allocator\GuiyangMahjong.Allocator.csproj -c Release -o C:\app --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-nanoserver-ltsc2022
+WORKDIR C:\app
+COPY --from=build C:\app .
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080 19000-19099/udp
+ENTRYPOINT ["dotnet", "GuiyangMahjong.Allocator.dll"]

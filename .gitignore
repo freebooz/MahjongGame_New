@@ -27,3 +27,4 @@ Build/Android/src/
 **/obj/
 *.user
 TestResults/
+Deploy/.env

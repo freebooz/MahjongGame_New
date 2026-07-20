@@ -3,6 +3,7 @@ using GuiyangMahjong.Lobby.Options;
 using GuiyangMahjong.Lobby.Realtime;
 using GuiyangMahjong.Lobby.Security;
 using GuiyangMahjong.Lobby.Services;
+using GuiyangMahjong.Lobby.Storage;
 using Microsoft.Extensions.Options;
 using System.Security.Cryptography;
 using System.Text;
@@ -14,7 +15,24 @@ public static class LobbyEndpoints
     public static void MapLobbyEndpoints(this WebApplication app)
     {
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
-        app.MapGet("/health/ready", () => Results.Ok(new { status = "ready" }));
+        app.MapGet("/health/ready", async (
+            ILobbyStore store,
+            IAllocatorClient allocator,
+            CancellationToken cancellationToken) =>
+        {
+            var persistenceReady = await store.CheckHealthAsync(cancellationToken);
+            var allocatorReady = await allocator.CheckReadinessAsync(cancellationToken);
+            return persistenceReady && allocatorReady
+                ? Results.Ok(new { status = "ready", persistence = "ready", allocator = "ready" })
+                : Results.Json(
+                    new
+                    {
+                        status = "not-ready",
+                        persistence = persistenceReady ? "ready" : "unavailable",
+                        allocator = allocatorReady ? "ready" : "unavailable"
+                    },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+        });
 
         var internalApi = app.MapGroup("/internal/gameservers");
         internalApi.MapPost("/register", async (
@@ -91,18 +109,19 @@ public static class LobbyEndpoints
 
         var v1 = app.MapGroup("/v1");
 
-        v1.MapGet("/lobby/bootstrap", (
+        v1.MapGet("/lobby/bootstrap", async (
             HttpContext context,
             IOptions<LobbyOptions> options,
-            OnlinePresenceService presence) =>
+            IOnlinePresenceService presence,
+            CancellationToken cancellationToken) =>
         {
             var player = PlayerAuthenticationMiddleware.GetPlayer(context);
-            presence.Touch(player.PlayerId);
+            var onlineCount = await presence.GetOnlineCountAsync(cancellationToken);
             return Results.Ok(new LobbyBootstrapResponse(
                 RequestIdMiddleware.GetRequestId(context),
                 player.PlayerId,
                 player.DisplayName,
-                presence.GetOnlineCount(),
+                (int)Math.Min(onlineCount, int.MaxValue),
                 options.Value.Announcements,
                 options.Value.ProtocolVersion));
         });
@@ -115,16 +134,21 @@ public static class LobbyEndpoints
             HttpContext context,
             CreateRoomRequest request,
             LobbyService lobbyService,
-            InMemoryIdempotencyStore idempotency,
+            IIdempotencyStore idempotency,
             CancellationToken cancellationToken) =>
         {
             var key = RequireIdempotencyKey(context);
             var player = PlayerAuthenticationMiddleware.GetPlayer(context);
             var result = await idempotency.ExecuteAsync(
                 $"create:{player.PlayerId}:{key}",
-                () => lobbyService.CreateRoomAsync(
-                    RequestIdMiddleware.GetRequestId(context), player, request, cancellationToken));
-            return Results.Accepted(value: result);
+                async () => new IdempotentHttpResponse(
+                    StatusCodes.Status202Accepted,
+                    System.Text.Json.JsonSerializer.SerializeToElement(
+                        await lobbyService.CreateRoomAsync(
+                            RequestIdMiddleware.GetRequestId(context), player, request, cancellationToken),
+                        new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web))),
+                cancellationToken);
+            return Results.Json(result.Body, statusCode: result.StatusCode);
         });
 
         v1.MapPost("/rooms/{roomCode}/join", async (
@@ -132,18 +156,26 @@ public static class LobbyEndpoints
             HttpContext context,
             JoinRoomRequest request,
             LobbyService lobbyService,
-            InMemoryIdempotencyStore idempotency,
+            IIdempotencyStore idempotency,
             CancellationToken cancellationToken) =>
         {
             var key = RequireIdempotencyKey(context);
             var player = PlayerAuthenticationMiddleware.GetPlayer(context);
             var result = await idempotency.ExecuteAsync(
                 $"join:{player.PlayerId}:{roomCode}:{key}",
-                () => lobbyService.JoinRoomAsync(
-                    RequestIdMiddleware.GetRequestId(context), player, roomCode, request, cancellationToken));
-            return result is GameServerRoute
-                ? Results.Ok(result)
-                : Results.Accepted(value: result);
+                async () =>
+                {
+                    var value = await lobbyService.JoinRoomAsync(
+                        RequestIdMiddleware.GetRequestId(context), player, roomCode, request, cancellationToken);
+                    return new IdempotentHttpResponse(
+                        value is GameServerRoute ? StatusCodes.Status200OK : StatusCodes.Status202Accepted,
+                        System.Text.Json.JsonSerializer.SerializeToElement(
+                            value,
+                            value.GetType(),
+                            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+                },
+                cancellationToken);
+            return Results.Json(result.Body, statusCode: result.StatusCode);
         });
 
         v1.MapGet("/rooms/{roomCode}/route", async (

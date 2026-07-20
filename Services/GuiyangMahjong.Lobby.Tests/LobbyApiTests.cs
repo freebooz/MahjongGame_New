@@ -14,6 +14,13 @@ public sealed class LobbyApiTests(LobbyWebApplicationFactory factory)
     : IClassFixture<LobbyWebApplicationFactory>
 {
     [Fact]
+    public async Task Readiness_ChecksStoreAndAllocatorDependency()
+    {
+        using var client = factory.CreateClient();
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/health/ready")).StatusCode);
+    }
+
+    [Fact]
     public async Task Bootstrap_ReturnsAuthenticatedPlayerAndProtocol()
     {
         using var client = factory.CreateAuthenticatedClient("bootstrap-player");
@@ -137,7 +144,8 @@ public sealed class LobbyApiTests(LobbyWebApplicationFactory factory)
             UpdatedAtUtc = DateTimeOffset.UtcNow
         };
         room = room with { Route = room.Route! with { RoomId = room.RoomId } };
-        Assert.True(await store.TryCreateRoomAsync(room, CancellationToken.None));
+        Assert.Equal(CreateRoomStatus.Created,
+            (await store.TryCreateRoomAsync(room, CancellationToken.None)).Status);
         var report = new MatchResultReport(
             room.RoomId, room.Route.ServerInstanceId, 7, 4,
             [new MatchPlayerResult("result-api-owner", 0, 1, 12)]);
@@ -188,7 +196,8 @@ public sealed class LobbyApiTests(LobbyWebApplicationFactory factory)
             CreatedAtUtc = DateTimeOffset.UtcNow,
             UpdatedAtUtc = DateTimeOffset.UtcNow
         };
-        Assert.True(await store.TryCreateRoomAsync(room, CancellationToken.None));
+        Assert.Equal(CreateRoomStatus.Created,
+            (await store.TryCreateRoomAsync(room, CancellationToken.None)).Status);
         var report = new MatchResultReport(
             room.RoomId, instanceId, 11, 4,
             [new MatchPlayerResult("recovery-owner", 0, 1, 20)]);

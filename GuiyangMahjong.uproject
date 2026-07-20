@@ -5,6 +5,16 @@
   "Description": "UE 5.8 贵阳捉鸡麻将服务端权威多人联机项目",
   "Modules": [
     {
+      "Name": "GuiyangMahjongCore",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "GuiyangMahjongOnline",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    },
+    {
       "Name": "GuiyangMahjong",
       "Type": "Runtime",
       "LoadingPhase": "Default"

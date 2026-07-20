@@ -1,9 +1,9 @@
 # 《贵阳捉鸡麻将》系统架构图
 
-日期：2026-07-18  
+日期：2026-07-20
 适用范围：UE 5.8 PC/Android/平板客户端、独立 Lobby、Allocator、一桌一进程 Dedicated Server。
 
-> 图中“已实现”表示当前仓库已有对应代码和自动化验证；“待接入/发布目标”表示架构边界已经确定，但仍属于发布门禁。
+> 图中“已实现”表示当前仓库已有对应代码和自动化验证；外部 Redis/PostgreSQL、容器集群与真机仍需在目标环境执行发布门禁。
 
 ## 1. 应用架构图
 
@@ -11,7 +11,7 @@
 flowchart LR
     subgraph Client["UE 5.8 客户端（PC / Android / 平板）"]
         UI["移动端全屏 UI\n大厅 / 房间 / 牌桌 / 结算 / 重连"]
-        Login["LoginSubsystem\n登录会话与玩家档案"]
+        Login["GuiyangMahjongOnline\nAuth HTTP / Token 刷新 / 玩家档案"]
         LobbySDK["LobbySubsystem + ILobbyBackend\nLocalLegacy / RemoteLobby"]
         Reconnect["ReconnectSubsystem\n重连窗口与非敏感牌桌提示"]
         NetClient["PlayerController\nClientTravel / RPC / 私有手牌"]
@@ -23,16 +23,18 @@ flowchart LR
         Reconnect --> LobbySDK
     end
 
-    Auth["独立 Auth 应用（待接入）\n签发 / 刷新 / 吊销玩家 Bearer Token"]
+    Auth["独立 Auth 应用（已实现）\n游客身份 / 签发 / 单次刷新 / 吊销"]
 
     subgraph ControlPlane["控制面"]
         Lobby["ASP.NET Core Lobby（已实现）\n房间目录 / 玩家映射 / 路由 / 票据 / 结算"]
-        Allocator["ASP.NET Core Allocator（已实现）\n端口租约 / 进程生命周期 / 健康监测 / 回收"]
+        Allocator["ASP.NET Core Allocator（已实现）\n持久化实例 / 启动对账 / 端口与进程生命周期"]
         Outbox[("本地结算 outbox\n原子 JSON / 无凭据")]
-        Store["ILobbyStore\nInMemory（开发）\nRedis + PostgreSQL（生产适配器）"]
-        EventHub["WebSocket Event Hub\nlobby.updated / room.updated\nserver.assigned / room.closed"]
+        Store["PostgreSQL\n房间事务 / 单活动房间唯一租约 / 结算"]
+        RedisState["Redis\n幂等 / Presence / 房间缓存 / 事件背板"]
+        EventHub["WebSocket Event Hub\nRedis Pub/Sub + 每连接有界发送队列"]
 
         Lobby --> Store
+        Lobby --> RedisState
         Lobby --> EventHub
         Lobby -->|"分配 / Drain"| Allocator
         Allocator --> Outbox
@@ -91,16 +93,16 @@ flowchart TB
     end
 
     subgraph Services["服务区"]
-        AuthSvc["Auth Service（独立应用，待接入）"]
+        AuthSvc["Auth Service\n可横向扩展"]
         LobbySvc["Lobby Service\n可横向扩展"]
-        AllocatorSvc["Allocator Service\n每区域一个控制器"]
+        AllocatorSvc["Allocator Service\nWindows GameServer 节点控制器\n持久化状态 + 启动对账"]
         OutboxDisk[("每区域本地 outbox\nServerInstanceId.json")]
         Observability["日志 / 指标 / 告警（Phase 7）"]
     end
 
     subgraph Persistence["数据区"]
-        Redis[("Redis\n在线房间热缓存 / 事件状态")]
-        Postgres[("PostgreSQL\n房间快照 / match_results\n唯一键 MatchId + ResultSequence")]
+        Redis[("Redis\n幂等结果 / Presence / Pub/Sub / 房间热缓存")]
+        Postgres[("PostgreSQL\nAuth / 房间快照 / active_player_rooms / match_results")]
         SecretStore["密钥服务（发布目标）\nToken / JoinTicket / 内部服务密钥"]
     end
 
@@ -150,6 +152,16 @@ flowchart TB
 - 开发环境可以使用单机 `Lobby + Allocator + 多个 UE Server`；生产环境使用 Redis/PostgreSQL，并把密钥改为密钥服务注入。
 - GameServer 只通过环境变量接收一次性注册凭据和签名材料，敏感值不进入命令行或日志。
 - 当前实现要求 Allocator 与其启动的 GameServer 共享本地 outbox 文件系统；扩展到多主机时，应在每台主机部署 Allocator Agent 或使用具备相同原子语义的持久卷。
+- `Deploy/kubernetes` 已给出 Auth/Lobby Linux Deployment 与 Allocator Windows Deployment；readiness 会实检存储、Allocator 依赖、启动对账和 GameServer 可执行文件。
+
+## 2.1 UE Runtime 模块边界
+
+| 模块 | 内容 | 依赖方向 |
+|---|---|---|
+| `GuiyangMahjongCore` | 牌型值对象、规则、计分、牌墙、TableEngine、网络 DTO | 只依赖 UE Core/CoreUObject/Engine |
+| `GuiyangMahjongOnline` | LoginSubsystem、Auth HTTP、访问令牌内存生命周期与刷新 | 只依赖 HTTP/JSON 和基础 UE Runtime |
+| `GuiyangMahjong` | GameMode、复制、房间、Lobby、UI、GameServer Bridge | 依赖 Core 与 Online |
+| `GuiyangMahjongEditorTools` | UI 生成 Commandlet 和编辑器资产工具 | 仅 Editor Target；Runtime 不再依赖 UnrealEd |
 
 ## 3. 运行流程图
 

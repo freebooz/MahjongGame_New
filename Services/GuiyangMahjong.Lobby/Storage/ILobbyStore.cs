@@ -2,13 +2,23 @@ using GuiyangMahjong.Lobby.Domain;
 
 namespace GuiyangMahjong.Lobby.Storage;
 
+public enum CreateRoomStatus
+{
+    Created,
+    RoomCodeConflict,
+    PlayerAlreadyActive
+}
+
+public sealed record CreateRoomResult(CreateRoomStatus Status, LobbyRoom? ActiveRoom = null);
+
 public enum AddPlayerStatus
 {
     Added,
     AlreadyMember,
     RoomNotFound,
     RoomClosed,
-    RoomFull
+    RoomFull,
+    AlreadyInAnotherRoom
 }
 
 public sealed record AddPlayerResult(AddPlayerStatus Status, LobbyRoom? Room);
@@ -23,7 +33,8 @@ public enum FinalizeMatchStatus
 public interface ILobbyStore
 {
     Task InitializeAsync(CancellationToken cancellationToken);
-    Task<bool> TryCreateRoomAsync(LobbyRoom room, CancellationToken cancellationToken);
+    Task<bool> CheckHealthAsync(CancellationToken cancellationToken);
+    Task<CreateRoomResult> TryCreateRoomAsync(LobbyRoom room, CancellationToken cancellationToken);
     Task<LobbyRoom?> GetRoomByCodeAsync(string roomCode, CancellationToken cancellationToken);
     Task<LobbyRoom?> GetRoomByIdAsync(string roomId, CancellationToken cancellationToken);
     Task<LobbyRoom?> GetActiveRoomByPlayerAsync(string playerId, CancellationToken cancellationToken);
