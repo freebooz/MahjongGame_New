@@ -91,6 +91,27 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/RoomOperation' }
         default: { $ref: '#/components/responses/Error' }
+  /v1/rooms/current/close:
+    post:
+      tags: [Rooms]
+      operationId: closeCurrentOwnedRoom
+      description: 仅房主可关闭当前活动房间并释放其 GameServer；非房主不得调用。
+      security: [{ playerBearer: [] }]
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: 房间已关闭并开始释放 GameServer
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RoomOperation' }
+        '403':
+          description: 当前玩家不是房主
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiError' }
+        default: { $ref: '#/components/responses/Error' }
   /v1/rooms/{roomCode}/route:
     get:
       tags: [Rooms]

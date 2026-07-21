@@ -217,6 +217,100 @@ public sealed class LobbyService
             : new RoomOperation(requestId, room.RoomId, room.RoomCode, room.Lifecycle);
     }
 
+    public async Task<RoomOperation> CloseOwnedRoomAsync(
+        string requestId,
+        PlayerIdentity player,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 0; attempt < 3; attempt++)
+        {
+            var room = await store.GetActiveRoomByPlayerAsync(player.PlayerId, cancellationToken)
+                ?? throw new LobbyOperationException(
+                    LobbyErrorCode.RoomNotFound,
+                    "当前玩家没有可关闭的活动房间",
+                    StatusCodes.Status404NotFound);
+            if (!string.Equals(room.OwnerPlayerId, player.PlayerId, StringComparison.Ordinal))
+            {
+                throw new LobbyOperationException(
+                    LobbyErrorCode.InvalidRequest,
+                    "只有房主可以关闭并释放房间",
+                    StatusCodes.Status403Forbidden);
+            }
+
+            var serverInstanceId = room.Route?.ServerInstanceId ?? room.PendingServerInstanceId;
+            var terminalLifecycle = room.Lifecycle == RoomLifecycle.Playing
+                ? RoomLifecycle.Failed
+                : RoomLifecycle.Closed;
+            if (!RoomStateMachine.CanTransition(room.Lifecycle, terminalLifecycle))
+            {
+                throw new LobbyOperationException(
+                    LobbyErrorCode.InvalidRequest,
+                    "当前房间状态不允许房主关闭",
+                    StatusCodes.Status409Conflict);
+            }
+
+            var closedRoom = RoomStateMachine.Transition(room, terminalLifecycle, timeProvider) with
+            {
+                Route = null,
+                PendingServerInstanceId = null,
+                LastServerInstanceId = serverInstanceId ?? room.LastServerInstanceId
+            };
+            if (!await store.UpdateRoomAsync(closedRoom, cancellationToken))
+            {
+                continue;
+            }
+
+            await events.PublishAsync(LobbyEventTypes.RoomClosed, ToDirectoryItem(closedRoom), cancellationToken);
+            logger.LogInformation(
+                "Owner closed room RequestId={RequestId} RoomId={RoomId} PlayerId={PlayerId}",
+                requestId,
+                closedRoom.RoomId,
+                player.PlayerId);
+            return new RoomOperation(
+                requestId,
+                closedRoom.RoomId,
+                closedRoom.RoomCode,
+                closedRoom.Lifecycle,
+                0);
+        }
+
+        throw new LobbyOperationException(
+            LobbyErrorCode.RequestInProgress,
+            "房间状态正在变化，请稍后重试",
+            StatusCodes.Status409Conflict,
+            250);
+    }
+
+    public async Task ReleaseClosedRoomServerAsync(
+        string requestId,
+        string roomId,
+        CancellationToken cancellationToken)
+    {
+        if (!allocator.Enabled) return;
+        var room = await store.GetRoomByIdAsync(roomId, cancellationToken);
+        var serverInstanceId = room?.LastServerInstanceId;
+        if (room is null
+            || room.Lifecycle is not RoomLifecycle.Closed and not RoomLifecycle.Failed
+            || string.IsNullOrEmpty(serverInstanceId))
+        {
+            return;
+        }
+
+        try
+        {
+            await allocator.DrainAsync(requestId, serverInstanceId, cancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)
+        {
+            logger.LogWarning(
+                exception,
+                "Owner closed room but allocator drain is pending RequestId={RequestId} RoomId={RoomId} InstanceId={InstanceId}",
+                requestId,
+                roomId,
+                serverInstanceId);
+        }
+    }
+
     public async Task<GameServerRoute> GetRouteAsync(
         string requestId,
         PlayerIdentity player,

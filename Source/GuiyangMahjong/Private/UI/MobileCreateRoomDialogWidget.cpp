@@ -6,6 +6,7 @@
 #include "Components/TextBlock.h"
 #include "Engine/GameInstance.h"
 #include "GuiyangMahjong.h"
+#include "Game/GuiyangMahjongPlayerController.h"
 #include "Lobby/GuiyangLobbySubsystem.h"
 #include "UI/MobileRuleConfigWidget.h"
 #include "UI/MobileRuleSummaryWidget.h"
@@ -72,6 +73,11 @@ void UMobileCreateRoomDialogWidget::HandleCreate()
         *Result.RequestId, Request.RoundCount, Request.bPublicRoom ? TEXT("是") : TEXT("否"),
         Request.bEnablePassword ? TEXT("是") : TEXT("否"));
     RemoveFromParent();
+    if (AGuiyangMahjongPlayerController* Controller =
+        Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
+    {
+        Controller->ShowCreatingRoomLoading();
+    }
 }
 
 void UMobileCreateRoomDialogWidget::HandleCancel()

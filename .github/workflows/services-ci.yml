@@ -5,11 +5,15 @@ on:
     paths:
       - "Services/**"
       - "Contracts/OpenAPI/**"
+      - "Deploy/linux/**"
+      - "Scripts/Linux/**"
       - ".github/workflows/services-ci.yml"
   pull_request:
     paths:
       - "Services/**"
       - "Contracts/OpenAPI/**"
+      - "Deploy/linux/**"
+      - "Scripts/Linux/**"
       - ".github/workflows/services-ci.yml"
 
 permissions:
@@ -19,6 +23,29 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: guiyang_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d guiyang_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     defaults:
       run:
         working-directory: Services
@@ -31,8 +58,28 @@ jobs:
         run: dotnet restore GuiyangMahjong.Services.slnx
       - name: Build
         run: dotnet build GuiyangMahjong.Services.slnx --configuration Release --no-restore
-      - name: Test
-        run: dotnet test GuiyangMahjong.Services.slnx --configuration Release --no-build --logger "trx;LogFileName=services.trx"
+      - name: Unit and contract tests
+        run: >-
+          dotnet test GuiyangMahjong.Services.slnx
+          --configuration Release
+          --no-build
+          --filter "Category!=ExternalPersistence&Category!=ProcessIntegration"
+          --logger "trx;LogFileName=services.trx"
+      - name: Allocator real-process recovery test
+        run: >-
+          dotnet test GuiyangMahjong.Allocator.Tests/GuiyangMahjong.Allocator.Tests.csproj
+          --configuration Release
+          --no-build
+          --filter "Category=ProcessIntegration"
+          --logger "trx;LogFileName=allocator-process-integration.trx"
+      - name: Auth and Lobby external persistence tests
+        run: |
+          dotnet test GuiyangMahjong.Auth.Tests/GuiyangMahjong.Auth.Tests.csproj --configuration Release --no-build --filter "Category=ExternalPersistence" --logger "trx;LogFileName=auth-external-persistence.trx"
+          dotnet test GuiyangMahjong.Lobby.Tests/GuiyangMahjong.Lobby.Tests.csproj --configuration Release --no-build --filter "Category=ExternalPersistence" --logger "trx;LogFileName=lobby-external-persistence.trx"
+        env:
+          AUTH_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=guiyang_ci;Username=postgres;Password=postgres
+          LOBBY_TEST_POSTGRES: Host=127.0.0.1;Port=5432;Database=guiyang_ci;Username=postgres;Password=postgres
+          LOBBY_TEST_REDIS: 127.0.0.1:6379,abortConnect=false
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -40,3 +87,54 @@ jobs:
           name: services-test-results
           path: "Services/**/TestResults/*.trx"
           if-no-files-found: error
+
+  linux-game-node-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Linux deployment files
+        run: |
+          bash -n Deploy/linux/deploy.sh
+          bash -n Scripts/Linux/test-services.sh
+          bash -n Scripts/Linux/smoke-deployment.sh
+          bash -n Scripts/Linux/diagnose-network.sh
+          bash -n Scripts/Linux/test-deployment-rollback.sh
+          docker compose --env-file Deploy/linux/.env.example -f Deploy/linux/compose.yaml config --quiet
+      - name: Build fake game-node image
+        run: >-
+          docker build
+          --build-arg GAME_SERVER_VARIANT=fake
+          --tag guiyang-mahjong-game-node:ci
+          --file Services/GuiyangMahjong.Allocator/Dockerfile .
+      - name: Verify non-root image and readiness
+        run: |
+          test -n "$(docker image inspect --format '{{.Config.User}}' guiyang-mahjong-game-node:ci)"
+          mkdir -p "$RUNNER_TEMP/allocator/state" "$RUNNER_TEMP/allocator/outbox"
+          chmod -R 0777 "$RUNNER_TEMP/allocator"
+          docker run --detach --name game-node-ci \
+            --read-only --tmpfs /tmp:rw,noexec,nosuid,size=64m \
+            --mount "type=bind,src=$RUNNER_TEMP/allocator,dst=/var/lib/guiyang-mahjong" \
+            -e Allocator__AdvertisedIp=127.0.0.1 \
+            -e Allocator__GameServerExecutablePath=/opt/guiyang-mahjong/server/GuiyangMahjongServer \
+            -e Allocator__GameServerWorkingDirectory=/opt/guiyang-mahjong/server \
+            -e Allocator__MatchResultOutboxDirectory=/var/lib/guiyang-mahjong/outbox \
+            -e Allocator__StateFilePath=/var/lib/guiyang-mahjong/state/instances.json \
+            -e Allocator__ServiceToken=ci-allocator-service-token-000000000000 \
+            -e Allocator__LobbyCallbackToken=ci-lobby-callback-token-000000000000 \
+            -e Allocator__JoinTicketSigningKey=ci-join-ticket-signing-key-000000000000 \
+            guiyang-mahjong-game-node:ci
+          for attempt in $(seq 1 30); do
+            if docker exec game-node-ci curl --fail --silent http://127.0.0.1:8080/health/ready; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs game-node-ci
+          exit 1
+      - name: Collect game-node logs
+        if: failure()
+        run: docker logs game-node-ci || true
+      - name: Remove test container
+        if: always()
+        run: docker rm --force game-node-ci 2>/dev/null || true

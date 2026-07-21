@@ -4,6 +4,7 @@
 #include "Containers/Ticker.h"
 #include "Dom/JsonObject.h"
 #include "Game/GuiyangMahjongPlayerController.h"
+#include "GuiyangMahjong.h"
 #include "HttpModule.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
@@ -219,6 +220,33 @@ namespace GuiyangRemoteLobbyPrivate
                 TEXT("正在向大厅申请新的重连票据"));
         }
 
+        virtual FGuiyangLobbyOperationResult CloseOwnedRoom(
+            AGuiyangMahjongPlayerController& PlayerController, const FString& RequestId) override
+        {
+            FString Token;
+            FString PlayerId;
+            FGuiyangLobbyOperationResult Rejection;
+            if (!ResolveAuthorization(PlayerController, RequestId, Token, PlayerId, Rejection)) return Rejection;
+            const TWeakObjectPtr<AGuiyangMahjongPlayerController> WeakController(&PlayerController);
+            StartRequest(TEXT("POST"), TEXT("/v1/rooms/current/close"), Token, RequestId,
+                TEXT("{}"), true,
+                [WeakThis = TWeakPtr<FRemoteLobbyBackend>(AsShared()), WeakController, RequestId]
+                (FHttpResponsePtr Response, const bool bSucceeded)
+                {
+                    const TSharedPtr<FRemoteLobbyBackend> Self = WeakThis.Pin();
+                    if (!Self || !WeakController.IsValid()) return;
+                    if (!Self->IsSuccess(Response, bSucceeded))
+                    {
+                        Self->NotifyFailure(RequestId, Response, bSucceeded, TEXT("关闭远程房间失败"));
+                        return;
+                    }
+                    UE_LOG(LogMahjongNet, Log, TEXT("房主远程房间已关闭并提交释放：RequestId=%s"), *RequestId);
+                    WeakController->CompleteRemoteReturnToLobby();
+                });
+            return MakeResult(RequestId, true, EGuiyangLobbyErrorCode::None,
+                TEXT("正在关闭并释放远程房间"));
+        }
+
     private:
         using FResponseHandler = TFunction<void(FHttpResponsePtr, bool)>;
 
@@ -257,6 +285,20 @@ namespace GuiyangRemoteLobbyPrivate
                     if (!Self || !WeakController.IsValid()) return;
                     if (!Self->IsSuccess(Response, bSucceeded))
                     {
+                        TSharedPtr<FJsonObject> ErrorObject;
+                        FString StableCode;
+                        if (Response.IsValid() && Response->GetResponseCode() == 409
+                            && DeserializeObject(Response->GetContentAsString(), ErrorObject)
+                            && ErrorObject->TryGetStringField(TEXT("code"), StableCode)
+                            && StableCode.Equals(TEXT("REQUEST_IN_PROGRESS"), ESearchCase::IgnoreCase))
+                        {
+                            const FString RecoveryRequestId = FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphensLower);
+                            UE_LOG(LogMahjongNet, Log,
+                                TEXT("创建房间时发现当前玩家已有活动牌桌，自动恢复该房间：CreateRequestId=%s RecoveryRequestId=%s"),
+                                *RequestId, *RecoveryRequestId);
+                            Self->Reconnect(*WeakController.Get(), RecoveryRequestId);
+                            return;
+                        }
                         Self->NotifyFailure(RequestId, Response, bSucceeded, TEXT("创建房间失败"));
                         return;
                     }

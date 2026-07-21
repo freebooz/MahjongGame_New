@@ -7,6 +7,8 @@ on:
       - "Source/**"
       - "Config/**"
       - "GuiyangMahjong.uproject"
+      - "Scripts/Build-LinuxServer.ps1"
+      - "Services/GuiyangMahjong.Allocator/Dockerfile"
       - ".github/workflows/unreal-ci.yml"
 
 permissions:
@@ -48,3 +50,41 @@ jobs:
           name: unreal-automation-report
           path: Saved/Automation/CI
           if-no-files-found: warn
+
+  linux-server-build:
+    runs-on: [self-hosted, Windows, X64, unreal-5.8]
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Linux cross-compile toolchain
+        shell: powershell
+        run: |
+          if (!(Test-Path -LiteralPath "$env:LINUX_MULTIARCH_ROOT\ToolchainVersion.txt")) {
+            throw 'LINUX_MULTIARCH_ROOT does not contain an Unreal Linux toolchain.'
+          }
+          $version = (Get-Content -LiteralPath "$env:LINUX_MULTIARCH_ROOT\ToolchainVersion.txt" -Raw).Trim()
+          if ($version -ne 'v26_clang-20.1.8-rockylinux8') {
+            throw "UE 5.8 requires v26_clang-20.1.8-rockylinux8; found $version"
+          }
+      - name: Build, cook and stage Linux dedicated server
+        shell: powershell
+        run: >-
+          & "$env:GITHUB_WORKSPACE\Scripts\Build-LinuxServer.ps1"
+          -EngineRoot "$env:UE_ROOT"
+          -Configuration Development
+      - name: Verify artifact checksum
+        shell: powershell
+        run: |
+          $artifact = "$env:GITHUB_WORKSPACE\Artifacts\LinuxServer"
+          $manifest = Get-Content -LiteralPath "$artifact\build-manifest.json" -Raw | ConvertFrom-Json
+          $binary = Join-Path $artifact ($manifest.executable.Replace('/', [IO.Path]::DirectorySeparatorChar))
+          if (!(Test-Path -LiteralPath $binary)) { throw 'Linux server binary was not staged.' }
+          $actual = (Get-FileHash -LiteralPath $binary -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $manifest.executableSha256) { throw 'Linux server checksum does not match its manifest.' }
+      - name: Upload Linux dedicated server
+        uses: actions/upload-artifact@v4
+        with:
+          name: guiyang-mahjong-linux-server-${{ github.sha }}
+          path: Artifacts/LinuxServer
+          if-no-files-found: error
+          retention-days: 14

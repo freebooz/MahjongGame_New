@@ -22,7 +22,7 @@
     {
       "Name": "GuiyangMahjongEditorTools",
       "Type": "Editor",
-      "LoadingPhase": "PostEngineInit"
+      "LoadingPhase": "Default"
     }
   ],
   "Plugins": [
@@ -49,6 +49,7 @@
   ],
   "TargetPlatforms": [
     "Windows",
-    "Android"
+    "Android",
+    "Linux"
   ]
 }

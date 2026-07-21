@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using GuiyangMahjong.Allocator.Domain;
 using GuiyangMahjong.Allocator.Options;
 using Microsoft.Extensions.Options;
@@ -17,20 +19,20 @@ public sealed class GameServerProcessLauncher(
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (string.IsNullOrWhiteSpace(options.GameServerExecutablePath))
-        {
-            throw new InvalidOperationException("GameServerExecutablePath is not configured.");
-        }
+        var executablePath = ResolveExecutablePath(options.GameServerExecutablePath);
+        EnsureExecutable(executablePath);
+        var workingDirectory = ResolveWorkingDirectory(executablePath);
         Directory.CreateDirectory(Path.GetDirectoryName(spec.MatchResultOutboxPath)
             ?? throw new InvalidOperationException("MatchResultOutboxPath has no parent directory."));
 
         var startInfo = new ProcessStartInfo
         {
-            FileName = options.GameServerExecutablePath,
+            FileName = OperatingSystem.IsLinux() ? ResolveSetSidPath() : executablePath,
             UseShellExecute = false,
             CreateNoWindow = true,
-            WorkingDirectory = AppContext.BaseDirectory
+            WorkingDirectory = workingDirectory
         };
+        if (OperatingSystem.IsLinux()) startInfo.ArgumentList.Add(executablePath);
         foreach (var argument in options.GameServerPrefixArguments) startInfo.ArgumentList.Add(argument);
         startInfo.ArgumentList.Add("-MahjongManagedGameServer");
         startInfo.ArgumentList.Add($"-RoomId={spec.RoomId}");
@@ -74,10 +76,15 @@ public sealed class GameServerProcessLauncher(
 
             try
             {
-                var configured = Path.GetFullPath(options.GameServerExecutablePath);
+                var configured = CanonicalizeExistingPath(ResolveExecutablePath(options.GameServerExecutablePath));
                 var actual = process.MainModule?.FileName;
-                if (!string.IsNullOrWhiteSpace(actual)
-                    && !string.Equals(configured, Path.GetFullPath(actual), StringComparison.OrdinalIgnoreCase))
+                if (string.IsNullOrWhiteSpace(actual)
+                    || !string.Equals(
+                        configured,
+                        CanonicalizeExistingPath(actual),
+                        OperatingSystem.IsWindows()
+                            ? StringComparison.OrdinalIgnoreCase
+                            : StringComparison.Ordinal))
                 {
                     process.Dispose();
                     return Task.FromResult<IManagedGameServerProcess?>(null);
@@ -85,12 +92,16 @@ public sealed class GameServerProcessLauncher(
             }
             catch (Exception exception) when (exception is System.ComponentModel.Win32Exception
                                                or InvalidOperationException
-                                               or NotSupportedException)
+                                               or NotSupportedException
+                                               or IOException
+                                               or UnauthorizedAccessException)
             {
                 logger.LogWarning(
                     exception,
-                    "Could not verify recovered GameServer executable path ProcessId={ProcessId}",
+                    "Refusing to recover GameServer because its executable path could not be verified ProcessId={ProcessId}",
                     processId);
+                process.Dispose();
+                return Task.FromResult<IManagedGameServerProcess?>(null);
             }
 
             return Task.FromResult<IManagedGameServerProcess?>(managed);
@@ -103,10 +114,96 @@ public sealed class GameServerProcessLauncher(
         }
     }
 
-    private sealed class ManagedGameServerProcess(Process process) : IManagedGameServerProcess
+    public string GetResolvedExecutablePath() => ResolveExecutablePath(options.GameServerExecutablePath);
+
+    public string GetResolvedWorkingDirectory() => ResolveWorkingDirectory(GetResolvedExecutablePath());
+
+    public static bool IsExecutable(string path)
     {
-        public int ProcessId => process.Id;
-        public DateTimeOffset StartedAtUtc => process.StartTime.ToUniversalTime();
+        if (!File.Exists(path)) return false;
+        if (!OperatingSystem.IsLinux()) return true;
+        var mode = File.GetUnixFileMode(path);
+        const UnixFileMode executeBits = UnixFileMode.UserExecute
+                                         | UnixFileMode.GroupExecute
+                                         | UnixFileMode.OtherExecute;
+        return (mode & executeBits) != 0;
+    }
+
+    private string ResolveWorkingDirectory(string executablePath)
+    {
+        var configured = options.GameServerWorkingDirectory.Trim();
+        var path = string.IsNullOrEmpty(configured)
+            ? Path.GetDirectoryName(executablePath)
+            : Path.IsPathRooted(configured)
+                ? configured
+                : Path.Combine(AppContext.BaseDirectory, configured);
+        path = Path.GetFullPath(path
+            ?? throw new InvalidOperationException("GameServer executable has no parent directory."));
+        if (!Directory.Exists(path))
+            throw new DirectoryNotFoundException($"GameServer working directory does not exist: {path}");
+        return path;
+    }
+
+    private static void EnsureExecutable(string path)
+    {
+        if (!File.Exists(path)) throw new FileNotFoundException("GameServer executable does not exist.", path);
+        if (!IsExecutable(path))
+            throw new InvalidOperationException($"GameServer file is not executable: {path}");
+    }
+
+    private static string ResolveExecutablePath(string configured)
+    {
+        configured = configured.Trim();
+        if (string.IsNullOrEmpty(configured))
+            throw new InvalidOperationException("GameServerExecutablePath is not configured.");
+        if (Path.IsPathRooted(configured)) return Path.GetFullPath(configured);
+        if (configured.Contains(Path.DirectorySeparatorChar)
+            || configured.Contains(Path.AltDirectorySeparatorChar))
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, configured));
+
+        var pathValue = Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (var directory in pathValue.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var candidate = Path.Combine(directory, configured);
+            if (File.Exists(candidate)) return Path.GetFullPath(candidate);
+            if (OperatingSystem.IsWindows() && Path.GetExtension(candidate).Length == 0)
+            {
+                foreach (var extension in new[] { ".exe", ".cmd", ".bat" })
+                {
+                    if (File.Exists(candidate + extension)) return Path.GetFullPath(candidate + extension);
+                }
+            }
+        }
+        throw new FileNotFoundException($"GameServer executable was not found on PATH: {configured}");
+    }
+
+    private static string CanonicalizeExistingPath(string path)
+    {
+        var fullPath = Path.GetFullPath(path);
+        var target = new FileInfo(fullPath).ResolveLinkTarget(returnFinalTarget: true);
+        return target is null ? fullPath : Path.GetFullPath(target.FullName);
+    }
+
+    private static string ResolveSetSidPath()
+    {
+        foreach (var candidate in new[] { "/usr/bin/setsid", "/bin/setsid" })
+            if (File.Exists(candidate)) return candidate;
+        throw new FileNotFoundException("Linux GameServer launch requires util-linux setsid.");
+    }
+
+    private sealed class ManagedGameServerProcess : IManagedGameServerProcess
+    {
+        private readonly Process process;
+
+        public ManagedGameServerProcess(Process process)
+        {
+            this.process = process;
+            ProcessId = process.Id;
+            StartedAtUtc = process.StartTime.ToUniversalTime();
+        }
+
+        public int ProcessId { get; }
+        public DateTimeOffset StartedAtUtc { get; }
 
         public bool HasExited
         {
@@ -119,7 +216,12 @@ public sealed class GameServerProcessLauncher(
 
         public async ValueTask StopAsync(TimeSpan gracePeriod, CancellationToken cancellationToken)
         {
-            if (HasExited) return;
+            if (HasExited)
+            {
+                process.Dispose();
+                return;
+            }
+            if (OperatingSystem.IsLinux()) SendLinuxProcessGroupSignal(ProcessId, 15);
             if (gracePeriod > TimeSpan.Zero)
             {
                 try
@@ -127,6 +229,7 @@ public sealed class GameServerProcessLauncher(
                     using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
                     timeout.CancelAfter(gracePeriod);
                     await process.WaitForExitAsync(timeout.Token);
+                    process.Dispose();
                     return;
                 }
                 catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -139,4 +242,15 @@ public sealed class GameServerProcessLauncher(
             process.Dispose();
         }
     }
+
+    private static void SendLinuxProcessGroupSignal(int processId, int signal)
+    {
+        if (kill(-processId, signal) == 0) return;
+        var error = Marshal.GetLastPInvokeError();
+        if (error == 3) return; // ESRCH: the process already exited.
+        throw new Win32Exception(error, $"Could not signal GameServer process group {processId}.");
+    }
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int kill(int processId, int signal);
 }

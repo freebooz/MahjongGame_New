@@ -15,6 +15,7 @@ public sealed class AllocatorOptions
     [Range(0, 60)] public int DrainGraceSeconds { get; init; } = 3;
     [Required] public string AdvertisedIp { get; init; } = "127.0.0.1";
     public string GameServerExecutablePath { get; init; } = string.Empty;
+    public string GameServerWorkingDirectory { get; init; } = string.Empty;
     public string[] GameServerPrefixArguments { get; init; } = [];
     [Required] public string MatchResultOutboxDirectory { get; init; } = "match-result-outbox";
     [Required] public string StateFilePath { get; init; } = "allocator-state/instances.json";

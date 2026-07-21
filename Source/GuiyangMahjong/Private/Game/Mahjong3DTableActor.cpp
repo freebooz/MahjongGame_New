@@ -1,22 +1,17 @@
 #include "Game/Mahjong3DTableActor.h"
 
-#include "UI/MahjongTileVisualLibrary.h"
-#include "Components/Image.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "Components/WidgetComponent.h"
 #include "Engine/StaticMesh.h"
-#include "Engine/Texture2D.h"
-#include "GuiyangMahjong.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
-#include "Widgets/Images/SImage.h"
 
 namespace
 {
     constexpr float TileWidth = 44.0f;
     constexpr float TileHeight = 62.0f;
     constexpr float TileDepth = 30.0f;
+    constexpr float Mahjong50ModelWidth = 3.6f;
 
     FVector RotateAroundTable(const FVector& Position, const int32 RelativeSeat)
     {
@@ -35,32 +30,34 @@ namespace
     }
 }
 
-void UMahjong3DTileFaceWidget::SetTileFace(const FMahjongTile* Tile, const bool bFaceUp)
-{
-    FaceTexture = bFaceUp && Tile
-        ? UMahjongTileVisualLibrary::LoadFaceTexture(*Tile)
-        : LoadObject<UTexture2D>(nullptr, TEXT("/Game/UI/Textures/Tiles/T_Tile_Back.T_Tile_Back"));
-    FaceBrush = FSlateBrush();
-    FaceBrush.DrawAs = ESlateBrushDrawType::Image;
-    FaceBrush.ImageSize = FVector2D(64.0f, 88.0f);
-    FaceBrush.TintColor = FSlateColor(FLinearColor::White);
-    FaceBrush.SetResourceObject(FaceTexture);
-    InvalidateLayoutAndVolatility();
-}
-
-TSharedRef<SWidget> UMahjong3DTileFaceWidget::RebuildWidget()
-{
-    return SNew(SImage).Image(&FaceBrush);
-}
-
 AMahjong3DTableActor::AMahjong3DTableActor()
 {
     PrimaryActorTick.bCanEverTick = false;
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
     SetRootComponent(SceneRoot);
     CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-    TileMesh = LoadObject<UStaticMesh>(nullptr,
-        TEXT("/Game/Art/Mahjong/Tiles/SM_MahjongTile.SM_MahjongTile"));
+    static const TCHAR* TileAssetNames[] = {
+        TEXT("Characters_1"), TEXT("Characters_2"), TEXT("Characters_3"),
+        TEXT("Characters_4"), TEXT("Characters_5"), TEXT("Characters_6"),
+        TEXT("Characters_7"), TEXT("Characters_8"), TEXT("Characters_9"),
+        TEXT("Bamboo_1"), TEXT("Bamboo_2"), TEXT("Bamboo_3"),
+        TEXT("Bamboo_4"), TEXT("Bamboo_5"), TEXT("Bamboo_6"),
+        TEXT("Bamboo_7"), TEXT("Bamboo_8"), TEXT("Bamboo_9"),
+        TEXT("Dots_1"), TEXT("Dots_2"), TEXT("Dots_3"),
+        TEXT("Dots_4"), TEXT("Dots_5"), TEXT("Dots_6"),
+        TEXT("Dots_7"), TEXT("Dots_8"), TEXT("Dots_9"),
+        TEXT("East"), TEXT("South"), TEXT("West"), TEXT("North"),
+        TEXT("Red_Dragon"), TEXT("Green_Dragon"), TEXT("White_Dragon")
+    };
+    TileMeshes.SetNum(UE_ARRAY_COUNT(TileAssetNames));
+    for (int32 Index = 0; Index < TileMeshes.Num(); ++Index)
+    {
+        const FString AssetName = FString::Printf(TEXT("SM_Mahjong50_%s"), TileAssetNames[Index]);
+        const FString AssetPath = FString::Printf(
+            TEXT("/Game/Art/Mahjong/Mahjong50/Tiles/%s.%s"), *AssetName, *AssetName);
+        TileMeshes[Index] = LoadObject<UStaticMesh>(nullptr, *AssetPath);
+    }
+    DefaultTileMesh = TileMeshes.IsValidIndex(31) ? TileMeshes[31] : nullptr;
     BasicMaterial = LoadObject<UMaterialInterface>(nullptr,
         TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 }
@@ -133,10 +130,11 @@ void AMahjong3DTableActor::AddTile(const FMahjongTile* Tile, const bool bFaceUp,
 {
     FVector TileLocation = Location;
     if (bSelected) TileLocation.Z += 16.0f;
-    if (TileMesh)
+    UStaticMesh* Mesh = ResolveTileMesh(Tile, bFaceUp);
+    if (Mesh)
     {
         UStaticMeshComponent* Component = NewObject<UStaticMeshComponent>(this);
-        Component->SetStaticMesh(TileMesh);
+        Component->SetStaticMesh(Mesh);
         Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Component->SetCastShadow(true);
         FRotator MeshRotation = Rotation;
@@ -152,7 +150,7 @@ void AMahjong3DTableActor::AddTile(const FMahjongTile* Tile, const bool bFaceUp,
         }
         Component->SetRelativeLocation(TileLocation);
         Component->SetRelativeRotation(MeshRotation);
-        Component->SetRelativeScale3D(FVector(TileWidth / 3.2f));
+        Component->SetRelativeScale3D(FVector(TileWidth / Mahjong50ModelWidth));
         Component->SetupAttachment(SceneRoot);
         AddInstanceComponent(Component);
         Component->RegisterComponent();
@@ -166,51 +164,15 @@ void AMahjong3DTableActor::AddTile(const FMahjongTile* Tile, const bool bFaceUp,
         AddBox(TileLocation, Size, Rotation,
             bSelected ? FLinearColor(0.95f, 0.68f, 0.16f) : FLinearColor(0.92f, 0.88f, 0.72f));
     }
-    if (bFaceUp || bUpright)
-    {
-        AddTileFace(Tile, bFaceUp, bUpright, TileLocation, Rotation);
-    }
 }
 
-void AMahjong3DTableActor::AddTileFace(const FMahjongTile* Tile, const bool bFaceUp, const bool bUpright,
-    const FVector& Location, const FRotator& Rotation)
+UStaticMesh* AMahjong3DTableActor::ResolveTileMesh(const FMahjongTile* Tile, const bool bFaceUp) const
 {
-    UWidgetComponent* Face = NewObject<UWidgetComponent>(this);
-    Face->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    Face->SetWidgetSpace(EWidgetSpace::World);
-    Face->SetDrawSize(FVector2D(64.0f, 88.0f));
-    Face->SetPivot(FVector2D(0.5f, 0.5f));
-    Face->SetTwoSided(true);
-    Face->SetBlendMode(EWidgetBlendMode::Transparent);
-    Face->SetRelativeScale3D(FVector(0.62f));
-    Face->SetupAttachment(SceneRoot);
-
-    if (bUpright)
-    {
-        const FVector Forward = Rotation.RotateVector(FVector(0.0f, -1.0f, 0.0f));
-        Face->SetRelativeLocation(Location + Forward * (TileDepth * 0.55f));
-        Face->SetRelativeRotation(FRotator(0.0f, Rotation.Yaw - 90.0f, 0.0f));
-    }
-    else
-    {
-        Face->SetRelativeLocation(Location + FVector(0.0f, 0.0f, TileDepth * 0.56f));
-        Face->SetRelativeRotation(FRotator(90.0f, Rotation.Yaw, 0.0f));
-    }
-
-    // UUserWidget 必须通过 CreateWidget 初始化 WidgetTree；直接 NewObject 会在
-    // UWidgetComponent 首次重建 Slate 控件时访问空 WidgetTree 并导致客户端崩溃。
-    UMahjong3DTileFaceWidget* FaceWidget = CreateWidget<UMahjong3DTileFaceWidget>(
-        GetWorld(), UMahjong3DTileFaceWidget::StaticClass());
-    if (!FaceWidget)
-    {
-        UE_LOG(LogMahjongUI, Error, TEXT("三维麻将牌面 Widget 创建失败，已跳过该牌面"));
-        return;
-    }
-    FaceWidget->SetTileFace(Tile, bFaceUp);
-    Face->SetWidget(FaceWidget);
-    AddInstanceComponent(Face);
-    Face->RegisterComponent();
-    RuntimeComponents.Add(Face);
+    if (!bFaceUp || !Tile || !Tile->IsValid()) return DefaultTileMesh;
+    const int32 RuleIndex = Tile->GetRuleIndex();
+    return TileMeshes.IsValidIndex(RuleIndex) && TileMeshes[RuleIndex]
+        ? TileMeshes[RuleIndex]
+        : DefaultTileMesh;
 }
 
 void AMahjong3DTableActor::AddTableAndFrame()

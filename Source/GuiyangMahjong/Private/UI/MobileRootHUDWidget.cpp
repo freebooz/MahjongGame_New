@@ -12,6 +12,7 @@
 #include "UI/MobileErrorToastWidget.h"
 #include "UI/MahjongBackgroundMusicSubsystem.h"
 #include "UI/MobileLobbyWidget.h"
+#include "UI/MobileCreatingRoomWidget.h"
 #include "UI/MobileMahjongHUDWidget.h"
 #include "UI/MobileRoomWidget.h"
 #include "UI/MobileReconnectOverlayWidget.h"
@@ -22,6 +23,11 @@
 
 namespace
 {
+    bool IsAwaitingAllocatedRoomState(const UWorld* World)
+    {
+        return World && World->URL.HasOption(TEXT("JoinTicket"));
+    }
+
     FMahjongTile MakeReviewTile(const EMahjongSuit Suit, const int32 Rank, const int32 UniqueId)
     {
         FMahjongTile Tile;
@@ -179,11 +185,24 @@ void UMobileRootHUDWidget::NativeConstruct()
     {
         Music->EnsurePlaying(this);
     }
+    if (FParse::Param(FCommandLine::Get(), TEXT("UIReviewScreenshot")))
+    {
+        ShowLogin();
+        UE_LOG(LogMahjongUI, Log, TEXT("UI 审查模式：已隔离登录、房间和大厅事件"));
+        return;
+    }
     if (UGuiyangLoginSubsystem* Login = GetGameInstance()->GetSubsystem<UGuiyangLoginSubsystem>())
     {
         Login->OnLoginStateChanged.AddUniqueDynamic(this, &ThisClass::HandleLoginStateChanged);
         Login->OnLoginFailed.AddUniqueDynamic(this, &ThisClass::HandleLoginFailed);
-        if (Login->IsSessionValid()) ShowLobby(); else ShowLogin();
+        if (Login->IsSessionValid())
+        {
+            if (IsAwaitingAllocatedRoomState(GetWorld())) ShowCreatingRoom(); else ShowLobby();
+        }
+        else
+        {
+            ShowLogin();
+        }
     }
     else
     {
@@ -255,7 +274,7 @@ void UMobileRootHUDWidget::HandleLoginStateChanged(const EGuiyangLoginState Stat
                     Login->GetSessionTokenForNetwork());
             }
         }
-        ShowLobby();
+        if (IsAwaitingAllocatedRoomState(GetWorld())) ShowCreatingRoom(); else ShowLobby();
         if (UMobileLobbyWidget* Lobby = Cast<UMobileLobbyWidget>(CurrentScreen))
         {
             Lobby->RefreshPlayerInfo(Profile.DisplayName, Profile.PlayerId, 1);
@@ -302,6 +321,21 @@ void UMobileRootHUDWidget::ShowLobby()
         LobbySubsystem && LobbySubsystem->GetBackendMode() == EGuiyangLobbyBackendMode::RemoteLobby)
     {
         LobbySubsystem->RequestBootstrap(GetOwningPlayer());
+    }
+}
+
+void UMobileRootHUDWidget::ShowCreatingRoom()
+{
+    HideReconnectOverlay();
+    ShowScreenByClassPath(TEXT("/Game/UI/Screens/WBP_CreatingRoom.WBP_CreatingRoom_C"));
+    UE_LOG(LogMahjongUI, Log, TEXT("创建房间加载界面已显示"));
+}
+
+void UMobileRootHUDWidget::UpdateCreatingRoomStage(const FString& ChineseStatus)
+{
+    if (UMobileCreatingRoomWidget* Loading = Cast<UMobileCreatingRoomWidget>(CurrentScreen))
+    {
+        Loading->SetConnectionStage(ChineseStatus);
     }
 }
 
@@ -388,6 +422,14 @@ void UMobileRootHUDWidget::RouteFromRoomState(const FMahjongRoomState& State)
     const int32 LocalSeat = FindLocalSeat(State);
     if (LocalSeat == INDEX_NONE)
     {
+        if (IsAwaitingAllocatedRoomState(GetWorld()))
+        {
+            if (CurrentScreenClassPath != TEXT("/Game/UI/Screens/WBP_CreatingRoom.WBP_CreatingRoom_C"))
+            {
+                ShowCreatingRoom();
+            }
+            return;
+        }
         ShowLobby();
         return;
     }
@@ -443,6 +485,10 @@ void UMobileRootHUDWidget::HandleReconnectStateChanged(const FString& Status, co
 void UMobileRootHUDWidget::HandleLobbyRequestFailed(const FString& RequestId,
     const EGuiyangLobbyErrorCode ErrorCode, const FString& ChineseMessage)
 {
+    if (CurrentScreenClassPath == TEXT("/Game/UI/Screens/WBP_CreatingRoom.WBP_CreatingRoom_C"))
+    {
+        ShowLobby();
+    }
     ShowChineseError(ChineseMessage.IsEmpty() ? TEXT("大厅请求失败，请稍后重试") : ChineseMessage);
 }
 
@@ -516,6 +562,10 @@ bool UMobileRootHUDWidget::ApplyVisualReviewScenario(const FString& ScenarioName
         {
             Lobby->RefreshPlayerInfo(TEXT("黔小鸡"), TEXT("GY-520001"), 128);
         }
+    }
+    else if (ScenarioName.Equals(TEXT("CreatingRoom"), ESearchCase::IgnoreCase))
+    {
+        ShowCreatingRoom();
     }
     else if (ScenarioName.Equals(TEXT("CreateRoomDialog"), ESearchCase::IgnoreCase))
     {

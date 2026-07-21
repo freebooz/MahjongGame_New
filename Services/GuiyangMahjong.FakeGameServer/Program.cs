@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 
 var arguments = args
     .Where(argument => argument.StartsWith('-') && argument.Contains('='))
@@ -26,6 +27,13 @@ var buildVersion = Required("BuildVersion");
 var advertisedIp = Required("AdvertisedIp");
 
 using var shutdown = new CancellationTokenSource();
+using var terminateSignal = !OperatingSystem.IsWindows()
+    ? PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
+    {
+        context.Cancel = true;
+        shutdown.Cancel();
+    })
+    : null;
 Console.CancelKeyPress += (_, eventArgs) =>
 {
     eventArgs.Cancel = true;

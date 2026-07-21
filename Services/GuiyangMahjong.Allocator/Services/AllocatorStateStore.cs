@@ -1,5 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using GuiyangMahjong.Allocator.Domain;
 using GuiyangMahjong.Allocator.Options;
 using Microsoft.Extensions.Options;
@@ -95,8 +97,10 @@ public sealed class JsonAllocatorStateStore(
                 {
                     await JsonSerializer.SerializeAsync(stream, state, JsonOptions, cancellationToken);
                     await stream.FlushAsync(cancellationToken);
+                    stream.Flush(flushToDisk: true);
                 }
                 File.Move(temporaryPath, statePath, true);
+                FlushDirectory(directory);
             }
             finally
             {
@@ -108,4 +112,34 @@ public sealed class JsonAllocatorStateStore(
             gate.Release();
         }
     }
+
+    private static void FlushDirectory(string directory)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        const int openReadOnly = 0;
+        const int openDirectory = 65536;
+        var descriptor = open(directory, openReadOnly | openDirectory);
+        if (descriptor < 0)
+            throw new Win32Exception(Marshal.GetLastPInvokeError(),
+                "Could not open allocator state directory for fsync.");
+        try
+        {
+            if (fsync(descriptor) != 0)
+                throw new Win32Exception(Marshal.GetLastPInvokeError(),
+                    "Could not fsync allocator state directory.");
+        }
+        finally
+        {
+            close(descriptor);
+        }
+    }
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int open(string path, int flags);
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int fsync(int fileDescriptor);
+
+    [DllImport("libc")]
+    private static extern int close(int fileDescriptor);
 }

@@ -53,4 +53,9 @@ public sealed class PortLeasePool
     {
         get { lock (gate) return available.Count; }
     }
+
+    public IReadOnlyList<int> GetAvailablePorts()
+    {
+        lock (gate) return available.ToArray();
+    }
 }

@@ -28,3 +28,10 @@ Build/Android/src/
 *.user
 TestResults/
 Deploy/.env
+Deploy/linux/.env
+Deploy/linux/backups/
+Deploy/linux/diagnostics/
+Deploy/linux/.deployed-version
+Deploy/linux/.previous-version
+Artifacts/LinuxServer/*
+!Artifacts/LinuxServer/.gitkeep

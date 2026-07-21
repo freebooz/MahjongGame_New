@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mahjong-allocator-data
+  namespace: guiyang-mahjong
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 10Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mahjong-allocator
+  namespace: guiyang-mahjong
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: mahjong-allocator}}
+  template:
+    metadata: {labels: {app: mahjong-allocator}}
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+        runAsGroup: 1654
+        fsGroup: 1654
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: game-node
+          image: ghcr.io/freebooz/guiyang-mahjong-game-node:REPLACE_WITH_GIT_SHA
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: http, containerPort: 8080, protocol: TCP}
+            # UE child processes bind 19000-19099/UDP directly on this Linux node.
+          envFrom:
+            - configMapRef: {name: mahjong-services}
+            - secretRef: {name: mahjong-secrets}
+          env:
+            - name: Allocator__AdvertisedIp
+              valueFrom: {fieldRef: {fieldPath: status.hostIP}}
+          volumeMounts:
+            - {name: allocator-data, mountPath: /var/lib/guiyang-mahjong}
+            - {name: tmp, mountPath: /tmp}
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 15
+            timeoutSeconds: 2
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: "1", memory: 2Gi}
+            limits: {cpu: "8", memory: 16Gi}
+      volumes:
+        - name: allocator-data
+          persistentVolumeClaim: {claimName: mahjong-allocator-data}
+        - name: tmp
+          emptyDir: {sizeLimit: 256Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mahjong-allocator
+  namespace: guiyang-mahjong
+spec:
+  selector: {app: mahjong-allocator}
+  ports: [{name: http, port: 8080, targetPort: http}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mahjong-allocator
+  namespace: guiyang-mahjong
+spec:
+  maxUnavailable: 0
+  selector: {matchLabels: {app: mahjong-allocator}}

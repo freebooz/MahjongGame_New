@@ -40,6 +40,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void RetryLastConnection();
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void ReturnToConnectScreen();
     UFUNCTION(BlueprintCallable, Category="麻将|网络") void ReturnToLobby();
+    UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowCreatingRoomLoading();
+    void CompleteRemoteReturnToLobby();
     UFUNCTION(BlueprintCallable, Category="麻将|牌桌") void RequestTableAction(EMahjongActionType Type, int32 TargetTileId);
 
     UFUNCTION(Server, Reliable) void Server_RequestCreateRoom();
@@ -79,8 +81,13 @@ private:
     bool bIntegrationReadyRequested = false;
     bool bIntegrationRetryRequested = false;
     double IntegrationReconnectObservedAtSeconds = 0.0;
+    double CreatingRoomLoadingShownAtSeconds = 0.0;
+    UPROPERTY(Transient) FGuiyangGameServerRoute PendingAllocatedRoute;
     FTimerHandle IntegrationPollTimer;
+    FTimerHandle CreatingRoomTravelDelayTimer;
 
+    void CompleteDelayedAllocatedServerConnection();
+    void TravelToAllocatedServer(FGuiyangGameServerRoute Route);
     void InitializeIntegrationClient();
     void PollIntegrationClient();
     void HandleIntegrationPrivateState(const FMahjongPrivatePlayerState& PrivateState);

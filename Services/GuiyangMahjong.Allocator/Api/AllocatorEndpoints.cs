@@ -2,6 +2,8 @@ using GuiyangMahjong.Allocator.Domain;
 using GuiyangMahjong.Allocator.Services;
 using GuiyangMahjong.Allocator.Options;
 using Microsoft.Extensions.Options;
+using System.Net;
+using System.Net.Sockets;
 
 namespace GuiyangMahjong.Allocator.Api;
 
@@ -12,22 +14,55 @@ public static class AllocatorEndpoints
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
         app.MapGet("/health/ready", (
             GameServerInstanceManager manager,
+            GameServerProcessLauncher launcher,
+            PortLeasePool portLeasePool,
             IOptions<AllocatorOptions> options) =>
         {
-            var executablePath = Path.IsPathRooted(options.Value.GameServerExecutablePath)
-                ? options.Value.GameServerExecutablePath
-                : Path.Combine(AppContext.BaseDirectory, options.Value.GameServerExecutablePath);
-            var executableReady = File.Exists(executablePath);
-            return manager.IsInitialized && executableReady
-                ? Results.Ok(new { status = "ready", stateReconciled = true, gameServerExecutable = "ready" })
-                : Results.Json(
-                    new
-                    {
-                        status = "not-ready",
-                        stateReconciled = manager.IsInitialized,
-                        gameServerExecutable = executableReady ? "ready" : "missing"
-                    },
-                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            var executableReady = false;
+            var workingDirectoryReady = false;
+            try
+            {
+                executableReady = GameServerProcessLauncher.IsExecutable(launcher.GetResolvedExecutablePath());
+                workingDirectoryReady = Directory.Exists(launcher.GetResolvedWorkingDirectory());
+            }
+            catch (Exception exception) when (exception is IOException
+                                               or UnauthorizedAccessException
+                                               or InvalidOperationException)
+            {
+                // Readiness reports the condition without leaking server paths to callers.
+            }
+
+            var stateDirectoryReady = IsWritableDirectory(GetParentDirectory(options.Value.StateFilePath));
+            var outboxDirectoryReady = IsWritableDirectory(
+                MatchResultOutboxPaths.GetDirectory(options.Value));
+            var gamePortReady = HasBindableUdpPort(portLeasePool);
+            var ready = manager.IsInitialized
+                        && executableReady
+                        && workingDirectoryReady
+                        && stateDirectoryReady
+                        && outboxDirectoryReady
+                        && gamePortReady;
+            return ready
+                ? Results.Ok(new
+                {
+                    status = "ready",
+                    stateReconciled = true,
+                    gameServerExecutable = "ready",
+                    gameServerWorkingDirectory = "ready",
+                    allocatorState = "writable",
+                    matchResultOutbox = "writable",
+                    gamePortCapacity = "available"
+                })
+                : Results.Json(new
+                {
+                    status = "not-ready",
+                    stateReconciled = manager.IsInitialized,
+                    gameServerExecutable = executableReady ? "ready" : "unavailable",
+                    gameServerWorkingDirectory = workingDirectoryReady ? "ready" : "unavailable",
+                    allocatorState = stateDirectoryReady ? "writable" : "unavailable",
+                    matchResultOutbox = outboxDirectoryReady ? "writable" : "unavailable",
+                    gamePortCapacity = gamePortReady ? "available" : "exhausted-or-occupied"
+                }, statusCode: StatusCodes.Status503ServiceUnavailable);
         });
         app.MapGet("/openapi/v1.yaml", async (HttpContext context) =>
         {
@@ -74,6 +109,54 @@ public static class AllocatorEndpoints
             GameServerInstanceManager manager,
             CancellationToken cancellationToken) => Results.Ok(await manager.DrainAsync(
                 serverInstanceId, cancellationToken)));
+    }
+
+    private static string GetParentDirectory(string configuredPath)
+    {
+        var path = Path.IsPathRooted(configuredPath)
+            ? configuredPath
+            : Path.Combine(AppContext.BaseDirectory, configuredPath);
+        return Path.GetDirectoryName(Path.GetFullPath(path))
+               ?? throw new InvalidOperationException("Allocator state path has no parent directory.");
+    }
+
+    private static bool IsWritableDirectory(string directory)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+            var probe = Path.Combine(directory, $".readiness-{Guid.NewGuid():N}.tmp");
+            using (File.Create(probe, 1, FileOptions.DeleteOnClose)) { }
+            return !File.Exists(probe);
+        }
+        catch (Exception exception) when (exception is IOException
+                                           or UnauthorizedAccessException
+                                           or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    private static bool HasBindableUdpPort(PortLeasePool portLeasePool)
+    {
+        foreach (var port in portLeasePool.GetAvailablePorts())
+        {
+            try
+            {
+                using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp)
+                {
+                    ExclusiveAddressUse = true
+                };
+                socket.Bind(new IPEndPoint(IPAddress.Any, port));
+                return true;
+            }
+            catch (SocketException)
+            {
+                // Try the next logically available port; another OS process may own this one.
+            }
+        }
+
+        return false;
     }
 
     private static string GetRequestId(HttpContext context)

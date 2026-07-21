@@ -18,10 +18,12 @@
 #include "UnrealClient.h"
 #include "Engine/NetConnection.h"
 #include "GenericPlatform/GenericPlatformHttp.h"
+#include "Interfaces/IPv4/IPv4Address.h"
 
 namespace
 {
     bool GIntegrationDisconnectTriggered = false;
+    constexpr double MinimumCreatingRoomLoadingSeconds = 1.5;
 
     bool IsClientFullMatchIntegrationEnabled()
     {
@@ -38,14 +40,18 @@ void AGuiyangMahjongPlayerController::BeginPlay()
         return;
     }
 
-    if (const UGuiyangLoginSubsystem* Login = GetGameInstance()
-        ? GetGameInstance()->GetSubsystem<UGuiyangLoginSubsystem>() : nullptr)
+    const bool bUIReviewScreenshot = FParse::Param(FCommandLine::Get(), TEXT("UIReviewScreenshot"));
+    if (!bUIReviewScreenshot)
     {
-        if (Login->IsSessionValid())
+        if (const UGuiyangLoginSubsystem* Login = GetGameInstance()
+            ? GetGameInstance()->GetSubsystem<UGuiyangLoginSubsystem>() : nullptr)
         {
-            const FGuiyangLoginProfile& Profile = Login->GetCurrentProfile();
-            Server_AuthenticateSession(Profile.PlayerId, Profile.DisplayName, Profile.Provider,
-                Login->GetSessionTokenForNetwork());
+            if (Login->IsSessionValid())
+            {
+                const FGuiyangLoginProfile& Profile = Login->GetCurrentProfile();
+                Server_AuthenticateSession(Profile.PlayerId, Profile.DisplayName, Profile.Provider,
+                    Login->GetSessionTokenForNetwork());
+            }
         }
     }
 
@@ -64,9 +70,7 @@ void AGuiyangMahjongPlayerController::BeginPlay()
     SetInputMode(InputMode);
     UE_LOG(LogMahjongUI, Log, TEXT("本地客户端 RootHUD 已加入视口"));
 
-    InitializeIntegrationClient();
-
-    if (FParse::Param(FCommandLine::Get(), TEXT("UIReviewScreenshot")))
+    if (bUIReviewScreenshot)
     {
         FString ReviewScreen = TEXT("Login");
         FParse::Value(FCommandLine::Get(), TEXT("UIReviewScreen="), ReviewScreen);
@@ -105,7 +109,10 @@ void AGuiyangMahjongPlayerController::BeginPlay()
             FTimerHandle ExitTimer;
             GetWorldTimerManager().SetTimer(ExitTimer, [] { FPlatformMisc::RequestExit(false); }, 1.0f, false);
         }), CaptureDelaySeconds, false);
+        return;
     }
+
+    InitializeIntegrationClient();
 }
 
 void AGuiyangMahjongPlayerController::Server_AuthenticateSession_Implementation(const FString& PlayerId,
@@ -142,16 +149,74 @@ void AGuiyangMahjongPlayerController::ConnectToAllocatedServer(const FGuiyangGam
         || Route.JoinTicket.Len() < 32 || Route.JoinTicket.Len() > 4096
         || Route.TicketExpireAtUtc <= FDateTime::UtcNow())
     {
+        CreatingRoomLoadingShownAtSeconds = 0.0;
+        PendingAllocatedRoute = {};
+        GetWorldTimerManager().ClearTimer(CreatingRoomTravelDelayTimer);
+        if (RootHUDInstance)
+        {
+            RootHUDInstance->ShowLobby();
+        }
         Client_ShowErrorMessage(TEXT("牌桌路由或入场票据无效"));
         return;
     }
+    if (RootHUDInstance)
+    {
+        RootHUDInstance->UpdateCreatingRoomStage(TEXT("服务器已就绪，正在进入房间……"));
+    }
+    if (CreatingRoomLoadingShownAtSeconds > 0.0)
+    {
+        const double VisibleSeconds = FPlatformTime::Seconds() - CreatingRoomLoadingShownAtSeconds;
+        const double RemainingSeconds = MinimumCreatingRoomLoadingSeconds - VisibleSeconds;
+        if (RemainingSeconds > 0.0)
+        {
+            PendingAllocatedRoute = Route;
+            GetWorldTimerManager().ClearTimer(CreatingRoomTravelDelayTimer);
+            GetWorldTimerManager().SetTimer(CreatingRoomTravelDelayTimer, this,
+                &ThisClass::CompleteDelayedAllocatedServerConnection,
+                static_cast<float>(RemainingSeconds), false);
+            return;
+        }
+        CreatingRoomLoadingShownAtSeconds = 0.0;
+    }
+    TravelToAllocatedServer(Route);
+}
+
+void AGuiyangMahjongPlayerController::CompleteDelayedAllocatedServerConnection()
+{
+    FGuiyangGameServerRoute Route = MoveTemp(PendingAllocatedRoute);
+    PendingAllocatedRoute = {};
+    CreatingRoomLoadingShownAtSeconds = 0.0;
+    TravelToAllocatedServer(MoveTemp(Route));
+}
+
+void AGuiyangMahjongPlayerController::TravelToAllocatedServer(FGuiyangGameServerRoute Route)
+{
+    const FString PlayerId = Route.PlayerId.TrimStartAndEnd();
+    FString ConnectServerIP = Route.ServerIP;
+    FString ConfiguredHostOverride;
+    if (FParse::Value(FCommandLine::Get(), TEXT("MahjongGameServerHostOverride="), ConfiguredHostOverride))
+    {
+        ConfiguredHostOverride.TrimStartAndEndInline();
+        FIPv4Address OverrideAddress;
+        if (FIPv4Address::Parse(ConfiguredHostOverride, OverrideAddress)
+            && OverrideAddress != FIPv4Address::Any)
+        {
+            ConnectServerIP = ConfiguredHostOverride;
+        }
+        else
+        {
+            UE_LOG(LogMahjongNet, Warning,
+                TEXT("忽略无效的本机牌桌地址覆盖：%s"), *ConfiguredHostOverride);
+        }
+    }
     const FString TravelURL = FString::Printf(TEXT("%s:%d?PlayerId=%s?JoinTicket=%s"),
-        *Route.ServerIP, Route.ServerPort,
+        *ConnectServerIP, Route.ServerPort,
         *FGenericPlatformHttp::UrlEncode(PlayerId),
         *FGenericPlatformHttp::UrlEncode(Route.JoinTicket));
     UE_LOG(LogMahjongNet, Log,
-        TEXT("客户端准备连接已分配牌桌：InstanceId=%s RoomId=%s Endpoint=%s:%d"),
-        *Route.ServerInstanceId, *Route.RoomId, *Route.ServerIP, Route.ServerPort);
+        TEXT("客户端准备连接已分配牌桌：InstanceId=%s RoomId=%s Endpoint=%s:%d Advertised=%s:%d"),
+        *Route.ServerInstanceId, *Route.RoomId, *ConnectServerIP, Route.ServerPort,
+        *Route.ServerIP, Route.ServerPort);
     if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()
         ? GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>() : nullptr)
         Reconnect->RememberRemoteRoute(Route.RoomId, Route.MatchId);
@@ -211,16 +276,56 @@ void AGuiyangMahjongPlayerController::ReturnToConnectScreen()
 
 void AGuiyangMahjongPlayerController::ReturnToLobby()
 {
-    const UGuiyangLobbySubsystem* Lobby = GetGameInstance()
+    UGuiyangLobbySubsystem* Lobby = GetGameInstance()
         ? GetGameInstance()->GetSubsystem<UGuiyangLobbySubsystem>() : nullptr;
     if (!Lobby || Lobby->GetBackendMode() == EGuiyangLobbyBackendMode::LocalLegacy)
     {
         Server_RequestLeaveRoom();
         return;
     }
-    if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>())
+    const AGuiyangMahjongGameState* MahjongGameState = GetWorld()
+        ? GetWorld()->GetGameState<AGuiyangMahjongGameState>() : nullptr;
+    const AGuiyangMahjongPlayerState* MahjongPlayerState = GetPlayerState<AGuiyangMahjongPlayerState>();
+    const bool bIsRoomOwner = MahjongGameState && MahjongPlayerState
+        && !MahjongGameState->RoomState.RoomInfo.OwnerPlayerId.IsEmpty()
+        && MahjongGameState->RoomState.RoomInfo.OwnerPlayerId == MahjongPlayerState->MahjongPlayerId;
+    if (!bIsRoomOwner)
+    {
+        UE_LOG(LogMahjongNet, Log, TEXT("非房主返回远程大厅，保留房间以便再次进入"));
+        CompleteRemoteReturnToLobby();
+        return;
+    }
+
+    UE_LOG(LogMahjongNet, Log, TEXT("房主返回大厅，正在关闭并释放远程房间"));
+    const FGuiyangLobbyOperationResult Result = Lobby->RequestCloseOwnedRoom(this);
+    if (!Result.bAccepted)
+    {
+        Client_ShowErrorMessage(Result.ChineseMessage);
+    }
+}
+
+void AGuiyangMahjongPlayerController::ShowCreatingRoomLoading()
+{
+    CreatingRoomLoadingShownAtSeconds = FPlatformTime::Seconds();
+    PendingAllocatedRoute = {};
+    GetWorldTimerManager().ClearTimer(CreatingRoomTravelDelayTimer);
+    if (RootHUDInstance)
+    {
+        RootHUDInstance->ShowCreatingRoom();
+    }
+}
+
+void AGuiyangMahjongPlayerController::CompleteRemoteReturnToLobby()
+{
+    CreatingRoomLoadingShownAtSeconds = 0.0;
+    PendingAllocatedRoute = {};
+    GetWorldTimerManager().ClearTimer(CreatingRoomTravelDelayTimer);
+    if (UGuiyangReconnectSubsystem* Reconnect = GetGameInstance()
+        ? GetGameInstance()->GetSubsystem<UGuiyangReconnectSubsystem>() : nullptr)
+    {
         Reconnect->CancelReconnect();
-    UE_LOG(LogMahjongNet, Log, TEXT("客户端断开牌桌并返回远程大厅"));
+    }
+    UE_LOG(LogMahjongNet, Log, TEXT("远程房间离开处理完成，返回大厅"));
     ClientTravel(TEXT("/Engine/Maps/Entry"), TRAVEL_Absolute);
 }
 

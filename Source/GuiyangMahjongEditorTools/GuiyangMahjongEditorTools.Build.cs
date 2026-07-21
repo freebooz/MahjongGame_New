@@ -6,6 +6,9 @@ public class GuiyangMahjongEditorTools : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "GuiyangMahjongCore", "GuiyangMahjongOnline", "GuiyangMahjong" });
-        PrivateDependencyModuleNames.AddRange(new[] { "UMG", "Slate", "SlateCore", "UnrealEd", "UMGEditor", "AssetRegistry", "Kismet" });
+        PrivateDependencyModuleNames.AddRange(new[]
+        {
+            "UMG", "Slate", "SlateCore", "UnrealEd", "UMGEditor", "AssetRegistry", "Kismet", "Json"
+        });
     }
 }

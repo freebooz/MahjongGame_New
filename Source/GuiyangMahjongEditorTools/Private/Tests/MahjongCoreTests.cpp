@@ -1311,15 +1311,15 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
     }
     TestNotNull(TEXT("三维牌桌 Actor 类必须可加载"), AMahjong3DTableActor::StaticClass());
     UStaticMesh* TileMesh = LoadObject<UStaticMesh>(nullptr,
-        TEXT("/Game/Art/Mahjong/Tiles/SM_MahjongTile.SM_MahjongTile"));
-    TestNotNull(TEXT("Blender 麻将牌静态网格必须已导入"), TileMesh);
+        TEXT("/Game/Art/Mahjong/Mahjong50/Tiles/SM_Mahjong50_Red_Dragon.SM_Mahjong50_Red_Dragon"));
+    TestNotNull(TEXT("Mahjong50 PBR 麻将牌静态网格必须已导入"), TileMesh);
     if (TileMesh)
     {
         const FVector Extent = TileMesh->GetBounds().BoxExtent;
-        TestTrue(TEXT("麻将牌宽度必须约为 32mm"), FMath::IsNearlyEqual(Extent.X * 2.0f, 3.2f, 0.15f));
-        TestTrue(TEXT("麻将牌厚度必须约为 22mm"), FMath::IsNearlyEqual(Extent.Y * 2.0f, 2.3f, 0.15f));
-        TestTrue(TEXT("麻将牌高度必须约为 44mm"), FMath::IsNearlyEqual(Extent.Z * 2.0f, 4.4f, 0.15f));
-        TestEqual(TEXT("麻将牌必须包含牌身、牌面、牌背三个材质槽"), TileMesh->GetStaticMaterials().Num(), 3);
+        TestTrue(TEXT("麻将牌宽度必须约为 36mm"), FMath::IsNearlyEqual(Extent.X * 2.0f, 3.6f, 0.15f));
+        TestTrue(TEXT("麻将牌厚度必须约为 26mm"), FMath::IsNearlyEqual(Extent.Y * 2.0f, 2.6f, 0.15f));
+        TestTrue(TEXT("麻将牌高度必须约为 50mm"), FMath::IsNearlyEqual(Extent.Z * 2.0f, 5.0f, 0.15f));
+        TestEqual(TEXT("Mahjong50 麻将牌必须包含牌身和牌面两个材质槽"), TileMesh->GetStaticMaterials().Num(), 2);
     }
     return true;
 }

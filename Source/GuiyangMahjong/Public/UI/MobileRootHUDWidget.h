@@ -41,6 +41,8 @@ public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowLogin();
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowConnectServer();
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowLobby();
+    UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowCreatingRoom();
+    UFUNCTION(BlueprintCallable, Category="麻将|UI") void UpdateCreatingRoomStage(const FString& ChineseStatus);
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowRoom(const FMahjongRoomState& State, int32 LocalSeat);
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowGameHUD();
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void ShowChineseError(const FString& ChineseReason);

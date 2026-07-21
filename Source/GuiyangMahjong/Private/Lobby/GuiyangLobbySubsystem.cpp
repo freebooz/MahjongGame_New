@@ -56,6 +56,13 @@ namespace GuiyangLobbyPrivate
             return MakeAccepted(RequestId);
         }
 
+        virtual FGuiyangLobbyOperationResult CloseOwnedRoom(
+            AGuiyangMahjongPlayerController& PlayerController, const FString& RequestId) override
+        {
+            PlayerController.Server_RequestLeaveRoom();
+            return MakeAccepted(RequestId);
+        }
+
     private:
         static FGuiyangLobbyOperationResult MakeAccepted(const FString& RequestId)
         {
@@ -213,6 +220,19 @@ FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RequestReconnect(APlayerCon
         return RejectRequest(RequestId, EGuiyangLobbyErrorCode::BackendNotConfigured,
             TEXT("远程大厅重连尚未配置"));
     return FinalizeBackendResult(Backend->Reconnect(*MahjongController, RequestId));
+}
+
+FGuiyangLobbyOperationResult UGuiyangLobbySubsystem::RequestCloseOwnedRoom(APlayerController* PlayerController)
+{
+    const FString RequestId = MakeRequestId();
+    AGuiyangMahjongPlayerController* MahjongController = Cast<AGuiyangMahjongPlayerController>(PlayerController);
+    if (!MahjongController)
+        return RejectRequest(RequestId, EGuiyangLobbyErrorCode::InvalidRequest,
+            TEXT("当前玩家控制器不可用"));
+    if (!Backend || BackendMode != EGuiyangLobbyBackendMode::RemoteLobby)
+        return RejectRequest(RequestId, EGuiyangLobbyErrorCode::BackendNotConfigured,
+            TEXT("远程大厅尚未配置"));
+    return FinalizeBackendResult(Backend->CloseOwnedRoom(*MahjongController, RequestId));
 }
 
 bool UGuiyangLobbySubsystem::TryParseBackendMode(const FString& Value, EGuiyangLobbyBackendMode& OutMode)

@@ -27,6 +27,10 @@ spec:
           env:
             - name: Allocator__AdvertisedIp
               valueFrom: {fieldRef: {fieldPath: status.hostIP}}
+            - {name: Allocator__StateFilePath, value: 'C:/mahjong/state/instances.json'}
+            - {name: Allocator__MatchResultOutboxDirectory, value: 'C:/mahjong/outbox'}
+            - {name: Allocator__GameServerExecutablePath, value: 'C:/mahjong/server/GuiyangMahjongServer.exe'}
+            - {name: Allocator__GameServerWorkingDirectory, value: 'C:/mahjong/server'}
           volumeMounts:
             - {name: server-build, mountPath: 'C:\mahjong\server', readOnly: true}
             - {name: allocator-data, mountPath: 'C:\mahjong\state'}

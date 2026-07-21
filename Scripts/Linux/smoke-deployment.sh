@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+ENV_FILE="${1:?environment file is required}"
+
+env_value() {
+  local key="$1"
+  awk -F= -v key="$key" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' "$ENV_FILE"
+}
+
+AUTH_URL="http://127.0.0.1:$(env_value AUTH_PORT)"
+LOBBY_URL="http://127.0.0.1:$(env_value LOBBY_PORT)"
+ALLOCATOR_URL="http://127.0.0.1:$(env_value ALLOCATOR_PORT)"
+INSTALLATION_ID="linux-smoke-$(cat /proc/sys/kernel/random/uuid)"
+REQUEST_ID="$(cat /proc/sys/kernel/random/uuid)"
+IDEMPOTENCY_KEY="linux-smoke-$REQUEST_ID"
+
+session="$(curl --fail --silent --show-error \
+  -H 'Content-Type: application/json' \
+  -d "{\"installationId\":\"$INSTALLATION_ID\",\"displayName\":\"LinuxSmoke\"}" \
+  "$AUTH_URL/v1/auth/guest")"
+access_token="$(jq -er '.accessToken' <<<"$session")"
+
+room="$(curl --fail --silent --show-error \
+  -H "Authorization: Bearer $access_token" \
+  -H 'Content-Type: application/json' \
+  -H "X-Request-Id: $REQUEST_ID" \
+  -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
+  -d '{"roundCount":4,"publicRoom":true,"autoStart":true,"passwordProtected":false,"ruleSnapshot":{"ruleId":"GuiyangMainstreamV1"}}' \
+  "$LOBBY_URL/v1/rooms")"
+room_code="$(jq -er '.roomCode' <<<"$room")"
+room_id="$(jq -er '.roomId' <<<"$room")"
+
+deadline=$((SECONDS + 45))
+route=""
+until route="$(curl --fail --silent --show-error \
+  -H "Authorization: Bearer $access_token" \
+  -H "X-Request-Id: $(cat /proc/sys/kernel/random/uuid)" \
+  "$LOBBY_URL/v1/rooms/$room_code/route" 2>/dev/null)"; do
+  ((SECONDS < deadline)) || { echo "Smoke room did not receive a GameServer route." >&2; exit 1; }
+  sleep 1
+done
+
+server_instance_id="$(jq -er '.serverInstanceId' <<<"$route")"
+server_ip="$(jq -er '.serverIp' <<<"$route")"
+server_port="$(jq -er '.serverPort' <<<"$route")"
+[[ "$server_ip" != "0.0.0.0" && "$server_port" -ge 19000 ]] \
+  || { echo "Smoke route contains an invalid advertised endpoint." >&2; exit 1; }
+
+curl --fail --silent --show-error \
+  -X POST \
+  -H "Authorization: Bearer $(env_value LOBBY_INTERNAL_TOKEN)" \
+  -H 'Content-Type: application/json' \
+  -H "X-Request-Id: $(cat /proc/sys/kernel/random/uuid)" \
+  -d "{\"serverInstanceId\":\"$server_instance_id\",\"roomId\":\"$room_id\",\"reason\":\"Deployment smoke cleanup\"}" \
+  "$LOBBY_URL/internal/gameservers/failure" >/dev/null
+
+curl --fail --silent --show-error \
+  -X POST \
+  -H "Authorization: Bearer $(env_value ALLOCATOR_SERVICE_TOKEN)" \
+  -H "X-Request-Id: $(cat /proc/sys/kernel/random/uuid)" \
+  "$ALLOCATOR_URL/internal/instances/$server_instance_id/drain" >/dev/null
+
+echo "SMOKE_OK roomCode=$room_code server=$server_ip:$server_port"

@@ -14,6 +14,7 @@
 #include "Components/HorizontalBox.h"
 #include "Components/Image.h"
 #include "Components/Overlay.h"
+#include "Components/ProgressBar.h"
 #include "Components/SafeZone.h"
 #include "Components/ScaleBox.h"
 #include "Components/SizeBox.h"
@@ -31,6 +32,7 @@
 #include "Sound/SoundBase.h"
 #include "Sound/SlateSound.h"
 #include "UI/MobileConnectServerWidget.h"
+#include "UI/MobileCreatingRoomWidget.h"
 #include "UI/MobileLobbyWidget.h"
 #include "UI/MobileRoomWidget.h"
 #include "UI/MobileMahjongHUDWidget.h"
@@ -285,6 +287,7 @@ namespace MahjongUIBuilder
         const TCHAR* BackgroundPath = (BPName == TEXT("WBP_Login") || BPName == TEXT("WBP_ConnectServer"))
             ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Login_Guiyang.T_BG_Login_Guiyang")
             : BPName == TEXT("WBP_Lobby") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Lobby_JiaxiuTower.T_BG_Lobby_JiaxiuTower")
+            : BPName == TEXT("WBP_CreatingRoom") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_CreatingRoom_GuiyangMoon.T_BG_CreatingRoom_GuiyangMoon")
             : BPName == TEXT("WBP_Room") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Room_GuiyangNight.T_BG_Room_GuiyangNight")
             : BPName == TEXT("WBP_GameHUD") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_GameTable_GreenFelt.T_BG_GameTable_GreenFelt")
             : BPName == TEXT("WBP_Settlement") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Settlement_GuiyangRiver.T_BG_Settlement_GuiyangRiver")
@@ -413,6 +416,49 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
         if (BP && Save(BP)) { ++Created; UE_LOG(LogTemp, Display, TEXT("UMG资产已生成：%s"), *BP->GetPathName()); return true; }
         UE_LOG(LogTemp, Error, TEXT("UMG资产生成失败")); return false;
     };
+
+    auto GenerateCreatingRoom = [&Finish]()
+    {
+        UWidgetBlueprint* Loading = Create(
+            TEXT("Screens"), TEXT("WBP_CreatingRoom"), UMobileCreatingRoomWidget::StaticClass());
+        UCanvasPanel* C = Root(Loading);
+
+        UTextBlock* Title = Text(Loading, TEXT("Txt_CreatingTitle"), TEXT("正在创建房间"), 48);
+        Title->SetJustification(ETextJustify::Center);
+        Place(C, Title, {0, 548}, {920, 76}, FAnchors(0.5f, 0), {0.5f, 0});
+
+        UTextBlock* Status = Text(Loading, TEXT("Txt_CreatingStatus"), TEXT("正在创建房间……"), 28);
+        Status->SetJustification(ETextJustify::Center);
+        Place(C, Status, {0, 635}, {920, 52}, FAnchors(0.5f, 0), {0.5f, 0});
+
+        UBorder* Track = Border(Loading, TEXT("Border_CreatingProgress"), FLinearColor(0.015f, 0.08f, 0.07f, 0.92f));
+        Track->SetPadding(FMargin(8.0f));
+        Place(C, Track, {0, 706}, {860, 50}, FAnchors(0.5f, 0), {0.5f, 0});
+        UProgressBar* Progress = Loading->WidgetTree->ConstructWidget<UProgressBar>(
+            UProgressBar::StaticClass(), TEXT("Progress_CreatingRoom"));
+        Progress->SetPercent(0.08f);
+        Progress->SetFillColorAndOpacity(Gold);
+        MarkVariable(Loading, Progress);
+        Track->AddChild(Progress);
+
+        UTextBlock* Percent = Text(Loading, TEXT("Txt_CreatingPercent"), TEXT("8%"), 22);
+        Percent->SetJustification(ETextJustify::Center);
+        Place(C, Percent, {0, 772}, {300, 42}, FAnchors(0.5f, 0), {0.5f, 0});
+
+        UTextBlock* Hint = Text(Loading, TEXT("Txt_CreatingHint"),
+            TEXT("正在准备专属牌桌，请勿重复操作"), 20);
+        Hint->SetJustification(ETextJustify::Center);
+        Hint->SetColorAndOpacity(FSlateColor(FLinearColor(0.82f, 0.88f, 0.82f, 0.92f)));
+        Place(C, Hint, {0, 834}, {900, 42}, FAnchors(0.5f, 0), {0.5f, 0});
+        return Finish(Loading);
+    };
+
+    if (Params.Contains(TEXT("OnlyCreatingRoom"), ESearchCase::IgnoreCase))
+    {
+        return GenerateCreatingRoom() ? 0 : 1;
+    }
+
+    GenerateCreatingRoom();
 
     // 手牌和弃牌组件先生成，供主 HUD 动态创建。
     UWidgetBlueprint* Hand = Create(TEXT("Components"), TEXT("WBP_HandTile"), UMobileHandTileWidget::StaticClass());

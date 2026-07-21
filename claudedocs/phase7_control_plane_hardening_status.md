@@ -20,6 +20,7 @@
 - UE Win64 Game Target：模块拆分与 RemoteAuth 客户端编译、链接成功。
 - UE Win64 Server Target：`GuiyangMahjongServer.exe` 编译、链接成功（UBT `Result: Succeeded`）。
 - UE Win64 Editor Target：在保留当前运行中 Editor 的前提下，以 `-NoLink` 完成所有模块、Commandlet 与 Editor 自动化测试源文件编译；未执行会覆盖已加载 DLL 的最终链接。
+- UE Game 无界面冒烟：使用 `-unattended -nullrhi -ExecCmds=Quit` 启动并正常退出（退出码 0），未发现模块重定向、类加载或链接错误。
 
 ## 发布前外部门禁
 

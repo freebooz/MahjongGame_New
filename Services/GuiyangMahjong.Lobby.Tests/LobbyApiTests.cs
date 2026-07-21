@@ -105,6 +105,50 @@ public sealed class LobbyApiTests(LobbyWebApplicationFactory factory)
     }
 
     [Fact]
+    public async Task OnlyOwnerCanCloseRoom_AndOwnerCanCreateAgainAfterClosing()
+    {
+        var suffix = Guid.NewGuid().ToString("N");
+        using var owner = factory.CreateAuthenticatedClient($"close-owner-{suffix}");
+        using var create = new HttpRequestMessage(HttpMethod.Post, "/v1/rooms")
+        {
+            Content = JsonContent.Create(NewCreateRequest(false, null))
+        };
+        LobbyWebApplicationFactory.AddRequestHeaders(create, $"close-create-{suffix}");
+        var createResponse = await owner.SendAsync(create);
+        var room = await createResponse.Content.ReadFromJsonAsync<RoomOperation>();
+        Assert.Equal(HttpStatusCode.Accepted, createResponse.StatusCode);
+        Assert.NotNull(room);
+
+        using var member = factory.CreateAuthenticatedClient($"close-member-{suffix}");
+        using var join = NewJoinRequest(room.RoomCode, string.Empty, $"close-join-{suffix}");
+        Assert.Equal(HttpStatusCode.Accepted, (await member.SendAsync(join)).StatusCode);
+
+        using var memberClose = new HttpRequestMessage(HttpMethod.Post, "/v1/rooms/current/close");
+        LobbyWebApplicationFactory.AddRequestHeaders(memberClose, $"member-close-{suffix}");
+        Assert.Equal(HttpStatusCode.Forbidden, (await member.SendAsync(memberClose)).StatusCode);
+
+        using var rejoin = NewJoinRequest(room.RoomCode, string.Empty, $"close-rejoin-{suffix}");
+        Assert.Equal(HttpStatusCode.Accepted, (await member.SendAsync(rejoin)).StatusCode);
+
+        using var ownerClose = new HttpRequestMessage(HttpMethod.Post, "/v1/rooms/current/close");
+        LobbyWebApplicationFactory.AddRequestHeaders(ownerClose, $"owner-close-{suffix}");
+        var closeResponse = await owner.SendAsync(ownerClose);
+        var closed = await closeResponse.Content.ReadFromJsonAsync<RoomOperation>();
+        Assert.Equal(HttpStatusCode.OK, closeResponse.StatusCode);
+        Assert.Equal(RoomLifecycle.Closed, closed?.Lifecycle);
+
+        using var createAgain = new HttpRequestMessage(HttpMethod.Post, "/v1/rooms")
+        {
+            Content = JsonContent.Create(NewCreateRequest(false, null))
+        };
+        LobbyWebApplicationFactory.AddRequestHeaders(createAgain, $"close-create-again-{suffix}");
+        var createAgainResponse = await owner.SendAsync(createAgain);
+        Assert.Equal(HttpStatusCode.Accepted, createAgainResponse.StatusCode);
+        var secondRoom = await createAgainResponse.Content.ReadFromJsonAsync<RoomOperation>();
+        Assert.NotEqual(room.RoomId, secondRoom?.RoomId);
+    }
+
+    [Fact]
     public async Task OpenApi_IsServedByIndependentApplication()
     {
         using var client = factory.CreateClient();

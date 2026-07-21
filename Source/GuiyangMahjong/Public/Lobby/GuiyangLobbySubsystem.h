@@ -48,6 +48,8 @@ public:
         APlayerController* PlayerController, const FMahjongJoinRoomRequest& Request);
     UFUNCTION(BlueprintCallable, Category="麻将|大厅")
     FGuiyangLobbyOperationResult RequestReconnect(APlayerController* PlayerController);
+    UFUNCTION(BlueprintCallable, Category="麻将|大厅")
+    FGuiyangLobbyOperationResult RequestCloseOwnedRoom(APlayerController* PlayerController);
 
     UFUNCTION(BlueprintPure, Category="麻将|大厅")
     EGuiyangLobbyBackendMode GetBackendMode() const { return BackendMode; }

@@ -7,6 +7,9 @@ COPY Services/GuiyangMahjong.Lobby/ Services/GuiyangMahjong.Lobby/
 RUN dotnet publish Services/GuiyangMahjong.Lobby/GuiyangMahjong.Lobby.csproj -c Release -o /app --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app .
 ENV ASPNETCORE_URLS=http://+:8080

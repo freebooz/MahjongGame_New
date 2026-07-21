@@ -151,6 +151,32 @@ public static class LobbyEndpoints
             return Results.Json(result.Body, statusCode: result.StatusCode);
         });
 
+        v1.MapPost("/rooms/current/close", async (
+            HttpContext context,
+            LobbyService lobbyService,
+            IIdempotencyStore idempotency,
+            CancellationToken cancellationToken) =>
+        {
+            var key = RequireIdempotencyKey(context);
+            var player = PlayerAuthenticationMiddleware.GetPlayer(context);
+            var result = await idempotency.ExecuteAsync(
+                $"close-owned:{player.PlayerId}:{key}",
+                async () =>
+                {
+                    var requestId = RequestIdMiddleware.GetRequestId(context);
+                    var closed = await lobbyService.CloseOwnedRoomAsync(requestId, player, cancellationToken);
+                    context.Response.OnCompleted(() => lobbyService.ReleaseClosedRoomServerAsync(
+                        requestId, closed.RoomId, CancellationToken.None));
+                    return new IdempotentHttpResponse(
+                        StatusCodes.Status200OK,
+                        System.Text.Json.JsonSerializer.SerializeToElement(
+                            closed,
+                            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
+                },
+                cancellationToken);
+            return Results.Json(result.Body, statusCode: result.StatusCode);
+        });
+
         v1.MapPost("/rooms/{roomCode}/join", async (
             string roomCode,
             HttpContext context,

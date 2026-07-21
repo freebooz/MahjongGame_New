@@ -212,29 +212,39 @@ void AGuiyangMahjongGameMode::HandleAuthenticateSession(AGuiyangMahjongPlayerCon
     }
     if (!Controller || CleanPlayerId.IsEmpty() || CleanPlayerId.Len() > 80
         || CleanDisplayName.IsEmpty() || CleanDisplayName.Len() > 24
-        || SessionToken.Len() < 16 || SessionToken.Len() > 256 || !bProviderAllowed)
+        || (!bManagedGameServer && (SessionToken.Len() < 16 || SessionToken.Len() > 256))
+        || !bProviderAllowed)
     {
         if (Controller) Controller->Client_ShowErrorMessage(TEXT("登录会话格式无效"));
         return;
     }
 
-    const FString CandidateDigest = HashSessionToken(SessionToken);
-    if (CandidateDigest.IsEmpty())
+    // A managed GameServer has already authenticated this connection in PreLogin with a
+    // short-lived, single-use JoinTicket and bound the claimed player to this controller in
+    // InitNewPlayer. The Auth access token sent by this profile RPC is a different credential
+    // and may legitimately rotate between logins, so it must not be compared with a previous
+    // connection's access-token digest. Legacy/local servers do not have JoinTicket admission
+    // and therefore retain the session-token continuity check below.
+    if (!bManagedGameServer)
     {
-        Controller->Client_ShowErrorMessage(TEXT("登录会话校验失败"));
-        return;
-    }
-    if (const FString* ExistingDigest = SessionTokenDigestsByPlayer.Find(CleanPlayerId))
-    {
-        if (!ConstantTimeDigestEquals(*ExistingDigest, CandidateDigest))
+        const FString CandidateDigest = HashSessionToken(SessionToken);
+        if (CandidateDigest.IsEmpty())
         {
-            Controller->Client_ShowErrorMessage(TEXT("重连凭据不匹配"));
+            Controller->Client_ShowErrorMessage(TEXT("登录会话校验失败"));
             return;
         }
-    }
-    else
-    {
-        SessionTokenDigestsByPlayer.Add(CleanPlayerId, CandidateDigest);
+        if (const FString* ExistingDigest = SessionTokenDigestsByPlayer.Find(CleanPlayerId))
+        {
+            if (!ConstantTimeDigestEquals(*ExistingDigest, CandidateDigest))
+            {
+                Controller->Client_ShowErrorMessage(TEXT("重连凭据不匹配"));
+                return;
+            }
+        }
+        else
+        {
+            SessionTokenDigestsByPlayer.Add(CleanPlayerId, CandidateDigest);
+        }
     }
 
     for (TActorIterator<AGuiyangMahjongPlayerController> It(GetWorld()); It; ++It)

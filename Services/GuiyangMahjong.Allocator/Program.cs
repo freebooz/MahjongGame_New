@@ -1,4 +1,5 @@
 using System.Text;
+using System.Net;
 using GuiyangMahjong.Allocator.Api;
 using GuiyangMahjong.Allocator.Domain;
 using GuiyangMahjong.Allocator.Options;
@@ -18,6 +19,9 @@ builder.Services
     .Bind(builder.Configuration.GetSection(AllocatorOptions.SectionName))
     .ValidateDataAnnotations()
     .Validate(options => options.PortEnd >= options.PortStart, "Allocator port range is invalid.")
+    .Validate(options => !IPAddress.TryParse(options.AdvertisedIp, out var address)
+                         || (!IPAddress.Any.Equals(address) && !IPAddress.IPv6Any.Equals(address)),
+        "Allocator AdvertisedIp must not be an unspecified address.")
     .Validate(options => !string.IsNullOrWhiteSpace(options.GameServerExecutablePath),
         "Allocator GameServerExecutablePath is required.")
     .ValidateOnStart();
@@ -26,7 +30,9 @@ builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<PortLeasePool>();
 builder.Services.AddSingleton<InstanceCredentialService>();
-builder.Services.AddSingleton<IGameServerProcessLauncher, GameServerProcessLauncher>();
+builder.Services.AddSingleton<GameServerProcessLauncher>();
+builder.Services.AddSingleton<IGameServerProcessLauncher>(provider =>
+    provider.GetRequiredService<GameServerProcessLauncher>());
 builder.Services.AddSingleton<IInstanceFailureNotifier, LobbyInstanceFailureNotifier>();
 builder.Services.AddSingleton<IAllocatorStateStore, JsonAllocatorStateStore>();
 builder.Services.AddSingleton<MatchResultOutboxRecovery>();

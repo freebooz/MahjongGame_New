@@ -129,6 +129,13 @@ void UGuiyangReconnectSubsystem::HandleNetworkFailure(UWorld* World, UNetDriver*
     const ENetworkFailure::Type FailureType, const FString& ErrorString)
 {
     if (World && World->GetGameInstance() != GetGameInstance()) return;
+    if (ErrorString.StartsWith(TEXT("JOIN_TICKET_"), ESearchCase::IgnoreCase))
+    {
+        UE_LOG(LogMahjongReconnect, Warning,
+            TEXT("入场票据被服务器拒绝，返回大厅重新获取路由，不进入断线重连：%s"), *ErrorString);
+        CancelReconnect();
+        return;
+    }
     int32 TimeoutSeconds = 120;
     if (const AGuiyangMahjongGameState* GameState = World
         ? World->GetGameState<AGuiyangMahjongGameState>() : nullptr)

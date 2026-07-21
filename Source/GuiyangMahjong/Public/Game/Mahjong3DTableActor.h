@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Blueprint/UserWidget.h"
 #include "GameFramework/Actor.h"
 #include "Network/MahjongNetworkTypes.h"
 #include "Mahjong3DTableActor.generated.h"
@@ -10,23 +9,6 @@ class UActorComponent;
 class USceneComponent;
 class UStaticMesh;
 class UMaterialInterface;
-
-/** 供三维牌体正面使用的轻量 Slate 牌面。 */
-UCLASS()
-class GUIYANGMAHJONG_API UMahjong3DTileFaceWidget final : public UUserWidget
-{
-    GENERATED_BODY()
-
-public:
-    void SetTileFace(const FMahjongTile* Tile, bool bFaceUp);
-
-protected:
-    virtual TSharedRef<SWidget> RebuildWidget() override;
-
-private:
-    FSlateBrush FaceBrush;
-    UPROPERTY(Transient) TObjectPtr<class UTexture2D> FaceTexture;
-};
 
 /**
  * UMG Viewport 中的三维牌桌表现层。
@@ -48,7 +30,8 @@ private:
     UPROPERTY() TObjectPtr<USceneComponent> SceneRoot;
     UPROPERTY(Transient) TArray<TObjectPtr<UActorComponent>> RuntimeComponents;
     UPROPERTY(Transient) TObjectPtr<UStaticMesh> CubeMesh;
-    UPROPERTY(Transient) TObjectPtr<UStaticMesh> TileMesh;
+    UPROPERTY(Transient) TObjectPtr<UStaticMesh> DefaultTileMesh;
+    UPROPERTY(Transient) TArray<TObjectPtr<UStaticMesh>> TileMeshes;
     UPROPERTY(Transient) TObjectPtr<UMaterialInterface> BasicMaterial;
     UPROPERTY() FMahjongPublicTableState CachedPublicState;
     UPROPERTY() FMahjongPrivatePlayerState CachedPrivateState;
@@ -60,10 +43,9 @@ private:
     void ClearRuntimeComponents();
     class UStaticMeshComponent* AddBox(const FVector& Location, const FVector& Size,
         const FRotator& Rotation, const FLinearColor& Color);
+    UStaticMesh* ResolveTileMesh(const FMahjongTile* Tile, bool bFaceUp) const;
     void AddTile(const FMahjongTile* Tile, bool bFaceUp, bool bUpright,
         const FVector& Location, const FRotator& Rotation, bool bSelected = false);
-    void AddTileFace(const FMahjongTile* Tile, bool bFaceUp, bool bUpright,
-        const FVector& Location, const FRotator& Rotation);
     void AddTableAndFrame();
     void AddRemainingWall();
     void AddHands();

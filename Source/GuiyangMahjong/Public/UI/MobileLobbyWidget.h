@@ -16,6 +16,7 @@ class GUIYANGMAHJONG_API UMobileLobbyWidget : public UUserWidget
     GENERATED_BODY()
 protected:
     virtual void NativeConstruct() override;
+    virtual void NativeDestruct() override;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_QuickStart;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_CreateRoom;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UButton> Btn_JoinRoom;
@@ -26,10 +27,12 @@ protected:
     UPROPERTY(Transient) TObjectPtr<UMobileCreateRoomDialogWidget> CreateRoomDialogInstance;
     UPROPERTY(Transient) TObjectPtr<UMobileJoinRoomDialogWidget> JoinRoomDialogInstance;
     UPROPERTY(Transient) TObjectPtr<UMobileSettingsWidget> SettingsDialogInstance;
+    FTimerHandle PresenceRefreshTimer;
     UFUNCTION() void HandleQuickStart();
     UFUNCTION() void HandleCreateRoom();
     UFUNCTION() void HandleJoinRoom();
     UFUNCTION() void HandleSetting();
+    void RefreshOnlinePresence();
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshPlayerInfo(const FString& PlayerName, const FString& PlayerId, int32 OnlineCount);
 };

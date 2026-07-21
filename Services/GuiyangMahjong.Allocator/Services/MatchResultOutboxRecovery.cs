@@ -154,7 +154,7 @@ public sealed class MatchResultOutboxRecovery(
             || !Guid.TryParse(envelope.Report.RoomId, out _)
             || !Guid.TryParse(envelope.Report.ServerInstanceId, out _)
             || !string.Equals(Path.GetFileNameWithoutExtension(path), envelope.Report.ServerInstanceId,
-                StringComparison.OrdinalIgnoreCase)
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal)
             || envelope.Report.ResultSequence < 1
             || envelope.Report.CompletedRounds is < 1 or > 16
             || envelope.Report.Players is null

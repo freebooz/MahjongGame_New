@@ -1,0 +1,155 @@
+name: guiyang-mahjong
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: mahjong
+      POSTGRES_USER: mahjong
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mahjong -d mahjong"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    cpus: ${POSTGRES_CPUS:-2.0}
+    mem_limit: ${POSTGRES_MEMORY:-2g}
+    pids_limit: 256
+    security_opt: ["no-new-privileges:true"]
+    logging: &logging
+      driver: json-file
+      options: {max-size: "20m", max-file: "5"}
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    cpus: ${REDIS_CPUS:-1.0}
+    mem_limit: ${REDIS_MEMORY:-1g}
+    pids_limit: 256
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  auth:
+    image: ${IMAGE_REGISTRY:-local}/guiyang-mahjong-auth:${MAHJONG_VERSION:-dev}
+    build:
+      context: ../..
+      dockerfile: Services/GuiyangMahjong.Auth/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Auth__PersistenceMode: Postgres
+      Auth__PostgresConnectionString: Host=postgres;Port=5432;Database=mahjong;Username=mahjong;Password=${POSTGRES_PASSWORD}
+      Auth__TokenSigningKey: ${PLAYER_TOKEN_SIGNING_KEY:?PLAYER_TOKEN_SIGNING_KEY is required}
+      Auth__GuestIdentityPepper: ${GUEST_IDENTITY_PEPPER:?GUEST_IDENTITY_PEPPER is required}
+    depends_on:
+      postgres: {condition: service_healthy}
+    ports: ["${AUTH_PORT:-18082}:8080"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    cpus: ${AUTH_CPUS:-1.0}
+    mem_limit: ${AUTH_MEMORY:-512m}
+    pids_limit: 256
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  game-node:
+    image: ${IMAGE_REGISTRY:-local}/guiyang-mahjong-game-node:${MAHJONG_VERSION:-dev}
+    build:
+      context: ../..
+      dockerfile: Services/GuiyangMahjong.Allocator/Dockerfile
+      args:
+        GAME_SERVER_VARIANT: ${GAME_SERVER_VARIANT:-fake}
+    environment:
+      ASPNETCORE_URLS: http://0.0.0.0:${ALLOCATOR_PORT:-18081}
+      ASPNETCORE_ENVIRONMENT: Production
+      Allocator__PortStart: ${GAME_PORT_START:-19000}
+      Allocator__PortEnd: ${GAME_PORT_END:-19099}
+      Allocator__AdvertisedIp: ${ADVERTISED_IP:?ADVERTISED_IP is required}
+      Allocator__GameServerExecutablePath: /opt/guiyang-mahjong/server/GuiyangMahjongServer
+      Allocator__GameServerWorkingDirectory: /opt/guiyang-mahjong/server
+      Allocator__MatchResultOutboxDirectory: /var/lib/guiyang-mahjong/outbox
+      Allocator__StateFilePath: /var/lib/guiyang-mahjong/state/instances.json
+      # UE uses a dynamic UDP port range. Host networking avoids the Docker
+      # bridge/NAT return-path loss seen when a Windows client connects to a
+      # WSL mirrored-network address on the same machine.
+      Allocator__LobbyInternalUrl: http://127.0.0.1:${LOBBY_PORT:-18080}
+      Allocator__ServiceToken: ${ALLOCATOR_SERVICE_TOKEN:?ALLOCATOR_SERVICE_TOKEN is required}
+      Allocator__LobbyCallbackToken: ${LOBBY_INTERNAL_TOKEN:?LOBBY_INTERNAL_TOKEN is required}
+      Allocator__JoinTicketSigningKey: ${JOIN_TICKET_SIGNING_KEY:?JOIN_TICKET_SIGNING_KEY is required}
+    volumes:
+      - ${MAHJONG_DATA_ROOT:-/var/lib/guiyang-mahjong}/allocator:/var/lib/guiyang-mahjong
+    network_mode: host
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://127.0.0.1:${ALLOCATOR_PORT:-18081}/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    cpus: ${GAME_NODE_CPUS:-8.0}
+    mem_limit: ${GAME_NODE_MEMORY:-16g}
+    pids_limit: 2048
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+      - /opt/guiyang-mahjong/server/GuiyangMahjong/Saved:rw,noexec,nosuid,nodev,size=256m,mode=1777
+      - /opt/guiyang-mahjong/server/Engine/Saved:rw,noexec,nosuid,nodev,size=64m,mode=1777
+      - /home/app/.config:rw,noexec,nosuid,nodev,size=16m,mode=1777
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  lobby:
+    image: ${IMAGE_REGISTRY:-local}/guiyang-mahjong-lobby:${MAHJONG_VERSION:-dev}
+    build:
+      context: ../..
+      dockerfile: Services/GuiyangMahjong.Lobby/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Lobby__Persistence__Mode: RedisPostgres
+      Lobby__Persistence__RedisConnectionString: redis:6379,abortConnect=false
+      Lobby__Persistence__PostgresConnectionString: Host=postgres;Port=5432;Database=mahjong;Username=mahjong;Password=${POSTGRES_PASSWORD}
+      Lobby__TokenSigningKey: ${PLAYER_TOKEN_SIGNING_KEY:?PLAYER_TOKEN_SIGNING_KEY is required}
+      Lobby__JoinTicketSigningKey: ${JOIN_TICKET_SIGNING_KEY:?JOIN_TICKET_SIGNING_KEY is required}
+      Lobby__InternalServiceToken: ${LOBBY_INTERNAL_TOKEN:?LOBBY_INTERNAL_TOKEN is required}
+      Lobby__Allocator__Enabled: "true"
+      Lobby__Allocator__BaseUrl: http://host.docker.internal:${ALLOCATOR_PORT:-18081}
+      Lobby__Allocator__ServiceToken: ${ALLOCATOR_SERVICE_TOKEN:?ALLOCATOR_SERVICE_TOKEN is required}
+      Lobby__Allocator__GameServerBuildVersion: ${MAHJONG_VERSION:-dev}
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports: ["${LOBBY_PORT:-18080}:8080"]
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "http://127.0.0.1:8080/health/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    restart: unless-stopped
+    cpus: ${LOBBY_CPUS:-2.0}
+    mem_limit: ${LOBBY_MEMORY:-1g}
+    pids_limit: 512
+    read_only: true
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+volumes:
+  postgres-data:
+  redis-data:

@@ -17,5 +17,10 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GuiyangMahjong.Allocator\GuiyangMahjong.Allocator.csproj" />
+    <ProjectReference Include="..\GuiyangMahjong.FakeGameServer\GuiyangMahjong.FakeGameServer.csproj"
+                      ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>
