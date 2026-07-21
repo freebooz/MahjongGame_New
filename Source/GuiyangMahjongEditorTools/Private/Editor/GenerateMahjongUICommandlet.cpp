@@ -668,7 +668,7 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
         UViewport* Table3DViewport = HUD->WidgetTree->ConstructWidget<UViewport>(
             UViewport::StaticClass(), TEXT("Table3DViewport"));
         MarkVariable(HUD, Table3DViewport);
-        Table3DViewport->SetBackgroundColor(FLinearColor(0.01f, 0.055f, 0.045f, 1.0f));
+        Table3DViewport->SetBackgroundColor(FLinearColor::Transparent);
         Table3DViewport->SetVisibility(ESlateVisibility::HitTestInvisible);
         Place(C, Table3DViewport, {0,0}, {1920,1080});
         Place(C, Text(HUD, TEXT("Txt_RoomId"), TEXT("房间：100001"), 20), {30,24}, {360,36});

@@ -79,19 +79,19 @@
   "material_workflow": "Principled BSDF metallic-roughness PBR; procedural Blender nodes",
   "files": [
     {
-      "path": "SourceArt/3D/MahjongTable/StandardMahjongTable_Preview.png",
-      "bytes": 1105947,
-      "sha256": "3321eadef6b8241e1b6d8be3642e73524021a295c7a76013bc0b6add1a8c102b"
+      "path": "SourceArt/3D/MahjongTable/SM_StandardMahjongTable.blend",
+      "bytes": 299507,
+      "sha256": "31937ad0b4756c87d7ccb060c142e0134e5431aafc5f5b1377f9d7ab70c8e654"
     },
     {
-      "path": "SourceArt/3D/MahjongTable/SM_StandardMahjongTable.blend",
-      "bytes": 300253,
-      "sha256": "b358a3b3ccced110c244e9279633d98bfa0cb0bed3524ed78b8ce35b82146de3"
+      "path": "SourceArt/3D/MahjongTable/SM_StandardMahjongTable.fbx",
+      "bytes": 1437772,
+      "sha256": "c51e0eb2bcc3499b230439fe6aae51c91bb864adcaa4d556208438ea27c78b7a"
     },
     {
       "path": "SourceArt/3D/MahjongTable/SM_StandardMahjongTable.glb",
-      "bytes": 1626240,
-      "sha256": "7b95693f622de72d4bb416f03b928bdc37afc71a388543474d79b452558ed08b"
+      "bytes": 1822732,
+      "sha256": "2776f567f1ce0ed022ef997e5717c890dddcaf9ede62d7b8b8dde0911a9fba91"
     }
   ]
 }

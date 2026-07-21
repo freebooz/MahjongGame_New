@@ -11,7 +11,15 @@ namespace
     constexpr float TileWidth = 44.0f;
     constexpr float TileHeight = 62.0f;
     constexpr float TileDepth = 30.0f;
+    // The mesh has rounded/beveled side edges, so exact bounding-box contact still looks gapped.
+    // A small overlap produces the tightly packed physical-table appearance requested.
+    constexpr float TileTightPitch = TileWidth - 2.0f;
+    constexpr float TileTightLongPitch = TileHeight - 2.0f;
     constexpr float Mahjong50ModelWidth = 3.6f;
+    // The imported table is authored at real-world centimeters. The UViewport layout uses a
+    // 10x presentation scale (for example a 4.4 cm tile is displayed at 44 units).
+    constexpr float ImportedTableSurfaceHeight = 76.5f;
+    constexpr float ImportedTableDisplayScale = 10.0f;
 
     FVector RotateAroundTable(const FVector& Position, const int32 RelativeSeat)
     {
@@ -35,6 +43,8 @@ AMahjong3DTableActor::AMahjong3DTableActor()
     PrimaryActorTick.bCanEverTick = false;
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
     SetRootComponent(SceneRoot);
+    TableMesh = LoadObject<UStaticMesh>(nullptr,
+        TEXT("/Game/Art/Mahjong/Table/Meshes/SM_StandardMahjongTable.SM_StandardMahjongTable"));
     CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
     static const TCHAR* TileAssetNames[] = {
         TEXT("Characters_1"), TEXT("Characters_2"), TEXT("Characters_3"),
@@ -45,9 +55,7 @@ AMahjong3DTableActor::AMahjong3DTableActor()
         TEXT("Bamboo_7"), TEXT("Bamboo_8"), TEXT("Bamboo_9"),
         TEXT("Dots_1"), TEXT("Dots_2"), TEXT("Dots_3"),
         TEXT("Dots_4"), TEXT("Dots_5"), TEXT("Dots_6"),
-        TEXT("Dots_7"), TEXT("Dots_8"), TEXT("Dots_9"),
-        TEXT("East"), TEXT("South"), TEXT("West"), TEXT("North"),
-        TEXT("Red_Dragon"), TEXT("Green_Dragon"), TEXT("White_Dragon")
+        TEXT("Dots_7"), TEXT("Dots_8"), TEXT("Dots_9")
     };
     TileMeshes.SetNum(UE_ARRAY_COUNT(TileAssetNames));
     for (int32 Index = 0; Index < TileMeshes.Num(); ++Index)
@@ -57,7 +65,7 @@ AMahjong3DTableActor::AMahjong3DTableActor()
             TEXT("/Game/Art/Mahjong/Mahjong50/Tiles/%s.%s"), *AssetName, *AssetName);
         TileMeshes[Index] = LoadObject<UStaticMesh>(nullptr, *AssetPath);
     }
-    DefaultTileMesh = TileMeshes.IsValidIndex(31) ? TileMeshes[31] : nullptr;
+    DefaultTileMesh = TileMeshes.IsValidIndex(0) ? TileMeshes[0] : nullptr;
     BasicMaterial = LoadObject<UMaterialInterface>(nullptr,
         TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 }
@@ -149,8 +157,9 @@ void AMahjong3DTableActor::AddTile(const FMahjongTile* Tile, const bool bFaceUp,
         FRotator MeshRotation = Rotation;
         if (!bUpright)
         {
-            // 正面朝上的弃牌使用 -90°，牌墙/暗牌使用 +90° 让绿色牌背朝上。
-            MeshRotation.Roll += bFaceUp ? -90.0f : 90.0f;
+            // Mahjong50's imported face normal points opposite to the legacy mesh: +90 exposes
+            // the atlas face, while -90 exposes the green back.
+            MeshRotation.Roll += bFaceUp ? 90.0f : -90.0f;
         }
         else
         {
@@ -163,6 +172,18 @@ void AMahjong3DTableActor::AddTile(const FMahjongTile* Tile, const bool bFaceUp,
         Component->SetupAttachment(SceneRoot);
         AddInstanceComponent(Component);
         Component->RegisterComponent();
+        if (bFaceUp && Tile && Tile->IsValid())
+        {
+            const int32 RuleIndex = Tile->GetRuleIndex();
+            if (RuleIndex >= 0 && RuleIndex < 27)
+            {
+                if (UMaterialInstanceDynamic* FaceMaterial = Component->CreateDynamicMaterialInstance(1))
+                {
+                    FaceMaterial->SetScalarParameterValue(TEXT("Column"), RuleIndex % 9);
+                    FaceMaterial->SetScalarParameterValue(TEXT("RowFromBottom"), 3 - RuleIndex / 9);
+                }
+            }
+        }
         RuntimeComponents.Add(Component);
     }
     else
@@ -179,13 +200,31 @@ UStaticMesh* AMahjong3DTableActor::ResolveTileMesh(const FMahjongTile* Tile, con
 {
     if (!bFaceUp || !Tile || !Tile->IsValid()) return DefaultTileMesh;
     const int32 RuleIndex = Tile->GetRuleIndex();
-    return TileMeshes.IsValidIndex(RuleIndex) && TileMeshes[RuleIndex]
+    return RuleIndex >= 0 && RuleIndex < 27 && TileMeshes.IsValidIndex(RuleIndex) && TileMeshes[RuleIndex]
         ? TileMeshes[RuleIndex]
         : DefaultTileMesh;
 }
 
 void AMahjong3DTableActor::AddTableAndFrame()
 {
+    if (TableMesh)
+    {
+        UStaticMeshComponent* Component = NewObject<UStaticMeshComponent>(this);
+        Component->SetStaticMesh(TableMesh);
+        Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+        Component->SetCastShadow(true);
+        Component->SetRelativeLocation(
+            FVector(0.0f, 0.0f, -ImportedTableSurfaceHeight * ImportedTableDisplayScale));
+        Component->SetRelativeRotation(FRotator::ZeroRotator);
+        Component->SetRelativeScale3D(FVector(ImportedTableDisplayScale));
+        Component->SetupAttachment(SceneRoot);
+        AddInstanceComponent(Component);
+        Component->RegisterComponent();
+        RuntimeComponents.Add(Component);
+        return;
+    }
+
+    // Keep the original primitive table as a safe fallback if the content asset is unavailable.
     AddBox(FVector(0.0f, 0.0f, -18.0f), FVector(1040.0f, 760.0f, 36.0f), FRotator::ZeroRotator,
         FLinearColor(0.05f, 0.18f, 0.11f));
     AddBox(FVector(0.0f, 0.0f, 1.0f), FVector(970.0f, 690.0f, 8.0f), FRotator::ZeroRotator,
@@ -206,11 +245,15 @@ void AMahjong3DTableActor::AddRemainingWall()
     for (int32 Seat = 0; Seat < 4 && Added < Remaining; ++Seat)
     {
         const int32 SideCount = FMath::Min(28, Remaining - Added);
+        const int32 ColumnCount = FMath::DivideAndRoundUp(SideCount, 2);
+        const float StartX = -0.5f * (ColumnCount - 1) * TileTightPitch;
         for (int32 Index = 0; Index < SideCount; ++Index)
         {
             const int32 Column = Index / 2;
             const int32 Level = Index % 2;
-            const FVector Base(-390.0f + Column * 58.0f, -245.0f, 15.0f + Level * 13.0f);
+            // Wall columns touch edge-to-edge and each upper tile sits on the full tile thickness.
+            const FVector Base(StartX + Column * TileTightPitch, -245.0f,
+                TileDepth * 0.5f + Level * TileDepth);
             AddTile(nullptr, false, false, RotateAroundTable(Base, Seat),
                 FRotator(0.0f, 90.0f * Seat, 0.0f));
             ++Added;
@@ -223,12 +266,11 @@ void AMahjong3DTableActor::AddHands()
     if (bCachedPrivateState)
     {
         const TArray<FMahjongTile>& Tiles = CachedPrivateState.Hand.Tiles;
-        const float StartX = -0.5f * (Tiles.Num() - 1) * 49.0f;
+        const float StartX = -0.5f * (Tiles.Num() - 1) * TileTightPitch;
         for (int32 Index = 0; Index < Tiles.Num(); ++Index)
         {
-            const float DrawGap = Tiles.Num() == 14 && Index == 13 ? 16.0f : 0.0f;
             AddTile(&Tiles[Index], true, true,
-                FVector(StartX + Index * 49.0f + DrawGap, -316.0f, TileHeight * 0.5f + 9.0f),
+                FVector(StartX + Index * TileTightPitch, -338.0f, TileHeight * 0.5f + 9.0f),
                 FRotator::ZeroRotator, Tiles[Index].UniqueId == SelectedTileId);
         }
     }
@@ -238,10 +280,10 @@ void AMahjong3DTableActor::AddHands()
         const int32 RelativeSeat = GetRelativeSeat(Seat.SeatIndex);
         if (RelativeSeat == 0) continue;
         const int32 Count = FMath::Clamp(Seat.HandTileCount, 0, 14);
-        const float StartX = -0.5f * (Count - 1) * 43.0f;
+        const float StartX = -0.5f * (Count - 1) * TileTightPitch;
         for (int32 Index = 0; Index < Count; ++Index)
         {
-            const FVector Base(StartX + Index * 43.0f, -316.0f, TileHeight * 0.5f + 9.0f);
+            const FVector Base(StartX + Index * TileTightPitch, -338.0f, TileHeight * 0.5f + 9.0f);
             AddTile(nullptr, false, true, RotateAroundTable(Base, RelativeSeat),
                 RotateAroundTable(FRotator::ZeroRotator, RelativeSeat));
         }
@@ -263,7 +305,9 @@ void AMahjong3DTableActor::AddDiscards()
         }
         const int32 Column = SeatSequence % 6;
         const int32 Row = SeatSequence / 6;
-        const FVector Base(-145.0f + Column * 58.0f, -126.0f - Row * 47.0f, 14.0f);
+        const float DiscardStartX = -0.5f * 5.0f * TileTightPitch;
+        const FVector Base(DiscardStartX + Column * TileTightPitch,
+            -126.0f - Row * TileTightLongPitch, 14.0f);
         AddTile(&Record.Tile, true, false, RotateAroundTable(Base, RelativeSeat),
             RotateAroundTable(FRotator::ZeroRotator, RelativeSeat),
             Record.Sequence == CachedPublicState.Discards.Last().Sequence);
@@ -272,17 +316,31 @@ void AMahjong3DTableActor::AddDiscards()
 
 void AMahjong3DTableActor::AddMelds()
 {
-    int32 MeldIndexBySeat[4] = {};
+    int32 MeldTileCountBySeat[4] = {};
+    for (const FMahjongMeld& Meld : CachedPublicState.PublicMelds)
+    {
+        const int32 RelativeSeat = GetRelativeSeat(Meld.OwnerSeat);
+        if (RelativeSeat >= 0 && RelativeSeat < 4)
+        {
+            MeldTileCountBySeat[RelativeSeat] += Meld.Tiles.Num();
+        }
+    }
+
+    int32 MeldTileIndexBySeat[4] = {};
     for (const FMahjongMeld& Meld : CachedPublicState.PublicMelds)
     {
         const int32 RelativeSeat = GetRelativeSeat(Meld.OwnerSeat);
         if (RelativeSeat == INDEX_NONE) continue;
-        const int32 MeldIndex = MeldIndexBySeat[RelativeSeat]++;
         for (int32 TileIndex = 0; TileIndex < Meld.Tiles.Num(); ++TileIndex)
         {
             const FMahjongTile& Tile = Meld.Tiles[TileIndex];
-            const FVector Base(-420.0f + MeldIndex * 205.0f + TileIndex * 51.0f, -267.0f, 14.0f);
-            AddTile(Tile.IsValid() ? &Tile : nullptr, Tile.IsValid(), false,
+            const int32 PackedIndex = MeldTileIndexBySeat[RelativeSeat]++;
+            // Exposed melds use the same upright orientation and tight pitch as the player's hand.
+            // Keep them on a parallel inner row so they remain readable without overlapping the hand.
+            const float StartX = -0.5f * (MeldTileCountBySeat[RelativeSeat] - 1) * TileTightPitch;
+            const FVector Base(StartX + PackedIndex * TileTightPitch, -292.0f,
+                TileHeight * 0.5f + 9.0f);
+            AddTile(Tile.IsValid() ? &Tile : nullptr, Tile.IsValid(), true,
                 RotateAroundTable(Base, RelativeSeat), RotateAroundTable(FRotator::ZeroRotator, RelativeSeat));
         }
     }

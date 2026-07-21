@@ -1,0 +1,291 @@
+{
+  "workflow": "Unreal metallic-roughness PBR",
+  "resolution": [
+    512,
+    512
+  ],
+  "packing": {
+    "ORM.R": "ambient_occlusion",
+    "ORM.G": "roughness",
+    "ORM.B": "metallic"
+  },
+  "materials": [
+    {
+      "material_slot": "M_Table_Felt_Green_PBR",
+      "textures": {
+        "BaseColor": "T_Table_Felt_BaseColor.png",
+        "Normal": "T_Table_Felt_Normal.png",
+        "ORM": "T_Table_Felt_ORM.png"
+      },
+      "roughness": 0.82,
+      "metallic": 0.0
+    },
+    {
+      "material_slot": "M_Table_BlackPowderMetal_PBR",
+      "textures": {
+        "BaseColor": "T_Table_BlackPowderMetal_BaseColor.png",
+        "Normal": "T_Table_BlackPowderMetal_Normal.png",
+        "ORM": "T_Table_BlackPowderMetal_ORM.png"
+      },
+      "roughness": 0.34,
+      "metallic": 0.78
+    },
+    {
+      "material_slot": "M_Table_PianoBlackMetal_PBR",
+      "textures": {
+        "BaseColor": "T_Table_PianoBlackMetal_BaseColor.png",
+        "Normal": "T_Table_PianoBlackMetal_Normal.png",
+        "ORM": "T_Table_PianoBlackMetal_ORM.png"
+      },
+      "roughness": 0.18,
+      "metallic": 0.5
+    },
+    {
+      "material_slot": "M_Table_SmokedOak_PBR",
+      "textures": {
+        "BaseColor": "T_Table_SmokedOak_BaseColor.png",
+        "Normal": "T_Table_SmokedOak_Normal.png",
+        "ORM": "T_Table_SmokedOak_ORM.png"
+      },
+      "roughness": 0.39,
+      "metallic": 0.0
+    },
+    {
+      "material_slot": "M_Table_PerforatedGrille_PBR",
+      "textures": {
+        "BaseColor": "T_Table_PerforatedGrille_BaseColor.png",
+        "Normal": "T_Table_PerforatedGrille_Normal.png",
+        "ORM": "T_Table_PerforatedGrille_ORM.png"
+      },
+      "roughness": 0.43,
+      "metallic": 0.38
+    },
+    {
+      "material_slot": "M_Table_Rubber_PBR",
+      "textures": {
+        "BaseColor": "T_Table_Rubber_BaseColor.png",
+        "Normal": "T_Table_Rubber_Normal.png",
+        "ORM": "T_Table_Rubber_ORM.png"
+      },
+      "roughness": 0.8,
+      "metallic": 0.0
+    },
+    {
+      "material_slot": "M_Table_Chrome_PBR",
+      "textures": {
+        "BaseColor": "T_Table_Chrome_BaseColor.png",
+        "Normal": "T_Table_Chrome_Normal.png",
+        "ORM": "T_Table_Chrome_ORM.png"
+      },
+      "roughness": 0.13,
+      "metallic": 1.0
+    },
+    {
+      "material_slot": "M_Table_DeckComposite_PBR",
+      "textures": {
+        "BaseColor": "T_Table_DeckComposite_BaseColor.png",
+        "Normal": "T_Table_DeckComposite_Normal.png",
+        "ORM": "T_Table_DeckComposite_ORM.png"
+      },
+      "roughness": 0.64,
+      "metallic": 0.0
+    },
+    {
+      "material_slot": "M_Table_IndicatorRed_PBR",
+      "textures": {
+        "BaseColor": "T_Table_IndicatorRed_BaseColor.png",
+        "Normal": "T_Table_IndicatorRed_Normal.png",
+        "ORM": "T_Table_IndicatorRed_ORM.png"
+      },
+      "roughness": 0.17,
+      "metallic": 0.0
+    },
+    {
+      "material_slot": "M_Table_IndicatorGreen_PBR",
+      "textures": {
+        "BaseColor": "T_Table_IndicatorGreen_BaseColor.png",
+        "Normal": "T_Table_IndicatorGreen_Normal.png",
+        "ORM": "T_Table_IndicatorGreen_ORM.png"
+      },
+      "roughness": 0.17,
+      "metallic": 0.0
+    },
+    {
+      "material_slot": "M_Table_ControllerFace_PBR",
+      "textures": {
+        "BaseColor": "T_Table_ControllerFace_BaseColor.png",
+        "Normal": "T_Table_ControllerFace_Normal.png",
+        "ORM": "T_Table_ControllerFace_ORM.png"
+      },
+      "roughness": 0.3,
+      "metallic": 0.32
+    }
+  ],
+  "files": [
+    {
+      "name": "T_Table_BlackPowderMetal_BaseColor.png",
+      "bytes": 1495,
+      "sha256": "08154d7ca42e4502719c22780143a2e8b9eb19005b676aab18f4f3b981395e85"
+    },
+    {
+      "name": "T_Table_BlackPowderMetal_Normal.png",
+      "bytes": 525140,
+      "sha256": "c5a8f26f1e0d8b35d874539c0d83dac286e87de3f1191203aedcccd001522601"
+    },
+    {
+      "name": "T_Table_BlackPowderMetal_ORM.png",
+      "bytes": 157543,
+      "sha256": "edeee6634d040d687a496a8f681fe25395292d8be27555b19545dceec3edcac8"
+    },
+    {
+      "name": "T_Table_Chrome_BaseColor.png",
+      "bytes": 48493,
+      "sha256": "7d27d6fa9f3d1f0d195a9a5135c878ba508f3cc36480c9f04d5691b0761e3b15"
+    },
+    {
+      "name": "T_Table_Chrome_Normal.png",
+      "bytes": 215496,
+      "sha256": "84b9390ccb202c30cf44b53c384636e3e1f510892b3dfce3c881c5d10d191605"
+    },
+    {
+      "name": "T_Table_Chrome_ORM.png",
+      "bytes": 46293,
+      "sha256": "8625aebfdd45b3f2cd5c896b9cdaf3630389e0754e134ffc44ed73aa0b2f8289"
+    },
+    {
+      "name": "T_Table_ControllerFace_BaseColor.png",
+      "bytes": 12919,
+      "sha256": "5eba9a41d2d3b27b5c99e3df67fe4fa3bc3441d543fec4471cf847298461af30"
+    },
+    {
+      "name": "T_Table_ControllerFace_Normal.png",
+      "bytes": 265312,
+      "sha256": "0e61851a807621b8f8bff123dcf41a7ea98f39acfe5c8383d583655dbcee9402"
+    },
+    {
+      "name": "T_Table_ControllerFace_ORM.png",
+      "bytes": 30952,
+      "sha256": "a73e32deed603690d0257f490a50ca45e3cfac32444c4428a3bdee5e4ba648be"
+    },
+    {
+      "name": "T_Table_DeckComposite_BaseColor.png",
+      "bytes": 1496,
+      "sha256": "1c3f382e6be4ae04e9a3daac3d9480aeccff83f9ad676d389222a0dcca0240b2"
+    },
+    {
+      "name": "T_Table_DeckComposite_Normal.png",
+      "bytes": 306866,
+      "sha256": "b4e6d8e42214926c01ba5bcdc7a62c74df086b43053e88ce805052ecb0864416"
+    },
+    {
+      "name": "T_Table_DeckComposite_ORM.png",
+      "bytes": 68171,
+      "sha256": "9953ff7dbd00184412e365ed076718aabcfc22d0e530af11c9b3f78ba3d1cc23"
+    },
+    {
+      "name": "T_Table_Felt_BaseColor.png",
+      "bytes": 133628,
+      "sha256": "3fc25059a838f1db9d27d0bc8c6682ce790549e2441720bcbb89b6068c2d6466"
+    },
+    {
+      "name": "T_Table_Felt_Normal.png",
+      "bytes": 719510,
+      "sha256": "81989a01d5efa6587a04b95bc05ed17d99a615cc7d6d7dfd5a651ea0af474432"
+    },
+    {
+      "name": "T_Table_Felt_ORM.png",
+      "bytes": 174028,
+      "sha256": "fab95508185b98ddb9e4a9a9713e6d44b325c3aa41e4e278b679d6115ef1e104"
+    },
+    {
+      "name": "T_Table_IndicatorGreen_BaseColor.png",
+      "bytes": 1496,
+      "sha256": "c5c142062e0c73f4112cfae2fc7224b22c4276ce6ac7db1a508f940d7e59b0bc"
+    },
+    {
+      "name": "T_Table_IndicatorGreen_Normal.png",
+      "bytes": 3320,
+      "sha256": "89589703ce021cf3bef481c64eda00833d4b375b81127315f71189684a1cb8ea"
+    },
+    {
+      "name": "T_Table_IndicatorGreen_ORM.png",
+      "bytes": 1797,
+      "sha256": "7ea16860b229ce6cb3731a678360ae692eaa2b389c4a341385c08748855d218f"
+    },
+    {
+      "name": "T_Table_IndicatorRed_BaseColor.png",
+      "bytes": 1494,
+      "sha256": "9f35d96cbb8714cadc6488d96a0b346142384c1f846a806aa4312874e026b805"
+    },
+    {
+      "name": "T_Table_IndicatorRed_Normal.png",
+      "bytes": 3320,
+      "sha256": "89589703ce021cf3bef481c64eda00833d4b375b81127315f71189684a1cb8ea"
+    },
+    {
+      "name": "T_Table_IndicatorRed_ORM.png",
+      "bytes": 1797,
+      "sha256": "7ea16860b229ce6cb3731a678360ae692eaa2b389c4a341385c08748855d218f"
+    },
+    {
+      "name": "T_Table_PerforatedGrille_BaseColor.png",
+      "bytes": 2760,
+      "sha256": "ed64145c760861de1f25bb0c2cc1cc3696aa5e174af6b76d40253c2097e7a37e"
+    },
+    {
+      "name": "T_Table_PerforatedGrille_Normal.png",
+      "bytes": 389984,
+      "sha256": "a64f55592eeb893122e212affd033d64e01c21dd3b49139240020223f046105a"
+    },
+    {
+      "name": "T_Table_PerforatedGrille_ORM.png",
+      "bytes": 27771,
+      "sha256": "ad150a811953820e135dca439d97a924531a119bc141b305a5e5585637d19fad"
+    },
+    {
+      "name": "T_Table_PianoBlackMetal_BaseColor.png",
+      "bytes": 1494,
+      "sha256": "3c9e4b4a5b486e86ed263e8e8a0dd28d9c90320c3338518ed02eaab0a6143bc1"
+    },
+    {
+      "name": "T_Table_PianoBlackMetal_Normal.png",
+      "bytes": 89060,
+      "sha256": "a7cc2f859482032404a7287dfd2785a6f8d4c0579abafa282a4ac69e7a59c395"
+    },
+    {
+      "name": "T_Table_PianoBlackMetal_ORM.png",
+      "bytes": 1496,
+      "sha256": "6984e71195832f6d1d97bede6f7dfeeee523c873d1ea7e5811a01ca38712fe11"
+    },
+    {
+      "name": "T_Table_Rubber_BaseColor.png",
+      "bytes": 1494,
+      "sha256": "06559a1d2089e4a6f45fbf8fa7c31e9f613421e91dd14f4285033bb5ca20f5c7"
+    },
+    {
+      "name": "T_Table_Rubber_Normal.png",
+      "bytes": 500916,
+      "sha256": "1562f9b77db4407f042fdebd114d7e2819d7716228c6c92f6a858022e839c094"
+    },
+    {
+      "name": "T_Table_Rubber_ORM.png",
+      "bytes": 90200,
+      "sha256": "7999939977936ea34c9052da206f0756ec186032095211cb98f64b3be95939e1"
+    },
+    {
+      "name": "T_Table_SmokedOak_BaseColor.png",
+      "bytes": 192881,
+      "sha256": "290ad24e7220448f487d27ffda8306d1507ef0b189d6cbf8a9137d3a5e5afb90"
+    },
+    {
+      "name": "T_Table_SmokedOak_Normal.png",
+      "bytes": 555280,
+      "sha256": "1cc4497b2bd412ee1da48334b56b3b592c1a0d7da7331e9585c7d1990e67f139"
+    },
+    {
+      "name": "T_Table_SmokedOak_ORM.png",
+      "bytes": 147568,
+      "sha256": "29d43077bfbfb0b0de894163d68037d0c8ffdd53ff820f6df614d180efde12f6"
+    }
+  ]
+}

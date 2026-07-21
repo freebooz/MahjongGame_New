@@ -5,7 +5,7 @@
 
 int32 FGuiyangRuleSnapshot::GetTileCount() const
 {
-    return Config.TileSetMode == EMahjongTileSetMode::Standard136 ? 136 : 108;
+    return 108;
 }
 
 FGuiyangRuleSnapshot UGuiyangRuleSnapshotLibrary::CreateSnapshot(const FMahjongRuleConfig& RequestedConfig)
@@ -33,6 +33,7 @@ bool UGuiyangRuleSnapshotLibrary::VerifySnapshot(const FGuiyangRuleSnapshot& Sna
 FMahjongRuleConfig UGuiyangRuleSnapshotLibrary::NormalizeConfig(const FMahjongRuleConfig& RequestedConfig)
 {
     FMahjongRuleConfig Result = RequestedConfig;
+    Result.TileSetMode = EMahjongTileSetMode::Suited108;
     if (Result.RuleId.IsNone())
     {
         Result.RuleId = TEXT("GuiyangMainstreamV1");

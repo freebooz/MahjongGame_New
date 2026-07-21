@@ -43,16 +43,21 @@ void UMobileMahjongHUDWidget::NativeConstruct()
     {
         Table3DViewport->SetVisibility(ESlateVisibility::HitTestInvisible);
         Table3DViewport->SetEnableAdvancedFeatures(true);
-        Table3DViewport->SetBackgroundColor(FLinearColor(0.01f, 0.055f, 0.045f, 1.0f));
+        // Let the already lit room level remain visible outside the rendered tabletop.
+        Table3DViewport->SetBackgroundColor(FLinearColor::Transparent);
+        // UViewport does not expose its internal FMinimalViewInfo/FOV. Apply a small horizontal
+        // projection compensation to the 3D layer only so the table reads naturally on landscape
+        // phones without distorting HUD text or controls.
+        Table3DViewport->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
+        Table3DViewport->SetRenderScale(FVector2D(1.08f, 1.0f));
         // PBR 麻将材质不需要高强度预览灯；较低的主光和天空光可避免白色树脂过曝。
         Table3DViewport->SetLightIntensity(1.7f);
         Table3DViewport->SetSkyIntensity(0.55f);
-        // 本家固定在南侧（屏幕底部），相机从南向北俯视；缩短距离让牌桌填满主要视口。
-        // Frame the 1060 x 770 cm tabletop as the room background, with only a narrow margin
-        // around its outer rails instead of viewing it as a small object in the distance.
-        const FVector CameraLocation(0.0f, -530.0f, 430.0f);
+        // 本家固定在南侧（屏幕底部）。抬高并向桌面中心移动相机，降低近大远小的
+        // 梯形透视，避免矩形牌桌看起来纵向拉长、横向压缩。
+        const FVector CameraLocation(0.0f, -410.0f, 570.0f);
         Table3DViewport->SetViewLocation(CameraLocation);
-        Table3DViewport->SetViewRotation((FVector(0.0f, -45.0f, 5.0f) - CameraLocation).Rotation());
+        Table3DViewport->SetViewRotation((FVector::ZeroVector - CameraLocation).Rotation());
         Table3DActor = Cast<AMahjong3DTableActor>(Table3DViewport->Spawn(AMahjong3DTableActor::StaticClass()));
 
         // 旧二维牌面仅保留本家透明点击层，其余牌区全部由三维模型表现。

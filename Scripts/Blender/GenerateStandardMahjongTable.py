@@ -18,6 +18,7 @@
     --output-dir PATH   指定输出目录
     --no-render         不渲染预览图
     --no-save           不保存 .blend 文件
+    --export-fbx        额外导出供 Unreal Engine 使用的 FBX
     --export-glb        额外导出 GLB（程序化纹理在 GLB 中可能被简化）
     --keep-scene        保留当前场景，只替换同名生成集合
 
@@ -95,6 +96,7 @@ def blender_arguments() -> argparse.Namespace:
     parser.add_argument("--output-dir", help="生成文件输出目录")
     parser.add_argument("--no-render", action="store_true", help="不生成预览图")
     parser.add_argument("--no-save", action="store_true", help="不保存 Blender 文件")
+    parser.add_argument("--export-fbx", action="store_true", help="额外导出 Unreal Engine 用 FBX")
     parser.add_argument("--export-glb", action="store_true", help="额外导出 GLB")
     parser.add_argument("--keep-scene", action="store_true", help="保留场景中的非生成对象")
     return parser.parse_args(argv)
@@ -1202,6 +1204,40 @@ def select_model(objects: Iterable[bpy.types.Object]) -> None:
         bpy.context.view_layer.objects.active = first
 
 
+def ensure_uv_maps(objects: Iterable[bpy.types.Object]) -> None:
+    """为所有桌体网格生成可供 UE 贴图采样的 Smart UV。"""
+    for obj in objects:
+        if obj.type != "MESH":
+            continue
+        bpy.ops.object.select_all(action="DESELECT")
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.uv.smart_project(angle_limit=math.radians(66.0), island_margin=0.02)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        obj.select_set(False)
+
+
+def export_fbx(path: Path, objects: list[bpy.types.Object]) -> None:
+    ensure_uv_maps(objects)
+    select_model(objects)
+    bpy.ops.export_scene.fbx(
+        filepath=str(path),
+        use_selection=True,
+        object_types={"MESH"},
+        apply_unit_scale=True,
+        apply_scale_options="FBX_SCALE_UNITS",
+        axis_forward="-Z",
+        axis_up="Y",
+        bake_space_transform=False,
+        use_mesh_modifiers=True,
+        add_leaf_bones=False,
+        path_mode="RELATIVE",
+        embed_textures=False,
+    )
+
+
 def export_glb(path: Path, objects: list[bpy.types.Object]) -> None:
     select_model(objects)
     bpy.ops.export_scene.gltf(
@@ -1316,6 +1352,11 @@ def main() -> None:
         if backup_path.is_file():
             backup_path.unlink()
         generated_files.append(blend_path)
+
+    if args.export_fbx:
+        fbx_path = output_dir / "SM_StandardMahjongTable.fbx"
+        export_fbx(fbx_path, objects)
+        generated_files.append(fbx_path)
 
     if args.export_glb:
         glb_path = output_dir / "SM_StandardMahjongTable.glb"

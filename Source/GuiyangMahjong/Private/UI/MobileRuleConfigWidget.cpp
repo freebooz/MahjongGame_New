@@ -2,6 +2,8 @@
 
 #include "Components/CheckBox.h"
 #include "Components/EditableTextBox.h"
+#include "Components/TextBlock.h"
+#include "Blueprint/WidgetTree.h"
 
 namespace
 {
@@ -22,6 +24,11 @@ void UMobileRuleConfigWidget::NativeConstruct()
 {
     Super::NativeConstruct();
     SetRuleConfig(FMahjongRuleConfig());
+    Chk_Standard136->SetIsEnabled(false);
+    if (UTextBlock* TileSetLabel = Cast<UTextBlock>(WidgetTree->FindWidget(TEXT("Lbl_Standard136"))))
+    {
+        TileSetLabel->SetText(FText::FromString(TEXT("贵阳 108 张数牌（不含红中）")));
+    }
 
     UCheckBox* CheckBoxes[] = {
         Chk_Standard136, Chk_ChongFengJi, Chk_ZeRenJi, Chk_WuGuJi,
@@ -44,7 +51,7 @@ void UMobileRuleConfigWidget::NativeConstruct()
 
 void UMobileRuleConfigWidget::SetRuleConfig(const FMahjongRuleConfig& Config)
 {
-    Chk_Standard136->SetIsChecked(Config.TileSetMode == EMahjongTileSetMode::Standard136);
+    Chk_Standard136->SetIsChecked(false);
     Chk_ChongFengJi->SetIsChecked(Config.bEnableChongFengJi);
     Chk_ZeRenJi->SetIsChecked(Config.bEnableZeRenJi);
     Chk_WuGuJi->SetIsChecked(Config.bEnableWuGuJi);
@@ -65,8 +72,7 @@ bool UMobileRuleConfigWidget::TryGetRuleConfig(FMahjongRuleConfig& OutConfig, FS
 {
     OutConfig = FMahjongRuleConfig();
     OutError.Reset();
-    OutConfig.TileSetMode = Chk_Standard136->IsChecked()
-        ? EMahjongTileSetMode::Standard136 : EMahjongTileSetMode::Suited108;
+    OutConfig.TileSetMode = EMahjongTileSetMode::Suited108;
     OutConfig.bEnableChongFengJi = Chk_ChongFengJi->IsChecked();
     OutConfig.bEnableZeRenJi = Chk_ZeRenJi->IsChecked();
     OutConfig.bEnableWuGuJi = Chk_WuGuJi->IsChecked();

@@ -29,6 +29,7 @@ public:
 private:
     UPROPERTY() TObjectPtr<USceneComponent> SceneRoot;
     UPROPERTY(Transient) TArray<TObjectPtr<UActorComponent>> RuntimeComponents;
+    UPROPERTY(Transient) TObjectPtr<UStaticMesh> TableMesh;
     UPROPERTY(Transient) TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY(Transient) TObjectPtr<UStaticMesh> DefaultTileMesh;
     UPROPERTY(Transient) TArray<TObjectPtr<UStaticMesh>> TileMeshes;

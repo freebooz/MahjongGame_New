@@ -3,8 +3,11 @@
 
 void UMahjongDeckManager::InitializeDeck(const FMahjongRuleConfig& RuleConfig)
 {
-    const bool bIncludeHonors = RuleConfig.TileSetMode == EMahjongTileSetMode::Standard136;
-    Deck.Reset(bIncludeHonors ? 136 : 108);
+    if (RuleConfig.TileSetMode != EMahjongTileSetMode::Suited108)
+    {
+        UE_LOG(LogMahjongCore, Warning, TEXT("Guiyang rules force Suited108; ignoring legacy tile-set mode"));
+    }
+    Deck.Reset(108);
     DrawIndex = 0;
     int32 UniqueId = 0;
 
@@ -23,33 +26,12 @@ void UMahjongDeckManager::InitializeDeck(const FMahjongRuleConfig& RuleConfig)
         }
     }
 
-    if (bIncludeHonors)
-    {
-    const TArray<TPair<EMahjongSuit, EMahjongTileType>> Honors = {
-        {EMahjongSuit::Winds, EMahjongTileType::East}, {EMahjongSuit::Winds, EMahjongTileType::South},
-        {EMahjongSuit::Winds, EMahjongTileType::West}, {EMahjongSuit::Winds, EMahjongTileType::North},
-        {EMahjongSuit::Dragons, EMahjongTileType::RedDragon}, {EMahjongSuit::Dragons, EMahjongTileType::GreenDragon},
-        {EMahjongSuit::Dragons, EMahjongTileType::WhiteDragon}
-    };
-    for (const TPair<EMahjongSuit, EMahjongTileType>& Honor : Honors)
-    {
-        for (int32 Copy = 0; Copy < 4; ++Copy)
-        {
-            FMahjongTile& Tile = Deck.AddDefaulted_GetRef();
-            Tile.Suit = Honor.Key;
-            Tile.Type = Honor.Value;
-            Tile.UniqueId = UniqueId++;
-        }
-    }
-    }
     UE_LOG(LogMahjongCore, Log, TEXT("牌墙初始化完成，共 %d 张牌"), Deck.Num());
 }
 
 void UMahjongDeckManager::InitializeStandardDeck()
 {
-    FMahjongRuleConfig StandardConfig;
-    StandardConfig.TileSetMode = EMahjongTileSetMode::Standard136;
-    InitializeDeck(StandardConfig);
+    InitializeDeck(FMahjongRuleConfig());
 }
 
 void UMahjongDeckManager::ShuffleDeck(const int32 Seed)

@@ -97,7 +97,7 @@ bool FMahjongDeckTest::RunTest(const FString& Parameters)
 {
     UMahjongDeckManager* Deck = NewObject<UMahjongDeckManager>();
     Deck->InitializeStandardDeck();
-    TestEqual(TEXT("牌墙必须为136张"), Deck->GetRemainingCount(), 136);
+    TestEqual(TEXT("贵阳规则即使收到旧版 136 请求也必须回退到 108 张"), Deck->GetRemainingCount(), 108);
     TSet<int32> UniqueIds;
     int32 Counts[34] = {};
     for (const FMahjongTile& Tile : Deck->GetDeckForServerTest())
@@ -105,8 +105,9 @@ bool FMahjongDeckTest::RunTest(const FString& Parameters)
         UniqueIds.Add(Tile.UniqueId);
         if (Tile.GetRuleIndex() >= 0) ++Counts[Tile.GetRuleIndex()];
     }
-    TestEqual(TEXT("每张物理牌ID唯一"), UniqueIds.Num(), 136);
-    for (int32 Index = 0; Index < 34; ++Index) TestEqual(FString::Printf(TEXT("牌型%d必须有4张"), Index), Counts[Index], 4);
+    TestEqual(TEXT("每张物理牌ID唯一"), UniqueIds.Num(), 108);
+    for (int32 Index = 0; Index < 27; ++Index) TestEqual(FString::Printf(TEXT("数牌牌型%d必须有4张"), Index), Counts[Index], 4);
+    for (int32 Index = 27; Index < 34; ++Index) TestEqual(FString::Printf(TEXT("贵阳牌库不得包含字牌%d"), Index), Counts[Index], 0);
     return true;
 }
 
@@ -156,7 +157,8 @@ bool FMahjongRuleSummaryTest::RunTest(const FString& Parameters)
     Config.TurnTimeoutSeconds = 20;
     const FGuiyangRuleSnapshot Snapshot = UGuiyangRuleSnapshotLibrary::CreateSnapshot(Config);
     const FString Summary = UMobileRuleSummaryWidget::BuildSummaryText(Snapshot, 8, true);
-    TestTrue(TEXT("规则摘要显示 136 张牌制"), Summary.Contains(TEXT("136 张标准牌")));
+    TestTrue(TEXT("贵阳规则摘要必须固定显示 108 张牌制"),
+        Summary.Contains(TEXT("108")) && !Summary.Contains(TEXT("136")));
     TestTrue(TEXT("规则摘要显示局数和密码房"), Summary.Contains(TEXT("8 局")) && Summary.Contains(TEXT("密码房")));
     TestTrue(TEXT("规则摘要显示关闭的冲锋鸡"), Summary.Contains(TEXT("冲锋鸡关")));
     TestTrue(TEXT("规则摘要显示关闭的七对"), Summary.Contains(TEXT("七对关")));
@@ -1320,11 +1322,16 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("三维牌桌 Viewport 必须覆盖完整 1920x1080 设计区域"),
             ViewportSlot->GetSize(), FVector2D(1920.0f, 1080.0f));
     }
+    if (Viewport)
+    {
+        TestEqual(TEXT("三维牌桌 Viewport 清屏色必须透明以显示关卡空间"),
+            Viewport->GetBackgroundColor(), FLinearColor::Transparent);
+    }
     const UImage* LegacyBackground = Cast<UImage>(GameHUD->WidgetTree->FindWidget(TEXT("Background_ComponentSlot")));
     TestNull(TEXT("游戏房间不得再使用旧版桌面背景图"), LegacyBackground);
     TestNotNull(TEXT("三维牌桌 Actor 类必须可加载"), AMahjong3DTableActor::StaticClass());
     UStaticMesh* TileMesh = LoadObject<UStaticMesh>(nullptr,
-        TEXT("/Game/Art/Mahjong/Mahjong50/Tiles/SM_Mahjong50_Red_Dragon.SM_Mahjong50_Red_Dragon"));
+        TEXT("/Game/Art/Mahjong/Mahjong50/Tiles/SM_Mahjong50_Characters_1.SM_Mahjong50_Characters_1"));
     TestNotNull(TEXT("Mahjong50 PBR 麻将牌静态网格必须已导入"), TileMesh);
     if (TileMesh)
     {

@@ -502,8 +502,7 @@ FString FGuiyangRemoteLobbyCodec::SerializeCreateRoom(const FMahjongCreateRoomRe
     const TSharedRef<FJsonObject> Rules = MakeShared<FJsonObject>();
     Rules->SetStringField(TEXT("ruleId"), Config.RuleId.ToString());
     Rules->SetNumberField(TEXT("ruleVersion"), Config.RuleVersion);
-    Rules->SetStringField(TEXT("tileSetMode"), Config.TileSetMode == EMahjongTileSetMode::Standard136
-        ? TEXT("Standard136") : TEXT("Suited108"));
+    Rules->SetStringField(TEXT("tileSetMode"), TEXT("Suited108"));
     Rules->SetStringField(TEXT("jiCountingScope"), GuiyangRemoteLobbyPrivate::JiScopeName(Config.JiCountingScope));
 #define WRITE_RULE_INT(JsonName, Member) Rules->SetNumberField(TEXT(JsonName), Config.Member)
 #define WRITE_RULE_BOOL(JsonName, Member) Rules->SetBoolField(TEXT(JsonName), Config.Member)
