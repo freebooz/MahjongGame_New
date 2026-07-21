@@ -29,13 +29,29 @@ void UMobileRoomWidget::RefreshRoomState(const FMahjongRoomState& State, const i
     Txt_RuleSummary->SetText(FText::FromString(State.RoomInfo.RuleSummary));
     RuleSummary->SetRuleSnapshot(State.RuleSnapshot, State.RoomInfo.RoundCount, State.RoomInfo.bPasswordProtected);
     UTextBlock* SeatWidgets[] = {Seat_Bottom, Seat_Right, Seat_Top, Seat_Left};
-    for (int32 Index = 0; Index < 4; ++Index)
+    const TCHAR* SeatDirections[] = {TEXT("南"), TEXT("东"), TEXT("北"), TEXT("西")};
+    for (int32 RelativePosition = 0; RelativePosition < 4; ++RelativePosition)
     {
-        const FMahjongSeatInfo* Seat = State.Seats.FindByPredicate([Index](const FMahjongSeatInfo& Item){ return Item.SeatIndex == Index; });
+        const int32 AbsoluteSeat = GetAbsoluteSeatForRelativePosition(RelativePosition, LocalSeat);
+        const FMahjongSeatInfo* Seat = State.Seats.FindByPredicate([AbsoluteSeat](const FMahjongSeatInfo& Item)
+        {
+            return Item.SeatIndex == AbsoluteSeat;
+        });
         const FString Label = Seat && Seat->bOccupied
-            ? FString::Printf(TEXT("%s%s\n%s"), Index == LocalSeat ? TEXT("【我】") : TEXT(""), *Seat->PlayerName, Seat->bReady ? TEXT("已准备") : TEXT("未准备"))
-            : TEXT("等待玩家");
-        SeatWidgets[Index]->SetText(FText::FromString(Label));
+            ? FString::Printf(TEXT("%s · %s%s\n%s"), SeatDirections[RelativePosition],
+                RelativePosition == 0 ? TEXT("【我】") : TEXT(""), *Seat->PlayerName,
+                Seat->bReady ? TEXT("已准备") : TEXT("未准备"))
+            : FString::Printf(TEXT("%s · 等待玩家"), SeatDirections[RelativePosition]);
+        SeatWidgets[RelativePosition]->SetText(FText::FromString(Label));
     }
     Txt_StartTip->SetText(FText::FromString(State.bGameStarting ? TEXT("四人已就绪，即将开局") : TEXT("满四人并准备后自动开始")));
+}
+
+int32 UMobileRoomWidget::GetAbsoluteSeatForRelativePosition(const int32 RelativePosition, const int32 LocalSeat)
+{
+    if (RelativePosition < 0 || RelativePosition >= 4 || LocalSeat < 0 || LocalSeat >= 4)
+    {
+        return INDEX_NONE;
+    }
+    return (LocalSeat + RelativePosition) % 4;
 }

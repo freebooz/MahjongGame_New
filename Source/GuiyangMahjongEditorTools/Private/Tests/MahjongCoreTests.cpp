@@ -18,6 +18,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Network/MahjongNetworkTypes.h"
 #include "UI/MobileMahjongHUDWidget.h"
+#include "UI/MobileRoomWidget.h"
 #include "UI/MobileReconnectOverlayWidget.h"
 #include "Network/GuiyangReconnectSubsystem.h"
 #include "UI/MobileRuleSummaryWidget.h"
@@ -36,6 +37,7 @@
 #include "Components/Border.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/CheckBox.h"
+#include "Components/Image.h"
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
 #include "Components/Viewport.h"
@@ -170,6 +172,14 @@ bool FMahjongHudSeatMappingTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("本地玩家对家映射到顶部"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(0, 2), 2);
     TestEqual(TEXT("本地玩家上家映射到左侧"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(1, 2), 3);
     TestEqual(TEXT("非法座位不会访问 UI 数组"), UMobileMahjongHUDWidget::GetRelativeSeatIndex(INDEX_NONE, 2), INDEX_NONE);
+    TestEqual(TEXT("当前登录玩家必须映射到南方座位"),
+        UMobileRoomWidget::GetAbsoluteSeatForRelativePosition(0, 2), 2);
+    TestEqual(TEXT("南方玩家下家必须映射到东方座位"),
+        UMobileRoomWidget::GetAbsoluteSeatForRelativePosition(1, 2), 3);
+    TestEqual(TEXT("南方玩家对家必须映射到北方座位"),
+        UMobileRoomWidget::GetAbsoluteSeatForRelativePosition(2, 2), 0);
+    TestEqual(TEXT("南方玩家上家必须映射到西方座位"),
+        UMobileRoomWidget::GetAbsoluteSeatForRelativePosition(3, 2), 1);
     TestEqual(TEXT("牌局阶段显示中文"), UMobileMahjongHUDWidget::GetPhaseDisplayText(
         EMahjongTablePhase::WaitingForAction), FString(TEXT("等待碰杠胡")));
     return true;
@@ -1306,9 +1316,12 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("三维牌桌 Viewport 必须使用画布布局"), ViewportSlot);
     if (ViewportSlot)
     {
-        TestTrue(TEXT("三维牌桌必须覆盖主要桌面宽度"), ViewportSlot->GetSize().X >= 1500.0f);
-        TestTrue(TEXT("三维牌桌必须覆盖主要桌面高度"), ViewportSlot->GetSize().Y >= 800.0f);
+        TestEqual(TEXT("三维牌桌 Viewport 必须从屏幕左上角开始"), ViewportSlot->GetPosition(), FVector2D::ZeroVector);
+        TestEqual(TEXT("三维牌桌 Viewport 必须覆盖完整 1920x1080 设计区域"),
+            ViewportSlot->GetSize(), FVector2D(1920.0f, 1080.0f));
     }
+    const UImage* LegacyBackground = Cast<UImage>(GameHUD->WidgetTree->FindWidget(TEXT("Background_ComponentSlot")));
+    TestNull(TEXT("游戏房间不得再使用旧版桌面背景图"), LegacyBackground);
     TestNotNull(TEXT("三维牌桌 Actor 类必须可加载"), AMahjong3DTableActor::StaticClass());
     UStaticMesh* TileMesh = LoadObject<UStaticMesh>(nullptr,
         TEXT("/Game/Art/Mahjong/Mahjong50/Tiles/SM_Mahjong50_Red_Dragon.SM_Mahjong50_Red_Dragon"));

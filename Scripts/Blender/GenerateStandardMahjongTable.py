@@ -1,6 +1,6 @@
-"""Blender 5.2：生成标准尺寸、程序化 PBR 材质的单柱全自动麻将桌。
+"""Blender 5.2：按参考图生成深色木纹单柱全自动麻将桌与程序化 PBR 材质。
 
-默认成品尺寸：900 x 900 x 760 mm（桌面宽 x 深 x 高）。
+默认成品尺寸：940 x 940 x 780 mm（桌面宽 x 深 x 高），底座 550 x 550 mm。
 
 本脚本是幂等资产生成器，默认会清空当前场景。直接在 Blender 的“脚本”
 工作区打开并运行即可；也可以通过命令行执行：
@@ -306,65 +306,6 @@ def create_powder_metal_material() -> bpy.types.Material:
     return material
 
 
-def create_champagne_material() -> bpy.types.Material:
-    material, shader, tree = base_material(
-        "M_Table_ChampagneGold_PBR",
-        (0.52, 0.40, 0.205, 1.0),
-        metallic=0.58,
-        roughness=0.27,
-    )
-    nodes, links = tree.nodes, tree.links
-    set_node_input(shader, "Coat Weight", 0.30)
-    set_node_input(shader, "Coat Roughness", 0.20)
-    set_node_input(shader, "Anisotropic IOR Level", 0.18)
-    texcoord = nodes.new("ShaderNodeTexCoord")
-    texcoord.location = (-560.0, 0.0)
-    noise = nodes.new("ShaderNodeTexNoise")
-    noise.name = "Champagne Brushing"
-    noise.location = (-340.0, 0.0)
-    set_node_input(noise, "Scale", 155.0)
-    set_node_input(noise, "Detail", 2.0)
-    set_node_input(noise, "Roughness", 0.46)
-    bump = nodes.new("ShaderNodeBump")
-    bump.name = "Fine Brushed Metal Normal"
-    bump.location = (80.0, -150.0)
-    bump.inputs["Strength"].default_value = 0.065
-    bump.inputs["Distance"].default_value = 0.00035
-    links.new(texcoord.outputs["Generated"], noise.inputs["Vector"])
-    links.new(noise.outputs["Fac"], bump.inputs["Height"])
-    links.new(bump.outputs["Normal"], shader.inputs["Normal"])
-    material["surface"] = "champagne_anodized_metal"
-    return material
-
-
-def create_burgundy_material() -> bpy.types.Material:
-    material, shader, tree = base_material(
-        "M_Table_BurgundyEnamel_PBR",
-        (0.185, 0.010, 0.014, 1.0),
-        metallic=0.05,
-        roughness=0.22,
-    )
-    nodes, links = tree.nodes, tree.links
-    set_node_input(shader, "Coat Weight", 0.48)
-    set_node_input(shader, "Coat Roughness", 0.16)
-    texcoord = nodes.new("ShaderNodeTexCoord")
-    texcoord.location = (-720.0, 20.0)
-    noise = nodes.new("ShaderNodeTexNoise")
-    noise.name = "Burgundy Marbling"
-    noise.location = (-500.0, 20.0)
-    set_node_input(noise, "Scale", 3.8)
-    set_node_input(noise, "Detail", 6.0)
-    set_node_input(noise, "Roughness", 0.70)
-    ramp = nodes.new("ShaderNodeValToRGB")
-    ramp.name = "Burgundy Color Variation"
-    ramp.location = (-250.0, 90.0)
-    ramp.color_ramp.elements[0].color = (0.008, 0.0003, 0.0005, 1.0)
-    ramp.color_ramp.elements[1].color = (0.105, 0.004, 0.007, 1.0)
-    links.new(texcoord.outputs["Generated"], noise.inputs["Vector"])
-    links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
-    links.new(ramp.outputs["Color"], shader.inputs["Base Color"])
-    material["surface"] = "high_gloss_burgundy_enamel"
-    return material
 
 
 def create_glossy_black_material() -> bpy.types.Material:
@@ -395,46 +336,30 @@ def create_wood_material() -> bpy.types.Material:
     mapping = nodes.new("ShaderNodeMapping")
     mapping.name = "Horizontal Wood Grain"
     mapping.location = (-670.0, 40.0)
-    mapping.inputs["Scale"].default_value = (1.2, 5.0, 3.0)
-    wave = nodes.new("ShaderNodeTexWave")
-    wave.name = "Oak Long Grain"
-    wave.location = (-460.0, 100.0)
-    wave.wave_type = "BANDS"
-    wave.bands_direction = "X"
-    set_node_input(wave, "Scale", 6.0)
-    set_node_input(wave, "Distortion", 7.5)
-    set_node_input(wave, "Detail", 5.0)
+    mapping.inputs["Scale"].default_value = (1.0, 5.5, 2.5)
     noise = nodes.new("ShaderNodeTexNoise")
     noise.name = "Oak Pores"
-    noise.location = (-460.0, -120.0)
-    set_node_input(noise, "Scale", 11.0)
-    set_node_input(noise, "Detail", 5.0)
+    noise.location = (-440.0, 20.0)
+    set_node_input(noise, "Scale", 4.2)
+    set_node_input(noise, "Detail", 6.0)
     set_node_input(noise, "Roughness", 0.72)
-    mix = nodes.new("ShaderNodeMixRGB")
-    mix.name = "Oak Grain Mix"
-    mix.location = (-230.0, 40.0)
-    mix.blend_type = "MULTIPLY"
-    mix.inputs[0].default_value = 0.70
     ramp = nodes.new("ShaderNodeValToRGB")
     ramp.name = "Smoked Oak Color"
-    ramp.location = (-20.0, 100.0)
-    ramp.color_ramp.elements[0].color = (0.018, 0.007, 0.002, 1.0)
-    ramp.color_ramp.elements[1].color = (0.205, 0.095, 0.035, 1.0)
+    ramp.location = (-160.0, 90.0)
+    ramp.color_ramp.elements[0].color = (0.018, 0.014, 0.010, 1.0)
+    ramp.color_ramp.elements[1].color = (0.110, 0.078, 0.052, 1.0)
     middle = ramp.color_ramp.elements.new(0.52)
-    middle.color = (0.075, 0.030, 0.010, 1.0)
+    middle.color = (0.052, 0.038, 0.026, 1.0)
     bump = nodes.new("ShaderNodeBump")
     bump.name = "Wood Grain Normal"
     bump.location = (100.0, -150.0)
     bump.inputs["Strength"].default_value = 0.14
     bump.inputs["Distance"].default_value = 0.0007
     links.new(texcoord.outputs["Generated"], mapping.inputs["Vector"])
-    links.new(mapping.outputs["Vector"], wave.inputs["Vector"])
     links.new(mapping.outputs["Vector"], noise.inputs["Vector"])
-    links.new(wave.outputs["Color"], mix.inputs[1])
-    links.new(noise.outputs["Fac"], mix.inputs[2])
-    links.new(mix.outputs["Color"], ramp.inputs["Fac"])
+    links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
     links.new(ramp.outputs["Color"], shader.inputs["Base Color"])
-    links.new(mix.outputs["Color"], bump.inputs["Height"])
+    links.new(noise.outputs["Fac"], bump.inputs["Height"])
     links.new(bump.outputs["Normal"], shader.inputs["Normal"])
     material["surface"] = "smoked_oak_veneer"
     return material
@@ -444,8 +369,8 @@ def create_grille_material() -> bpy.types.Material:
     material, shader, tree = base_material(
         "M_Table_PerforatedGrille_PBR",
         (0.055, 0.060, 0.058, 1.0),
-        metallic=0.74,
-        roughness=0.32,
+        metallic=0.30,
+        roughness=0.40,
     )
     nodes, links = tree.nodes, tree.links
     texcoord = nodes.new("ShaderNodeTexCoord")
@@ -455,11 +380,11 @@ def create_grille_material() -> bpy.types.Material:
     brick.location = (-400.0, 20.0)
     brick.offset = 0.5
     brick.offset_frequency = 2
-    set_node_input(brick, "Color1", (0.10, 0.11, 0.105, 1.0))
-    set_node_input(brick, "Color2", (0.055, 0.060, 0.057, 1.0))
+    set_node_input(brick, "Color1", (0.28, 0.30, 0.29, 1.0))
+    set_node_input(brick, "Color2", (0.14, 0.16, 0.15, 1.0))
     set_node_input(brick, "Mortar", (0.001, 0.001, 0.001, 1.0))
     set_node_input(brick, "Scale", 62.0)
-    set_node_input(brick, "Mortar Size", 0.08)
+    set_node_input(brick, "Mortar Size", 0.025)
     set_node_input(brick, "Mortar Smooth", 0.02)
     bump = nodes.new("ShaderNodeBump")
     bump.name = "Recessed Perforations"
@@ -475,43 +400,6 @@ def create_grille_material() -> bpy.types.Material:
     return material
 
 
-def create_tile_wall_material() -> bpy.types.Material:
-    material, shader, tree = base_material(
-        "M_Preview_BlueWhiteTileWall_PBR",
-        (0.10, 0.42, 0.78, 1.0),
-        metallic=0.0,
-        roughness=0.34,
-    )
-    nodes, links = tree.nodes, tree.links
-    set_node_input(shader, "Coat Weight", 0.25)
-    texcoord = nodes.new("ShaderNodeTexCoord")
-    texcoord.location = (-580.0, 20.0)
-    wave = nodes.new("ShaderNodeTexWave")
-    wave.name = "Tile Separators"
-    wave.location = (-360.0, 20.0)
-    wave.wave_type = "BANDS"
-    wave.bands_direction = "X"
-    set_node_input(wave, "Scale", 41.0)
-    set_node_input(wave, "Distortion", 0.0)
-    ramp = nodes.new("ShaderNodeValToRGB")
-    ramp.name = "Blue White Tile Pattern"
-    ramp.location = (-130.0, 70.0)
-    ramp.color_ramp.interpolation = "CONSTANT"
-    ramp.color_ramp.elements[0].position = 0.42
-    ramp.color_ramp.elements[0].color = (0.035, 0.30, 0.78, 1.0)
-    ramp.color_ramp.elements[1].position = 0.58
-    ramp.color_ramp.elements[1].color = (0.70, 0.88, 1.0, 1.0)
-    bump = nodes.new("ShaderNodeBump")
-    bump.location = (100.0, -110.0)
-    bump.inputs["Strength"].default_value = 0.18
-    bump.inputs["Distance"].default_value = 0.0008
-    links.new(texcoord.outputs["Generated"], wave.inputs["Vector"])
-    links.new(wave.outputs["Color"], ramp.inputs["Fac"])
-    links.new(ramp.outputs["Color"], shader.inputs["Base Color"])
-    links.new(wave.outputs["Color"], bump.inputs["Height"])
-    links.new(bump.outputs["Normal"], shader.inputs["Normal"])
-    material["surface"] = "preview_blue_white_mahjong_tiles"
-    return material
 
 
 def create_simple_materials() -> dict[str, bpy.types.Material]:
@@ -520,7 +408,6 @@ def create_simple_materials() -> dict[str, bpy.types.Material]:
     glossy_black = create_glossy_black_material()
     wood = create_wood_material()
     grille = create_grille_material()
-    tile_wall = create_tile_wall_material()
 
     rubber, _shader, _tree = base_material(
         "M_Table_Rubber_PBR",
@@ -565,6 +452,15 @@ def create_simple_materials() -> dict[str, bpy.types.Material]:
     set_node_input(green_shader, "Coat Weight", 0.38)
     indicator_green["surface"] = "green_indicator_lens"
 
+    controller_face, face_shader, _tree = base_material(
+        "M_Table_ControllerFace_PBR",
+        (0.34, 0.37, 0.36, 1.0),
+        metallic=0.30,
+        roughness=0.29,
+    )
+    set_node_input(face_shader, "Coat Weight", 0.18)
+    controller_face["surface"] = "satin_controller_face"
+
     floor, _shader, _tree = base_material(
         "M_PreviewFloor_Neutral",
         (0.055, 0.060, 0.056, 1.0),
@@ -577,12 +473,12 @@ def create_simple_materials() -> dict[str, bpy.types.Material]:
         "glossy_black": glossy_black,
         "wood": wood,
         "grille": grille,
-        "tile_wall": tile_wall,
         "rubber": rubber,
         "chrome": chrome,
         "deck": deck,
         "indicator_red": indicator_red,
         "indicator_green": indicator_green,
+        "controller_face": controller_face,
         "floor": floor,
     }
 
@@ -1027,6 +923,56 @@ def build_table(
             )
         )
 
+    grille_front = -d.pedestal_depth * 0.5 - 0.0065
+    grille_right = d.pedestal_width * 0.5 + 0.0065
+    for index, offset in enumerate((-0.044, -0.022, 0.0, 0.022, 0.044), start=1):
+        objects.append(
+            create_rounded_box(
+                f"Table_GrilleFront_V{index}",
+                (0.0022, 0.0018, 0.252),
+                (offset, grille_front, grille_z),
+                materials["metal"],
+                0.0006,
+                collection,
+                control_group,
+            )
+        )
+        objects.append(
+            create_rounded_box(
+                f"Table_GrilleRight_V{index}",
+                (0.0018, 0.0022, 0.252),
+                (grille_right, offset, grille_z),
+                materials["metal"],
+                0.0006,
+                collection,
+                control_group,
+            )
+        )
+    for index in range(10):
+        z = grille_z - 0.117 + index * 0.026
+        objects.append(
+            create_rounded_box(
+                f"Table_GrilleFront_H{index + 1}",
+                (0.100, 0.0018, 0.0022),
+                (0.0, grille_front, z),
+                materials["metal"],
+                0.0006,
+                collection,
+                control_group,
+            )
+        )
+        objects.append(
+            create_rounded_box(
+                f"Table_GrilleRight_H{index + 1}",
+                (0.0018, 0.100, 0.0022),
+                (grille_right, 0.0, z),
+                materials["metal"],
+                0.0006,
+                collection,
+                control_group,
+            )
+        )
+
     capital_height = 0.050
     objects.append(
         create_chamfered_frustum(
@@ -1045,12 +991,12 @@ def build_table(
     )
 
     # 前置控制盒与三枚物理按钮。
-    controller_z = d.shroud_bottom - 0.020
+    controller_z = d.shroud_bottom - 0.045
     objects.append(
         create_rounded_box(
             "Table_FrontControllerHousing",
             (0.300, 0.160, 0.068),
-            (0.0, -0.165, controller_z),
+            (0.0, -0.320, controller_z),
             materials["glossy_black"],
             0.009,
             collection,
@@ -1061,8 +1007,8 @@ def build_table(
         create_rounded_box(
             "Table_FrontControllerFace",
             (0.205, 0.006, 0.038),
-            (0.0, -0.248, controller_z),
-            materials["chrome"],
+            (0.0, -0.403, controller_z),
+            materials["controller_face"],
             0.005,
             collection,
             control_group,
@@ -1077,7 +1023,7 @@ def build_table(
                 f"Table_ControllerButton_{index}",
                 radius=0.011,
                 depth=0.008,
-                location=(x, -0.253, controller_z),
+                location=(x, -0.408, controller_z),
                 material=materials[material_key],
                 collection=collection,
                 parent=control_group,
@@ -1087,10 +1033,10 @@ def build_table(
 
     # 四组脚轮与支架，所有轮子保持在 550 mm 底座外廓内。
     caster_positions = (
-        ("NE", 0.220, 0.245),
-        ("NW", -0.220, 0.245),
-        ("SE", 0.220, -0.245),
-        ("SW", -0.220, -0.245),
+        ("NE", 0.245, 0.282),
+        ("NW", -0.245, 0.282),
+        ("SE", 0.245, -0.282),
+        ("SW", -0.245, -0.282),
     )
     for suffix, x, y in caster_positions:
         objects.append(
@@ -1186,41 +1132,6 @@ def build_table(
     return root, objects
 
 
-def add_preview_tile_walls(
-    collection: bpy.types.Collection,
-    material: bpy.types.Material,
-) -> list[bpy.types.Object]:
-    """创建参考图中的蓝白牌墙，仅用于预览，不参加桌体导出。"""
-    group = bpy.data.objects.new("Preview_MahjongTileWalls", None)
-    group.empty_display_type = "CUBE"
-    group.empty_display_size = 0.05
-    collection.objects.link(group)
-    walls: list[bpy.types.Object] = []
-    wall_length = 0.540
-    wall_depth = 0.024
-    wall_height = 0.032
-    wall_offset = 0.286
-    first_z = 0.785 + wall_height * 0.5
-    for layer in range(2):
-        z = first_z + layer * (wall_height + 0.002)
-        for name, location, rotation_z in (
-            ("North", (0.0, wall_offset, z), 0.0),
-            ("South", (0.0, -wall_offset, z), 0.0),
-            ("East", (wall_offset, 0.0, z), math.radians(90.0)),
-            ("West", (-wall_offset, 0.0, z), math.radians(90.0)),
-        ):
-            wall = create_rounded_box(
-                f"Preview_TileWall_{name}_L{layer + 1}",
-                (wall_length, wall_depth, wall_height),
-                location,
-                material,
-                0.0025,
-                collection,
-                group,
-            )
-            wall.rotation_euler.z = rotation_z
-            walls.append(wall)
-    return walls
 
 
 def point_at(obj: bpy.types.Object, target: tuple[float, float, float]) -> None:
@@ -1242,6 +1153,7 @@ def add_presentation_scene(
         ("Preview_Key", "AREA", (-1.20, -1.15, 2.10), 220.0, 1.25),
         ("Preview_Fill", "AREA", (1.35, -0.30, 1.45), 95.0, 1.00),
         ("Preview_Rim", "AREA", (0.30, 1.35, 1.80), 150.0, 0.95),
+        ("Preview_UnderFill", "AREA", (0.20, -1.10, 0.58), 85.0, 0.55),
     )
     for name, light_type, location, energy, size in light_specs:
         bpy.ops.object.light_add(type=light_type, location=location)
@@ -1345,6 +1257,10 @@ def write_manifest(
             round(dimensions.playing_width * 1000.0, 3),
             round(dimensions.playing_depth * 1000.0, 3),
         ],
+        "base_footprint_mm": [
+            round(dimensions.plinth_width * 1000.0, 3),
+            round(dimensions.plinth_depth * 1000.0, 3),
+        ],
         "dimensions_m": asdict(dimensions),
         "pivot": "floor_center",
         "mesh_object_count": sum(obj.type == "MESH" for obj in objects),
@@ -1418,7 +1334,13 @@ def main() -> None:
     )
 
     print(f"MAHJONG_TABLE_ASSETS_GENERATED={output_dir}")
-    print("NOMINAL_DIMENSIONS_MM=900x900x760")
+    print(
+        "NOMINAL_DIMENSIONS_MM="
+        f"{dimensions.outer_width * 1000.0:.0f}x"
+        f"{dimensions.outer_depth * 1000.0:.0f}x"
+        f"{dimensions.tabletop_height * 1000.0:.0f}"
+    )
+    print(f"BASE_FOOTPRINT_MM={dimensions.plinth_width * 1000.0:.0f}x{dimensions.plinth_depth * 1000.0:.0f}")
     print(f"MEASURED_DIMENSIONS_MM={'x'.join(f'{value * 1000.0:.3f}' for value in measured)}")
     print(f"MESH_OBJECT_COUNT={sum(obj.type == 'MESH' for obj in objects)}")
     print(f"BLENDER_VERSION={bpy.app.version_string}")

@@ -29,4 +29,6 @@ protected:
     UFUNCTION() void HandleReturnLobby();
 public:
     UFUNCTION(BlueprintCallable, Category="麻将|UI") void RefreshRoomState(const FMahjongRoomState& State, int32 LocalSeat);
+    /** 将屏幕相对方位（南、东、北、西）转换为服务端绝对座位号。 */
+    static int32 GetAbsoluteSeatForRelativePosition(int32 RelativePosition, int32 LocalSeat);
 };

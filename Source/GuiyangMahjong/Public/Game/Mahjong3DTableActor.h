@@ -36,6 +36,7 @@ private:
     UPROPERTY() FMahjongPublicTableState CachedPublicState;
     UPROPERTY() FMahjongPrivatePlayerState CachedPrivateState;
     bool bCachedPrivateState = false;
+    bool bLayoutInitialized = false;
     int32 CachedLocalSeat = 0;
     int32 SelectedTileId = INDEX_NONE;
 

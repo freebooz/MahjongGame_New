@@ -1,91 +1,97 @@
 {
   "generator": "Blender 5.2 GenerateStandardMahjongTable.py",
-  "generator_version": "1.0.0",
+  "generator_version": "2.0.0",
   "blender_version": "5.2.0 LTS",
   "asset_root": "SM_StandardMahjongTable",
   "nominal_dimensions_mm": [
-    900.0,
-    900.0,
-    760.0
+    940.0,
+    940.0,
+    780.0
   ],
   "measured_bounds_mm": {
     "minimum": [
-      -450.0,
-      -450.0,
-      0.0
+      -470.0,
+      -470.0,
+      -0.0
     ],
     "maximum": [
-      450.0,
-      450.0,
-      760.0
+      470.0,
+      470.0,
+      780.0
     ],
     "size": [
-      900.0,
-      900.0,
-      760.0
+      940.0,
+      940.0,
+      780.0
     ]
   },
   "playing_surface_mm": [
-    720.0,
-    720.0
+    760.0,
+    760.0
+  ],
+  "base_footprint_mm": [
+    550.0,
+    550.0
   ],
   "dimensions_m": {
-    "outer_width": 0.9,
-    "outer_depth": 0.9,
-    "tabletop_height": 0.76,
-    "bezel_width": 0.075,
-    "bumper_width": 0.015,
+    "outer_width": 0.94,
+    "outer_depth": 0.94,
+    "tabletop_height": 0.78,
+    "bezel_width": 0.07,
+    "bumper_width": 0.02,
     "bezel_height": 0.032,
     "felt_thickness": 0.012,
-    "felt_top": 0.746,
-    "shroud_top": 0.728,
-    "shroud_bottom": 0.575,
-    "shroud_bottom_width": 0.82,
-    "shroud_bottom_depth": 0.82,
-    "corner_chamfer": 0.055,
-    "side_panel_width": 0.635,
-    "side_panel_height": 0.092,
-    "side_panel_depth": 0.01,
-    "pedestal_width": 0.18,
-    "pedestal_depth": 0.18,
-    "pedestal_bottom": 0.095,
-    "pedestal_top": 0.575,
-    "plinth_width": 0.46,
-    "plinth_depth": 0.46,
-    "plinth_height": 0.045,
-    "plinth_slope_height": 0.06,
-    "center_lift_radius": 0.067
+    "felt_top": 0.765,
+    "shroud_top": 0.748,
+    "shroud_bottom": 0.595,
+    "shroud_bottom_width": 0.9,
+    "shroud_bottom_depth": 0.9,
+    "corner_chamfer": 0.035,
+    "side_panel_width": 0.72,
+    "side_panel_height": 0.082,
+    "side_panel_depth": 0.008,
+    "pedestal_width": 0.19,
+    "pedestal_depth": 0.19,
+    "pedestal_bottom": 0.115,
+    "pedestal_top": 0.595,
+    "plinth_width": 0.55,
+    "plinth_depth": 0.55,
+    "plinth_height": 0.04,
+    "plinth_slope_height": 0.07,
+    "center_lift_radius": 0.062
   },
   "pivot": "floor_center",
-  "mesh_object_count": 38,
+  "mesh_object_count": 79,
   "materials": [
     "M_PreviewFloor_Neutral",
     "M_Table_BlackPowderMetal_PBR",
-    "M_Table_BrushedBrass_PBR",
-    "M_Table_BurgundyEnamel_PBR",
-    "M_Table_ChampagneGold_PBR",
     "M_Table_Chrome_PBR",
+    "M_Table_ControllerFace_PBR",
     "M_Table_DeckComposite_PBR",
     "M_Table_Felt_Green_PBR",
+    "M_Table_IndicatorGreen_PBR",
+    "M_Table_IndicatorRed_PBR",
+    "M_Table_PerforatedGrille_PBR",
     "M_Table_PianoBlackMetal_PBR",
-    "M_Table_Rubber_PBR"
+    "M_Table_Rubber_PBR",
+    "M_Table_SmokedOak_PBR"
   ],
   "material_workflow": "Principled BSDF metallic-roughness PBR; procedural Blender nodes",
   "files": [
     {
       "path": "SourceArt/3D/MahjongTable/StandardMahjongTable_Preview.png",
-      "bytes": 1080543,
-      "sha256": "316ef7c596ae016fa1aa95d14f2f60644a973601c039a9adf62be35a2845eadc"
+      "bytes": 1105947,
+      "sha256": "3321eadef6b8241e1b6d8be3642e73524021a295c7a76013bc0b6add1a8c102b"
     },
     {
       "path": "SourceArt/3D/MahjongTable/SM_StandardMahjongTable.blend",
-      "bytes": 219859,
-      "sha256": "3742badcf61e21941e2dac6708039801f0c15bbcf9a4e6ef70fe0aae68c2fb8e"
+      "bytes": 300253,
+      "sha256": "b358a3b3ccced110c244e9279633d98bfa0cb0bed3524ed78b8ce35b82146de3"
     },
     {
       "path": "SourceArt/3D/MahjongTable/SM_StandardMahjongTable.glb",
-      "bytes": 706508,
-      "sha256": "72cf1e8063534ed8feef7974a8f49a635c4de3b0ac8590f5b80caa38712e5884"
+      "bytes": 1626240,
+      "sha256": "7b95693f622de72d4bb416f03b928bdc37afc71a388543474d79b452558ed08b"
     }
   ]
 }

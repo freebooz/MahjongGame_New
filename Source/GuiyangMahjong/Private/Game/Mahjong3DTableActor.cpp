@@ -65,10 +65,18 @@ AMahjong3DTableActor::AMahjong3DTableActor()
 void AMahjong3DTableActor::UpdateLayout(const FMahjongPublicTableState& PublicState,
     const FMahjongPrivatePlayerState& PrivateState, const bool bHasPrivateState, const int32 LocalSeat)
 {
+    const int32 ClampedLocalSeat = FMath::Clamp(LocalSeat, 0, 3);
+    const bool bLayoutUnchanged = bLayoutInitialized
+        && CachedPublicState.StateSequence == PublicState.StateSequence
+        && CachedPrivateState.StateSequence == PrivateState.StateSequence
+        && bCachedPrivateState == bHasPrivateState
+        && CachedLocalSeat == ClampedLocalSeat;
     CachedPublicState = PublicState;
     CachedPrivateState = PrivateState;
     bCachedPrivateState = bHasPrivateState;
-    CachedLocalSeat = FMath::Clamp(LocalSeat, 0, 3);
+    CachedLocalSeat = ClampedLocalSeat;
+    if (bLayoutUnchanged) return;
+    bLayoutInitialized = true;
     RebuildLayout();
 }
 
@@ -136,7 +144,8 @@ void AMahjong3DTableActor::AddTile(const FMahjongTile* Tile, const bool bFaceUp,
         UStaticMeshComponent* Component = NewObject<UStaticMeshComponent>(this);
         Component->SetStaticMesh(Mesh);
         Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        Component->SetCastShadow(true);
+        // UViewport 中同时存在上百张动态牌时，逐牌动态投影会产生闪烁和过亮边缘。
+        Component->SetCastShadow(false);
         FRotator MeshRotation = Rotation;
         if (!bUpright)
         {

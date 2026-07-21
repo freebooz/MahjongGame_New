@@ -289,7 +289,6 @@ namespace MahjongUIBuilder
             : BPName == TEXT("WBP_Lobby") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Lobby_JiaxiuTower.T_BG_Lobby_JiaxiuTower")
             : BPName == TEXT("WBP_CreatingRoom") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_CreatingRoom_GuiyangMoon.T_BG_CreatingRoom_GuiyangMoon")
             : BPName == TEXT("WBP_Room") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Room_GuiyangNight.T_BG_Room_GuiyangNight")
-            : BPName == TEXT("WBP_GameHUD") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_GameTable_GreenFelt.T_BG_GameTable_GreenFelt")
             : BPName == TEXT("WBP_Settlement") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Settlement_GuiyangRiver.T_BG_Settlement_GuiyangRiver")
             : nullptr;
         UWidget* Background = nullptr;
@@ -303,7 +302,10 @@ namespace MahjongUIBuilder
         }
         else
         {
-            Background = Border(BP, TEXT("Background_ComponentSlot"), DeepGreen);
+            // The in-game room is rendered by its 3D viewport. Keep its backing layer transparent so
+            // the legacy green-felt artwork cannot show around the viewport on wide displays.
+            Background = Border(BP, TEXT("Background_ComponentSlot"),
+                BPName == TEXT("WBP_GameHUD") ? FLinearColor::Transparent : DeepGreen);
         }
         BackgroundSize->AddChild(Background);
         BackgroundScale->AddChild(BackgroundSize);
@@ -668,7 +670,7 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
         MarkVariable(HUD, Table3DViewport);
         Table3DViewport->SetBackgroundColor(FLinearColor(0.01f, 0.055f, 0.045f, 1.0f));
         Table3DViewport->SetVisibility(ESlateVisibility::HitTestInvisible);
-        Place(C, Table3DViewport, {170,100}, {1580,840});
+        Place(C, Table3DViewport, {0,0}, {1920,1080});
         Place(C, Text(HUD, TEXT("Txt_RoomId"), TEXT("房间：100001"), 20), {30,24}, {360,36});
         Place(C, Text(HUD, TEXT("Txt_CurrentPhase"), TEXT("阶段：玩家回合"), 20), {30,62}, {420,36});
         Place(C, Text(HUD, TEXT("Txt_RemainingTileCount"), TEXT("剩余：83"), 26), {820,20}, {250,44});
@@ -735,8 +737,8 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     }
     Finish(HUD);
 
-    UE_LOG(LogTemp, Display, TEXT("P0 UMG 生成结束：成功=%d/18"), Created);
-    return Created == 18 ? 0 : 1;
+    UE_LOG(LogTemp, Display, TEXT("P0 UMG 生成结束：成功=%d/19"), Created);
+    return Created == 19 ? 0 : 1;
 }
 #else
 UGenerateMahjongUICommandlet::UGenerateMahjongUICommandlet()

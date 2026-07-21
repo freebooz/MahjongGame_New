@@ -44,11 +44,15 @@ void UMobileMahjongHUDWidget::NativeConstruct()
         Table3DViewport->SetVisibility(ESlateVisibility::HitTestInvisible);
         Table3DViewport->SetEnableAdvancedFeatures(true);
         Table3DViewport->SetBackgroundColor(FLinearColor(0.01f, 0.055f, 0.045f, 1.0f));
-        Table3DViewport->SetLightIntensity(4.0f);
-        Table3DViewport->SetSkyIntensity(1.25f);
-        const FVector CameraLocation(0.0f, -1120.0f, 900.0f);
+        // PBR 麻将材质不需要高强度预览灯；较低的主光和天空光可避免白色树脂过曝。
+        Table3DViewport->SetLightIntensity(1.7f);
+        Table3DViewport->SetSkyIntensity(0.55f);
+        // 本家固定在南侧（屏幕底部），相机从南向北俯视；缩短距离让牌桌填满主要视口。
+        // Frame the 1060 x 770 cm tabletop as the room background, with only a narrow margin
+        // around its outer rails instead of viewing it as a small object in the distance.
+        const FVector CameraLocation(0.0f, -530.0f, 430.0f);
         Table3DViewport->SetViewLocation(CameraLocation);
-        Table3DViewport->SetViewRotation((FVector(0.0f, 0.0f, 20.0f) - CameraLocation).Rotation());
+        Table3DViewport->SetViewRotation((FVector(0.0f, -45.0f, 5.0f) - CameraLocation).Rotation());
         Table3DActor = Cast<AMahjong3DTableActor>(Table3DViewport->Spawn(AMahjong3DTableActor::StaticClass()));
 
         // 旧二维牌面仅保留本家透明点击层，其余牌区全部由三维模型表现。
@@ -142,9 +146,11 @@ void UMobileMahjongHUDWidget::RefreshTableState(const FMahjongPublicTableState& 
         : TEXT("当前：--")));
 
     UTextBlock* SeatWidgets[] = {Seat_Self, Seat_Right, Seat_Top, Seat_Left};
-    for (UTextBlock* SeatWidget : SeatWidgets)
+    const TCHAR* SeatDirections[] = {TEXT("南"), TEXT("东"), TEXT("北"), TEXT("西")};
+    for (int32 RelativeSeat = 0; RelativeSeat < 4; ++RelativeSeat)
     {
-        SeatWidget->SetText(FText::FromString(TEXT("等待玩家")));
+        SeatWidgets[RelativeSeat]->SetText(FText::FromString(
+            FString::Printf(TEXT("%s · 等待玩家"), SeatDirections[RelativeSeat])));
     }
     for (const FMahjongSeatInfo& Seat : State.Seats)
     {
@@ -153,7 +159,8 @@ void UMobileMahjongHUDWidget::RefreshTableState(const FMahjongPublicTableState& 
         const FString OnlineText = Seat.bOnline ? TEXT("在线") : TEXT("离线");
         const FString TurnMark = Seat.SeatIndex == State.CurrentTurnSeat ? TEXT("▶ ") : TEXT("");
         SeatWidgets[RelativeSeat]->SetText(FText::FromString(FString::Printf(
-            TEXT("%s%s\n手牌 %d\n%d 分 · %s"), *TurnMark, *Seat.PlayerName,
+            TEXT("%s%s · %s%s\n手牌 %d\n%d 分 · %s"), SeatDirections[RelativeSeat],
+            RelativeSeat == 0 ? TEXT("【我】") : TEXT(""), *TurnMark, *Seat.PlayerName,
             Seat.HandTileCount, Seat.Score, *OnlineText)));
     }
     RefreshOpponentHands(LocalSeat);
