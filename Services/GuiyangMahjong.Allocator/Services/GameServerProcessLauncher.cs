@@ -33,7 +33,10 @@ public sealed class GameServerProcessLauncher(
             WorkingDirectory = workingDirectory
         };
         if (OperatingSystem.IsLinux()) startInfo.ArgumentList.Add(executablePath);
-        foreach (var argument in options.GameServerPrefixArguments) startInfo.ArgumentList.Add(argument);
+        foreach (var argument in options.GameServerPrefixArguments)
+        {
+            if (!string.IsNullOrWhiteSpace(argument)) startInfo.ArgumentList.Add(argument.Trim());
+        }
         startInfo.ArgumentList.Add("-MahjongManagedGameServer");
         startInfo.ArgumentList.Add($"-RoomId={spec.RoomId}");
         startInfo.ArgumentList.Add($"-MatchId={spec.MatchId}");

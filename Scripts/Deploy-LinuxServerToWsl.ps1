@@ -69,6 +69,8 @@ rsync -a --delete $(Quote-Bash "$artifactLinux/") $(Quote-Bash "$LinuxRepository
 cd $(Quote-Bash $LinuxRepositoryPath)
 sudo sed -i '/^GAME_SERVER_VARIANT=/d' Deploy/linux/.env
 printf '%s\n' 'GAME_SERVER_VARIANT=unreal' | sudo tee -a Deploy/linux/.env >/dev/null
+sudo sed -i '/^GAME_SERVER_MAP=/d' Deploy/linux/.env
+printf '%s\n' 'GAME_SERVER_MAP=/Game/Maps/MahjongRoomMap' | sudo tee -a Deploy/linux/.env >/dev/null
 sudo ./Deploy/linux/deploy.sh upgrade --version $(Quote-Bash $Version)
 "@
 & wsl.exe -d $Distribution -- bash -lc $syncAndDeploy

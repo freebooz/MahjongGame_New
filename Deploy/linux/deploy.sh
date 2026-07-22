@@ -203,6 +203,7 @@ ensure_environment() {
 MAHJONG_VERSION=${VERSION:-dev}
 IMAGE_REGISTRY=local
 GAME_SERVER_VARIANT=fake
+GAME_SERVER_MAP=
 MAHJONG_DATA_ROOT=/var/lib/guiyang-mahjong
 ADVERTISED_IP=$advertised_ip
 AUTH_PORT=18082
@@ -245,13 +246,18 @@ validate_environment() {
       exit 1
     fi
   done
-  local advertised_ip variant port_start port_end
+  local advertised_ip variant game_server_map port_start port_end
   advertised_ip="$(env_value ADVERTISED_IP)"
   [[ "$advertised_ip" != "0.0.0.0" && "$advertised_ip" != "::" ]] \
     || { echo "ADVERTISED_IP must be a client-reachable address." >&2; exit 1; }
   variant="$(env_value GAME_SERVER_VARIANT)"; variant="${variant:-fake}"
   [[ "$variant" == fake || "$variant" == unreal ]] \
     || { echo "GAME_SERVER_VARIANT must be fake or unreal." >&2; exit 1; }
+  game_server_map="$(env_value GAME_SERVER_MAP)"
+  if [[ "$variant" == unreal && "$game_server_map" != "/Game/Maps/MahjongRoomMap" ]]; then
+    echo "GAME_SERVER_MAP must be /Game/Maps/MahjongRoomMap for the Unreal server variant." >&2
+    exit 1
+  fi
   if [[ "$variant" == unreal && ( "$advertised_ip" == 127.* || "$advertised_ip" == "::1" ) ]]; then
     echo "A real UE server cannot advertise a loopback address to external clients." >&2
     exit 1

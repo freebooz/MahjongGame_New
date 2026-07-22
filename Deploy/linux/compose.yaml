@@ -83,6 +83,9 @@ services:
       Allocator__AdvertisedIp: ${ADVERTISED_IP:?ADVERTISED_IP is required}
       Allocator__GameServerExecutablePath: /opt/guiyang-mahjong/server/GuiyangMahjongServer
       Allocator__GameServerWorkingDirectory: /opt/guiyang-mahjong/server
+      # Real UE servers must receive the authored room map explicitly. Fake servers leave
+      # GAME_SERVER_MAP empty; the launcher ignores the resulting blank prefix argument.
+      Allocator__GameServerPrefixArguments__0: ${GAME_SERVER_MAP:-}
       Allocator__MatchResultOutboxDirectory: /var/lib/guiyang-mahjong/outbox
       Allocator__StateFilePath: /var/lib/guiyang-mahjong/state/instances.json
       # UE uses a dynamic UDP port range. Host networking avoids the Docker
