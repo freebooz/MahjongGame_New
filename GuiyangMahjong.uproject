@@ -35,6 +35,10 @@
       "Enabled": true
     },
     {
+      "Name": "Agones",
+      "Enabled": true
+    },
+    {
       "Name": "Landmass",
       "Enabled": false
     },

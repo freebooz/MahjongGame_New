@@ -6,6 +6,7 @@
 #include "GuiyangMahjong.h"
 #include "Room/GuiyangManagedRoomDefinition.h"
 #include "Room/GuiyangRoomManager.h"
+#include "Server/GuiyangAgonesLifecycleSubsystem.h"
 #include "Server/GuiyangGameServerBridge.h"
 #include "Table/MahjongTableEngine.h"
 #include "HAL/PlatformTime.h"
@@ -133,10 +134,32 @@ FString AGuiyangMahjongGameMode::InitNewPlayer(APlayerController* NewPlayerContr
 void AGuiyangMahjongGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
+    if (const FString* PlayerId = AuthorizedPlayerIdsByController.Find(NewPlayer))
+    {
+        if (UGameInstance* GameInstance = GetGameInstance())
+        {
+            if (UGuiyangAgonesLifecycleSubsystem* Lifecycle =
+                GameInstance->GetSubsystem<UGuiyangAgonesLifecycleSubsystem>())
+            {
+                Lifecycle->NotifyPlayerConnected(*PlayerId);
+            }
+        }
+    }
 }
 
 void AGuiyangMahjongGameMode::Logout(AController* Exiting)
 {
+    if (const FString* PlayerId = AuthorizedPlayerIdsByController.Find(Cast<APlayerController>(Exiting)))
+    {
+        if (UGameInstance* GameInstance = GetGameInstance())
+        {
+            if (UGuiyangAgonesLifecycleSubsystem* Lifecycle =
+                GameInstance->GetSubsystem<UGuiyangAgonesLifecycleSubsystem>())
+            {
+                Lifecycle->NotifyPlayerDisconnected(*PlayerId);
+            }
+        }
+    }
     if (AGuiyangMahjongPlayerController* Controller = Cast<AGuiyangMahjongPlayerController>(Exiting))
     {
         AGuiyangMahjongPlayerState* Player = Controller->GetPlayerState<AGuiyangMahjongPlayerState>();
@@ -161,6 +184,14 @@ void AGuiyangMahjongGameMode::Logout(AController* Exiting)
 
 void AGuiyangMahjongGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    if (UGameInstance* GameInstance = GetGameInstance())
+    {
+        if (UGuiyangAgonesLifecycleSubsystem* Lifecycle =
+            GameInstance->GetSubsystem<UGuiyangAgonesLifecycleSubsystem>())
+        {
+            Lifecycle->RequestShutdown();
+        }
+    }
     if (GameServerBridge) GameServerBridge->Shutdown();
     PendingAuthorizedPlayersByTicketDigest.Reset();
     PendingTicketExpiryByDigest.Reset();
@@ -263,6 +294,22 @@ void AGuiyangMahjongGameMode::HandleAuthenticateSession(AGuiyangMahjongPlayerCon
     {
         Controller->Client_ShowErrorMessage(TEXT("服务器认证失败"));
         return;
+    }
+
+    // Managed connections were counted immediately after their signed join ticket was accepted.
+    // A non-managed Agones server learns the stable player id only after this profile RPC, so
+    // register it here exactly once and retain the controller binding for Logout.
+    if (!AuthorizedPlayerIdsByController.Contains(Controller))
+    {
+        AuthorizedPlayerIdsByController.Add(Controller, CleanPlayerId);
+        if (UGameInstance* GameInstance = GetGameInstance())
+        {
+            if (UGuiyangAgonesLifecycleSubsystem* Lifecycle =
+                GameInstance->GetSubsystem<UGuiyangAgonesLifecycleSubsystem>())
+            {
+                Lifecycle->NotifyPlayerConnected(CleanPlayerId);
+            }
+        }
     }
 
     FString RoomCode;

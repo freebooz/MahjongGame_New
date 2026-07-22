@@ -2,6 +2,7 @@
 param(
     [string]$EngineRoot = 'F:\UnrealEngine-5.8.0-release',
     [string]$ProjectPath = 'H:\MahjongGame\GuiyangMahjong.uproject',
+    [string]$MapPath = '/Game/Maps/UIReviewMap',
     [string[]]$Resolutions = @('1920x1080', '1280x720', '2400x1080', '2340x1080'),
     [string]$ScreenName = 'Login',
     [string]$OutputPhase = 'Phase18',
@@ -69,6 +70,9 @@ function Get-ImageMetrics {
 $editor = Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealEditor.exe'
 if (-not (Test-Path -LiteralPath $editor)) { throw "UnrealEditor.exe not found: $editor" }
 if (-not (Test-Path -LiteralPath $ProjectPath)) { throw "Project not found: $ProjectPath" }
+if ($MapPath -notmatch '^/Game/[A-Za-z0-9_/-]+$' -or $MapPath.Contains('..')) {
+    throw 'MapPath contains unsupported characters.'
+}
 if ($TimeoutSeconds -lt 10) { throw 'TimeoutSeconds must be at least 10.' }
 if ($ScreenName -notmatch '^[A-Za-z0-9_-]+$') { throw 'ScreenName contains unsupported characters.' }
 if ($OutputPhase -notmatch '^[A-Za-z0-9_\\/-]+$' -or $OutputPhase.Contains('..')) {
@@ -96,7 +100,7 @@ foreach ($resolution in $Resolutions) {
     Remove-Item -LiteralPath $logPath -Force -ErrorAction SilentlyContinue
 
     $arguments = @(
-        $ProjectPath, '/Game/Maps/UIReviewMap', '-game', '-windowed',
+        $ProjectPath, $MapPath, '-game', '-RenderOffscreen',
         "-ResX=$width", "-ResY=$height", '-ForceRes',
         '-NoSplash', '-NoSound', '-unattended', '-nop4', '-d3d12', '-Multiprocess',
         '-UIReviewScreenshot', "-UIReviewScreen=$ScreenName", "-UIReviewName=$relativeName", '-UIReviewDelaySeconds=3',
@@ -144,6 +148,7 @@ $report = [ordered]@{
     GeneratedAt = [DateTime]::UtcNow.ToString('o')
     Passed = $passed
     Screen = $ScreenName
+    Map = $MapPath
     Results = $results
 }
 $resultPath = Join-Path $outputRoot 'result.json'

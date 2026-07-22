@@ -1,0 +1,32 @@
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        ca-certificates \
+        libcurl4 \
+        libicu70 \
+        libssl3 \
+        libstdc++6 \
+        zlib1g \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 10001 mahjong \
+    && useradd --uid 10001 --gid mahjong --create-home --shell /usr/sbin/nologin mahjong
+
+WORKDIR /opt/guiyang-mahjong
+
+# Build context must be the repository root. Build-LinuxServer.ps1 writes this directory.
+COPY --chown=mahjong:mahjong Artifacts/LinuxServer/ ./
+
+RUN test -f ./GuiyangMahjongServer.sh \
+    && test -f ./GuiyangMahjong/Binaries/Linux/GuiyangMahjongServer \
+    && chmod 0555 ./GuiyangMahjongServer.sh \
+        ./GuiyangMahjong/Binaries/Linux/GuiyangMahjongServer
+
+USER 10001:10001
+
+EXPOSE 7777/udp
+
+ENTRYPOINT ["/bin/sh", "/opt/guiyang-mahjong/GuiyangMahjongServer.sh"]
+CMD ["/Game/Maps/MahjongRoomMap", "-server", "-log", "-unattended", "-port=7777", "-MahjongOrchestrator=Agones"]

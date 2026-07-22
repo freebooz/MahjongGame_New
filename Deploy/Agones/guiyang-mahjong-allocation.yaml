@@ -1,0 +1,18 @@
+apiVersion: allocation.agones.dev/v1
+kind: GameServerAllocation
+metadata:
+  generateName: guiyang-mahjong-
+  namespace: guiyang-mahjong
+spec:
+  scheduling: Packed
+  selectors:
+    - matchLabels:
+        agones.dev/fleet: guiyang-mahjong
+        mahjong.freebooz/game: guiyang-zhua-ji
+  metadata:
+    labels:
+      mahjong.freebooz/allocation-source: lobby
+    annotations:
+      # The allocator must replace these values for each room allocation.
+      mahjong.freebooz/room-id: REPLACE_WITH_ROOM_ID
+      mahjong.freebooz/match-id: REPLACE_WITH_MATCH_ID

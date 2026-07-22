@@ -28,6 +28,10 @@
 #include "UI/MahjongResponsiveScaleBox.h"
 #include "UI/MahjongUIScalingRule.h"
 #include "Game/Mahjong3DTableActor.h"
+#include "Game/MahjongRoomCameraActor.h"
+#include "CineCameraComponent.h"
+#include "Engine/Level.h"
+#include "Engine/World.h"
 #include "UObject/UnrealType.h"
 #include "Sound/SoundBase.h"
 #if WITH_EDITOR
@@ -40,7 +44,6 @@
 #include "Components/Image.h"
 #include "Components/Slider.h"
 #include "Components/TextBlock.h"
-#include "Components/Viewport.h"
 #endif
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -1312,24 +1315,41 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("三维牌桌 HUD 必须存在"), GameHUD);
     if (!GameHUD || !GameHUD->WidgetTree) return false;
 
-    const UViewport* Viewport = Cast<UViewport>(GameHUD->WidgetTree->FindWidget(TEXT("Table3DViewport")));
-    TestNotNull(TEXT("游戏 HUD 必须包含三维牌桌 Viewport"), Viewport);
-    const UCanvasPanelSlot* ViewportSlot = Viewport ? Cast<UCanvasPanelSlot>(Viewport->Slot) : nullptr;
-    TestNotNull(TEXT("三维牌桌 Viewport 必须使用画布布局"), ViewportSlot);
-    if (ViewportSlot)
-    {
-        TestEqual(TEXT("三维牌桌 Viewport 必须从屏幕左上角开始"), ViewportSlot->GetPosition(), FVector2D::ZeroVector);
-        TestEqual(TEXT("三维牌桌 Viewport 必须覆盖完整 1920x1080 设计区域"),
-            ViewportSlot->GetSize(), FVector2D(1920.0f, 1080.0f));
-    }
-    if (Viewport)
-    {
-        TestEqual(TEXT("三维牌桌 Viewport 清屏色必须透明以显示关卡空间"),
-            Viewport->GetBackgroundColor(), FLinearColor::Transparent);
-    }
-    const UImage* LegacyBackground = Cast<UImage>(GameHUD->WidgetTree->FindWidget(TEXT("Background_ComponentSlot")));
-    TestNull(TEXT("游戏房间不得再使用旧版桌面背景图"), LegacyBackground);
+    // The serialized legacy UViewport is ignored at runtime. The table and camera now live in
+    // MahjongRoomMap, where artists can pilot and tune the camera directly in the editor.
+    const UWidget* LegacyBackground = GameHUD->WidgetTree->FindWidget(TEXT("Background_ComponentSlot"));
+    TestTrue(TEXT("旧版绿色桌面背景若仍存在于序列化资源中，必须由 HUD 兼容绑定接管"),
+        !LegacyBackground || FindFProperty<FObjectPropertyBase>(
+            UMobileMahjongHUDWidget::StaticClass(), TEXT("Background_ComponentSlot")) != nullptr);
     TestNotNull(TEXT("三维牌桌 Actor 类必须可加载"), AMahjong3DTableActor::StaticClass());
+    const AMahjongRoomCameraActor* CameraDefault = GetDefault<AMahjongRoomCameraActor>();
+    TestNotNull(TEXT("房间电影摄像机预设类必须可加载"), CameraDefault);
+    if (CameraDefault && CameraDefault->GetCineCameraComponent())
+    {
+        TestTrue(TEXT("房间摄像机必须带稳定标签"),
+            CameraDefault->ActorHasTag(AMahjongRoomCameraActor::RoomCameraTag));
+        TestEqual(TEXT("默认摄像机焦距必须为 45mm"),
+            CameraDefault->GetCineCameraComponent()->CurrentFocalLength, 45.0f);
+        TestFalse(TEXT("移动横屏摄像机不得强制黑边宽高比"),
+            CameraDefault->GetCineCameraComponent()->bConstrainAspectRatio);
+    }
+
+    UWorld* RoomWorld = LoadObject<UWorld>(nullptr,
+        TEXT("/Game/Maps/MahjongRoomMap.MahjongRoomMap"));
+    TestNotNull(TEXT("麻将房间关卡必须可加载"), RoomWorld);
+    bool bHasRoomTable = false;
+    bool bHasRoomCamera = false;
+    if (RoomWorld && RoomWorld->PersistentLevel)
+    {
+        for (const AActor* Actor : RoomWorld->PersistentLevel->Actors)
+        {
+            bHasRoomTable |= IsValid(Actor) && Actor->IsA<AMahjong3DTableActor>();
+            bHasRoomCamera |= IsValid(Actor) && Actor->IsA<AMahjongRoomCameraActor>()
+                && Actor->ActorHasTag(AMahjongRoomCameraActor::RoomCameraTag);
+        }
+    }
+    TestTrue(TEXT("MahjongRoomMap 必须放置真实三维麻将桌"), bHasRoomTable);
+    TestTrue(TEXT("MahjongRoomMap 必须放置可编辑电影摄像机"), bHasRoomCamera);
     UStaticMesh* TileMesh = LoadObject<UStaticMesh>(nullptr,
         TEXT("/Game/Art/Mahjong/Mahjong50/Tiles/SM_Mahjong50_Characters_1.SM_Mahjong50_Characters_1"));
     TestNotNull(TEXT("Mahjong50 PBR 麻将牌静态网格必须已导入"), TileMesh);

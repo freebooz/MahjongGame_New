@@ -8,7 +8,8 @@ public class GuiyangMahjongEditorTools : ModuleRules
         PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "GuiyangMahjongCore", "GuiyangMahjongOnline", "GuiyangMahjong" });
         PrivateDependencyModuleNames.AddRange(new[]
         {
-            "UMG", "Slate", "SlateCore", "UnrealEd", "UMGEditor", "AssetRegistry", "Kismet", "Json"
+            "UMG", "Slate", "SlateCore", "UnrealEd", "UMGEditor", "AssetRegistry", "Kismet", "Json",
+            "CinematicCamera"
         });
     }
 }

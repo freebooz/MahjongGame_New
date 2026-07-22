@@ -1,8 +1,10 @@
 #include "UI/MobileRootHUDWidget.h"
 
 #include "Auth/GuiyangLoginSubsystem.h"
+#include "Blueprint/WidgetTree.h"
 #include "Components/Overlay.h"
 #include "Components/OverlaySlot.h"
+#include "Components/Widget.h"
 #include "Game/GuiyangMahjongGameState.h"
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "Game/GuiyangMahjongPlayerState.h"
@@ -355,6 +357,15 @@ void UMobileRootHUDWidget::ShowGameHUD()
 
 UUserWidget* UMobileRootHUDWidget::ShowScreenByClassPath(const TCHAR* ClassPath)
 {
+    const bool bShowRoomWorld = FCString::Strifind(ClassPath, TEXT("WBP_GameHUD")) != nullptr;
+    if (UWidget* RootBackingLayer = WidgetTree
+        ? WidgetTree->FindWidget(TEXT("Scale_BackgroundFill")) : nullptr)
+    {
+        RootBackingLayer->SetVisibility(
+            bShowRoomWorld ? ESlateVisibility::Collapsed : ESlateVisibility::HitTestInvisible);
+        UE_LOG(LogMahjongUI, Log, TEXT("Root HUD backing layer %s for screen %s"),
+            bShowRoomWorld ? TEXT("collapsed") : TEXT("restored"), ClassPath);
+    }
     if (CurrentScreen && CurrentScreenClassPath == ClassPath)
     {
         return CurrentScreen;

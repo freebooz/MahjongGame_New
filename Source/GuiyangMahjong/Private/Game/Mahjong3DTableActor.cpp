@@ -45,6 +45,14 @@ AMahjong3DTableActor::AMahjong3DTableActor()
     SetRootComponent(SceneRoot);
     TableMesh = LoadObject<UStaticMesh>(nullptr,
         TEXT("/Game/Art/Mahjong/Table/Meshes/SM_StandardMahjongTable.SM_StandardMahjongTable"));
+    TableComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MahjongTableMesh"));
+    TableComponent->SetupAttachment(SceneRoot);
+    TableComponent->SetStaticMesh(TableMesh);
+    TableComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    TableComponent->SetCastShadow(true);
+    TableComponent->SetRelativeLocation(
+        FVector(0.0f, 0.0f, -ImportedTableSurfaceHeight * ImportedTableDisplayScale));
+    TableComponent->SetRelativeScale3D(FVector(ImportedTableDisplayScale));
     CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
     static const TCHAR* TileAssetNames[] = {
         TEXT("Characters_1"), TEXT("Characters_2"), TEXT("Characters_3"),
@@ -207,20 +215,8 @@ UStaticMesh* AMahjong3DTableActor::ResolveTileMesh(const FMahjongTile* Tile, con
 
 void AMahjong3DTableActor::AddTableAndFrame()
 {
-    if (TableMesh)
+    if (TableComponent && TableComponent->GetStaticMesh())
     {
-        UStaticMeshComponent* Component = NewObject<UStaticMeshComponent>(this);
-        Component->SetStaticMesh(TableMesh);
-        Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        Component->SetCastShadow(true);
-        Component->SetRelativeLocation(
-            FVector(0.0f, 0.0f, -ImportedTableSurfaceHeight * ImportedTableDisplayScale));
-        Component->SetRelativeRotation(FRotator::ZeroRotator);
-        Component->SetRelativeScale3D(FVector(ImportedTableDisplayScale));
-        Component->SetupAttachment(SceneRoot);
-        AddInstanceComponent(Component);
-        Component->RegisterComponent();
-        RuntimeComponents.Add(Component);
         return;
     }
 

@@ -8,6 +8,7 @@
 class UActorComponent;
 class USceneComponent;
 class UStaticMesh;
+class UStaticMeshComponent;
 class UMaterialInterface;
 
 /**
@@ -27,7 +28,9 @@ public:
     void SetSelectedTile(int32 UniqueId);
 
 private:
-    UPROPERTY() TObjectPtr<USceneComponent> SceneRoot;
+    UPROPERTY(VisibleAnywhere, Category="Mahjong|Presentation") TObjectPtr<USceneComponent> SceneRoot;
+    /** Persistent editor-visible table mesh; runtime tile components are rebuilt around it. */
+    UPROPERTY(VisibleAnywhere, Category="Mahjong|Presentation") TObjectPtr<UStaticMeshComponent> TableComponent;
     UPROPERTY(Transient) TArray<TObjectPtr<UActorComponent>> RuntimeComponents;
     UPROPERTY(Transient) TObjectPtr<UStaticMesh> TableMesh;
     UPROPERTY(Transient) TObjectPtr<UStaticMesh> CubeMesh;

@@ -7,6 +7,7 @@
 #include "Game/Mahjong3DTableActor.h"
 #include "Game/GuiyangMahjongGameState.h"
 #include "Game/GuiyangMahjongPlayerController.h"
+#include "Blueprint/WidgetTree.h"
 #include "Game/GuiyangMahjongPlayerState.h"
 #include "Components/HorizontalBox.h"
 #include "Components/HorizontalBoxSlot.h"
@@ -16,6 +17,7 @@
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
 #include "Components/Viewport.h"
+#include "Components/Widget.h"
 #include "Components/WrapBox.h"
 #include "Engine/Texture2D.h"
 #include "GuiyangMahjong.h"
@@ -39,49 +41,47 @@ namespace
 void UMobileMahjongHUDWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+    for (const FName LayerName : {FName(TEXT("Scale_BackgroundFill")),
+        FName(TEXT("Background_ComponentSlot"))})
+    {
+        if (UWidget* LegacyLayer = WidgetTree ? WidgetTree->FindWidget(LayerName) : nullptr)
+        {
+            // The real room world is the background. Collapse the serialized parent scale layer
+            // as well as its old green-gold brush so neither can tint/obscure the 3D scene.
+            LegacyLayer->SetVisibility(ESlateVisibility::Collapsed);
+            UE_LOG(LogMahjongUI, Log, TEXT("Collapsed legacy room HUD backing layer: %s (%s)"),
+                *LayerName.ToString(), *LegacyLayer->GetClass()->GetName());
+        }
+    }
     if (Table3DViewport)
     {
-        Table3DViewport->SetVisibility(ESlateVisibility::HitTestInvisible);
-        Table3DViewport->SetEnableAdvancedFeatures(true);
-        // Let the already lit room level remain visible outside the rendered tabletop.
-        Table3DViewport->SetBackgroundColor(FLinearColor::Transparent);
-        // UViewport does not expose its internal FMinimalViewInfo/FOV. Apply a small horizontal
-        // projection compensation to the 3D layer only so the table reads naturally on landscape
-        // phones without distorting HUD text or controls.
-        Table3DViewport->SetRenderTransformPivot(FVector2D(0.5f, 0.5f));
-        Table3DViewport->SetRenderScale(FVector2D(1.08f, 1.0f));
-        // PBR 麻将材质不需要高强度预览灯；较低的主光和天空光可避免白色树脂过曝。
-        Table3DViewport->SetLightIntensity(1.7f);
-        Table3DViewport->SetSkyIntensity(0.55f);
-        // 本家固定在南侧（屏幕底部）。抬高并向桌面中心移动相机，降低近大远小的
-        // 梯形透视，避免矩形牌桌看起来纵向拉长、横向压缩。
-        const FVector CameraLocation(0.0f, -410.0f, 570.0f);
-        Table3DViewport->SetViewLocation(CameraLocation);
-        Table3DViewport->SetViewRotation((FVector::ZeroVector - CameraLocation).Rotation());
-        Table3DActor = Cast<AMahjong3DTableActor>(Table3DViewport->Spawn(AMahjong3DTableActor::StaticClass()));
-
-        // 旧二维牌面仅保留本家透明点击层，其余牌区全部由三维模型表现。
-        Panel_SelfHandTiles->SetRenderOpacity(0.0f);
-        Panel_TopHandTiles->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_LeftHandTiles->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_RightHandTiles->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_SelfDiscards->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_TopDiscards->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_LeftDiscards->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_RightDiscards->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_SelfMelds->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_TopMelds->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_LeftMelds->SetVisibility(ESlateVisibility::Collapsed);
-        Panel_RightMelds->SetVisibility(ESlateVisibility::Collapsed);
+        // The Mahjong table now renders in the real room world through a CineCameraActor.
+        // Keep the legacy widget only for asset compatibility; it must not cover the level.
+        Table3DViewport->SetVisibility(ESlateVisibility::Collapsed);
     }
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
     {
+        Table3DActor = PC->EnsureMahjongRoomPresentation();
         PC->OnPrivateHandUpdated.AddUniqueDynamic(this, &ThisClass::HandlePrivateHand);
         PC->OnAvailableActionsUpdated.AddUniqueDynamic(this, &ThisClass::HandleAvailableActions);
         PC->OnSettlementShown.AddUniqueDynamic(this, &ThisClass::HandleSettlement);
         PC->OnFinalSettlementShown.AddUniqueDynamic(this, &ThisClass::HandleFinalSettlement);
         PC->OnErrorShown.AddUniqueDynamic(this, &ThisClass::HandleError);
     }
+
+    // The old 2D tiles remain only as the transparent local-hand hit target. All visuals are 3D.
+    Panel_SelfHandTiles->SetRenderOpacity(0.0f);
+    Panel_TopHandTiles->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_LeftHandTiles->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_RightHandTiles->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_SelfDiscards->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_TopDiscards->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_LeftDiscards->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_RightDiscards->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_SelfMelds->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_TopMelds->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_LeftMelds->SetVisibility(ESlateVisibility::Collapsed);
+    Panel_RightMelds->SetVisibility(ESlateVisibility::Collapsed);
     if (AGuiyangMahjongGameState* GS = GetWorld()->GetGameState<AGuiyangMahjongGameState>())
     {
         GS->OnPublicTableStateUpdated.AddUniqueDynamic(this, &ThisClass::HandlePublicTableState);
@@ -92,11 +92,8 @@ void UMobileMahjongHUDWidget::NativeConstruct()
 
 void UMobileMahjongHUDWidget::NativeDestruct()
 {
-    if (Table3DActor)
-    {
-        Table3DActor->Destroy();
-        Table3DActor = nullptr;
-    }
+    // The table belongs to the room world and survives HUD screen transitions.
+    Table3DActor = nullptr;
     if (AGuiyangMahjongPlayerController* PC = Cast<AGuiyangMahjongPlayerController>(GetOwningPlayer()))
     {
         PC->OnPrivateHandUpdated.RemoveDynamic(this, &ThisClass::HandlePrivateHand);

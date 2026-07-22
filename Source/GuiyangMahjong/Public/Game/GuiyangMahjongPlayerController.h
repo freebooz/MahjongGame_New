@@ -16,6 +16,8 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongReconnectRestored, const FMa
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMahjongFinalSettlementShown, const FMahjongFinalSettlementResult&, Result);
 
 class UMobileRootHUDWidget;
+class ACameraActor;
+class AMahjong3DTableActor;
 
 /**
  * 客户端输入与 UI 生命周期入口。UI 只能调用本类请求函数，所有牌局修改均由 Server RPC 校验后执行。
@@ -25,6 +27,9 @@ class GUIYANGMAHJONG_API AGuiyangMahjongPlayerController : public APlayerControl
 {
     GENERATED_BODY()
 public:
+    /** Finds the editor-authored room table/camera, spawning a safe runtime fallback when absent. */
+    AMahjong3DTableActor* EnsureMahjongRoomPresentation();
+
     UFUNCTION(BlueprintCallable, Category="Mahjong|Network")
     void ConnectToAllocatedServer(const FGuiyangGameServerRoute& Route);
 
@@ -74,6 +79,8 @@ protected:
 
 private:
     UPROPERTY(Transient) TObjectPtr<UMobileRootHUDWidget> RootHUDInstance;
+    UPROPERTY(Transient) TObjectPtr<AMahjong3DTableActor> RoomTableActor;
+    UPROPERTY(Transient) TObjectPtr<ACameraActor> RoomCameraActor;
     UPROPERTY() FString PendingPlayerName;
     int32 LastClientActionSequence = -1;
     int32 IntegrationClientIndex = INDEX_NONE;

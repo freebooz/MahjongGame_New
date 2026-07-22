@@ -292,7 +292,14 @@ namespace MahjongUIBuilder
             : BPName == TEXT("WBP_Settlement") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Settlement_GuiyangRiver.T_BG_Settlement_GuiyangRiver")
             : nullptr;
         UWidget* Background = nullptr;
-        if (BackgroundPath)
+        if (BPName == TEXT("WBP_GameHUD"))
+        {
+            // The in-game HUD overlays the real MahjongRoomMap. It must not create any backing
+            // brush, even a nominally transparent one, because serialized brush tint can survive
+            // generator revisions and obscure the 3D world.
+            BackgroundScale->SetVisibility(ESlateVisibility::Collapsed);
+        }
+        else if (BackgroundPath)
         {
             const FName BackgroundName = BPName == TEXT("WBP_Login") ? TEXT("Img_Background") : TEXT("Background_ComponentSlot");
             UImage* BackgroundImage = BP->WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), BackgroundName);
@@ -302,14 +309,14 @@ namespace MahjongUIBuilder
         }
         else
         {
-            // The in-game room is rendered by its 3D viewport. Keep its backing layer transparent so
-            // the legacy green-felt artwork cannot show around the viewport on wide displays.
-            Background = Border(BP, TEXT("Background_ComponentSlot"),
-                BPName == TEXT("WBP_GameHUD") ? FLinearColor::Transparent : DeepGreen);
+            Background = Border(BP, TEXT("Background_ComponentSlot"), DeepGreen);
         }
-        BackgroundSize->AddChild(Background);
-        BackgroundScale->AddChild(BackgroundSize);
-        ViewportRoot->AddChildToOverlay(BackgroundScale);
+        if (Background)
+        {
+            BackgroundSize->AddChild(Background);
+            BackgroundScale->AddChild(BackgroundSize);
+            ViewportRoot->AddChildToOverlay(BackgroundScale);
+        }
 
         USafeZone* Safe = BP->WidgetTree->ConstructWidget<USafeZone>(USafeZone::StaticClass(), TEXT("SafeZone_Root"));
         // 本项目要求移动端前景 UI 覆盖刘海区域，不再由 SafeZone 自动收缩四边。

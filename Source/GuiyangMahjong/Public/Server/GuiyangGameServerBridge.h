@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
+#include "Server/GuiyangServerTicketVerifier.h"
 #include "UObject/Object.h"
 #include "GuiyangGameServerBridge.generated.h"
 
@@ -25,32 +26,6 @@ struct GUIYANGMAHJONG_API FGuiyangGameServerLaunchConfig
 };
 
 struct FMahjongFinalSettlementResult;
-
-struct GUIYANGMAHJONG_API FGuiyangJoinTicketClaims
-{
-    FString PlayerId;
-    FString RoomId;
-    FString MatchId;
-    FString ServerInstanceId;
-    FString Nonce;
-    int64 ExpiresAtUnixSeconds = 0;
-};
-
-class GUIYANGMAHJONG_API FGuiyangJoinTicketValidator
-{
-public:
-    explicit FGuiyangJoinTicketValidator(const FGuiyangGameServerLaunchConfig& Config);
-
-    bool ValidateAndConsume(const FString& Ticket, const FString& SuppliedPlayerId,
-        int64 NowUnixSeconds, FGuiyangJoinTicketClaims& OutClaims, FString& OutError);
-
-private:
-    FString SigningKey;
-    FString ExpectedRoomId;
-    FString ExpectedMatchId;
-    FString ExpectedServerInstanceId;
-    TMap<FString, int64> UsedNonces;
-};
 
 UCLASS()
 class GUIYANGMAHJONG_API UGuiyangGameServerBridge final : public UObject

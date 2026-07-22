@@ -4,6 +4,8 @@
 #include "Game/GuiyangMahjongGameMode.h"
 #include "Game/GuiyangMahjongGameState.h"
 #include "Game/GuiyangMahjongPlayerState.h"
+#include "Game/Mahjong3DTableActor.h"
+#include "Game/MahjongRoomCameraActor.h"
 #include "Auth/GuiyangLoginSubsystem.h"
 #include "History/GuiyangMatchHistorySubsystem.h"
 #include "Lobby/GuiyangLobbySubsystem.h"
@@ -16,7 +18,9 @@
 #include "Misc/Paths.h"
 #include "TimerManager.h"
 #include "UnrealClient.h"
+#include "Camera/CameraActor.h"
 #include "Engine/NetConnection.h"
+#include "EngineUtils.h"
 #include "GenericPlatform/GenericPlatformHttp.h"
 #include "Interfaces/IPv4/IPv4Address.h"
 
@@ -24,6 +28,7 @@ namespace
 {
     bool GIntegrationDisconnectTriggered = false;
     constexpr double MinimumCreatingRoomLoadingSeconds = 1.5;
+    const FVector DefaultRoomCameraLocation(0.0f, -950.0f, 1320.0f);
 
     bool IsClientFullMatchIntegrationEnabled()
     {
@@ -53,6 +58,11 @@ void AGuiyangMahjongPlayerController::BeginPlay()
                     Login->GetSessionTokenForNetwork());
             }
         }
+    }
+
+    if (GetWorld() && GetWorld()->GetMapName().Contains(TEXT("MahjongRoomMap")))
+    {
+        EnsureMahjongRoomPresentation();
     }
 
     UClass* RootHUDClass = LoadClass<UMobileRootHUDWidget>(nullptr, TEXT("/Game/UI/Screens/WBP_RootHUD.WBP_RootHUD_C"));
@@ -113,6 +123,62 @@ void AGuiyangMahjongPlayerController::BeginPlay()
     }
 
     InitializeIntegrationClient();
+}
+
+AMahjong3DTableActor* AGuiyangMahjongPlayerController::EnsureMahjongRoomPresentation()
+{
+    if (!IsLocalController() || IsRunningDedicatedServer() || !GetWorld())
+    {
+        return nullptr;
+    }
+
+    if (!IsValid(RoomTableActor))
+    {
+        TActorIterator<AMahjong3DTableActor> It(GetWorld());
+        if (It)
+        {
+            RoomTableActor = *It;
+        }
+        if (!RoomTableActor)
+        {
+            FActorSpawnParameters Parameters;
+            Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            RoomTableActor = GetWorld()->SpawnActor<AMahjong3DTableActor>(
+                AMahjong3DTableActor::StaticClass(), FTransform::Identity, Parameters);
+            UE_LOG(LogMahjongUI, Warning,
+                TEXT("Room level has no authored Mahjong table actor; spawned runtime fallback"));
+        }
+    }
+
+    if (!IsValid(RoomCameraActor))
+    {
+        for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
+        {
+            if (It->ActorHasTag(AMahjongRoomCameraActor::RoomCameraTag))
+            {
+                RoomCameraActor = *It;
+                break;
+            }
+        }
+        if (!RoomCameraActor)
+        {
+            const FRotator DefaultRotation = (FVector::ZeroVector - DefaultRoomCameraLocation).Rotation();
+            FActorSpawnParameters Parameters;
+            Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+            RoomCameraActor = GetWorld()->SpawnActor<AMahjongRoomCameraActor>(
+                AMahjongRoomCameraActor::StaticClass(), DefaultRoomCameraLocation, DefaultRotation, Parameters);
+            UE_LOG(LogMahjongUI, Warning,
+                TEXT("Room level has no authored Mahjong camera preset; spawned runtime fallback"));
+        }
+    }
+
+    if (RoomCameraActor && GetViewTarget() != RoomCameraActor)
+    {
+        SetViewTarget(RoomCameraActor);
+        UE_LOG(LogMahjongUI, Log, TEXT("Room view switched to editor-adjustable Mahjong camera: %s"),
+            *RoomCameraActor->GetName());
+    }
+    return RoomTableActor;
 }
 
 void AGuiyangMahjongPlayerController::Server_AuthenticateSession_Implementation(const FString& PlayerId,

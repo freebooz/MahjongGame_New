@@ -1,0 +1,17 @@
+apiVersion: autoscaling.agones.dev/v1
+kind: FleetAutoscaler
+metadata:
+  name: guiyang-mahjong-buffer
+  namespace: guiyang-mahjong
+spec:
+  fleetName: guiyang-mahjong
+  policy:
+    type: Buffer
+    buffer:
+      bufferSize: 2
+      minReplicas: 2
+      maxReplicas: 100
+  sync:
+    type: FixedInterval
+    fixedInterval:
+      seconds: 30

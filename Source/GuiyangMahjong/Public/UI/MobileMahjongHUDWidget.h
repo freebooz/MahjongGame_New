@@ -5,7 +5,7 @@
 #include "Network/MahjongNetworkTypes.h"
 #include "MobileMahjongHUDWidget.generated.h"
 
-class UHorizontalBox; class UOverlay; class UTextBlock; class UVerticalBox; class UViewport; class UWrapBox;
+class UHorizontalBox; class UOverlay; class UTextBlock; class UVerticalBox; class UViewport; class UWidget; class UWrapBox;
 class AMahjong3DTableActor;
 class UMobileActionButtonPanel;
 class UMobileHandTileWidget;
@@ -28,6 +28,8 @@ protected:
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_Countdown;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_FlippedJiTile;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UTextBlock> Txt_JiEvents;
+    /** Legacy green-gold backing layer; retained only for old asset serialization and hidden at runtime. */
+    UPROPERTY(meta=(BindWidgetOptional)) TObjectPtr<UWidget> Background_ComponentSlot;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UViewport> Table3DViewport;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UHorizontalBox> Panel_SelfHandTiles;
     UPROPERTY(meta=(BindWidget)) TObjectPtr<UHorizontalBox> Panel_TopHandTiles;

@@ -5,8 +5,28 @@
 #include "Room/GuiyangManagedRoomDefinition.h"
 #include "Room/GuiyangRoomManager.h"
 #include "Server/GuiyangGameServerBridge.h"
+#include "Server/GuiyangAgonesLifecycleSubsystem.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FGuiyangAgonesActivationTest,
+    "GuiyangMahjong.GameServer.AgonesActivation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FGuiyangAgonesActivationTest::RunTest(const FString& Parameters)
+{
+    TestFalse(TEXT("Agones must be opt-in"),
+        UGuiyangAgonesLifecycleSubsystem::IsAgonesRequested(TEXT(""), TEXT("")));
+    TestTrue(TEXT("Command line can select Agones"),
+        UGuiyangAgonesLifecycleSubsystem::IsAgonesRequested(
+            TEXT("-MahjongOrchestrator=Agones"), TEXT("")));
+    TestTrue(TEXT("Environment can select Agones case-insensitively"),
+        UGuiyangAgonesLifecycleSubsystem::IsAgonesRequested(TEXT(""), TEXT("agones")));
+    TestFalse(TEXT("Local allocator selection must not activate Agones"),
+        UGuiyangAgonesLifecycleSubsystem::IsAgonesRequested(
+            TEXT("-MahjongOrchestrator=Allocator"), TEXT("agones")));
+    return true;
+}
 
 namespace GuiyangManagedGameServerTests
 {
