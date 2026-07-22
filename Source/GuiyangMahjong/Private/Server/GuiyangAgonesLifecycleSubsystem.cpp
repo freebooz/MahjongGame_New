@@ -102,6 +102,10 @@ void UGuiyangAgonesLifecycleSubsystem::Initialize(FSubsystemCollectionBase& Coll
     FGameServerDelegate WatchDelegate;
     WatchDelegate.BindDynamic(this, &ThisClass::HandleGameServerUpdated);
     Agones->WatchGameServer(WatchDelegate);
+    // The SDK subsystem exists in every dedicated-server process. Start its health timer only
+    // after this project has explicitly selected Agones, otherwise local Allocator servers would
+    // continuously call a sidecar that is intentionally absent.
+    Agones->HealthPing(Agones->HealthRateSeconds);
     Agones->Connect();
     UE_LOG(LogMahjongServer, Display, TEXT("Agones lifecycle connection started"));
 }
