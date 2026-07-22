@@ -12,15 +12,18 @@ public static class AllocatorEndpoints
     public static void MapAllocatorEndpoints(this WebApplication app)
     {
         app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
-        app.MapGet("/health/ready", (
+        app.MapGet("/health/ready", async (
             GameServerInstanceManager manager,
             GameServerProcessLauncher launcher,
             PortLeasePool portLeasePool,
-            IOptions<AllocatorOptions> options) =>
+            IAgonesAllocationClient agones,
+            IOptions<AllocatorOptions> options,
+            CancellationToken cancellationToken) =>
         {
+            var agonesMode = options.Value.Backend == AllocatorBackendMode.Agones;
             var executableReady = false;
             var workingDirectoryReady = false;
-            try
+            if (!agonesMode) try
             {
                 executableReady = GameServerProcessLauncher.IsExecutable(launcher.GetResolvedExecutablePath());
                 workingDirectoryReady = Directory.Exists(launcher.GetResolvedWorkingDirectory());
@@ -35,20 +38,24 @@ public static class AllocatorEndpoints
             var stateDirectoryReady = IsWritableDirectory(GetParentDirectory(options.Value.StateFilePath));
             var outboxDirectoryReady = IsWritableDirectory(
                 MatchResultOutboxPaths.GetDirectory(options.Value));
-            var gamePortReady = HasBindableUdpPort(portLeasePool);
+            var gamePortReady = agonesMode || HasBindableUdpPort(portLeasePool);
+            var orchestratorReady = !agonesMode || await agones.CheckReadyAsync(cancellationToken);
             var ready = manager.IsInitialized
-                        && executableReady
-                        && workingDirectoryReady
+                        && (agonesMode || executableReady)
+                        && (agonesMode || workingDirectoryReady)
                         && stateDirectoryReady
                         && outboxDirectoryReady
-                        && gamePortReady;
+                        && gamePortReady
+                        && orchestratorReady;
             return ready
                 ? Results.Ok(new
                 {
                     status = "ready",
                     stateReconciled = true,
-                    gameServerExecutable = "ready",
-                    gameServerWorkingDirectory = "ready",
+                    backend = options.Value.Backend.ToString(),
+                    orchestrator = orchestratorReady ? "ready" : "unavailable",
+                    gameServerExecutable = agonesMode ? "not-applicable" : "ready",
+                    gameServerWorkingDirectory = agonesMode ? "not-applicable" : "ready",
                     allocatorState = "writable",
                     matchResultOutbox = "writable",
                     gamePortCapacity = "available"
@@ -57,8 +64,10 @@ public static class AllocatorEndpoints
                 {
                     status = "not-ready",
                     stateReconciled = manager.IsInitialized,
-                    gameServerExecutable = executableReady ? "ready" : "unavailable",
-                    gameServerWorkingDirectory = workingDirectoryReady ? "ready" : "unavailable",
+                    backend = options.Value.Backend.ToString(),
+                    orchestrator = orchestratorReady ? "ready" : "unavailable",
+                    gameServerExecutable = agonesMode ? "not-applicable" : executableReady ? "ready" : "unavailable",
+                    gameServerWorkingDirectory = agonesMode ? "not-applicable" : workingDirectoryReady ? "ready" : "unavailable",
                     allocatorState = stateDirectoryReady ? "writable" : "unavailable",
                     matchResultOutbox = outboxDirectoryReady ? "writable" : "unavailable",
                     gamePortCapacity = gamePortReady ? "available" : "exhausted-or-occupied"

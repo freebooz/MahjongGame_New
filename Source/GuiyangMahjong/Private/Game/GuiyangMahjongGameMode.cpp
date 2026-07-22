@@ -38,9 +38,29 @@ void AGuiyangMahjongGameMode::InitGame(const FString& MapName, const FString& Op
 {
     Super::InitGame(MapName, Options, ErrorMessage);
     RoomManager = NewObject<UGuiyangRoomManager>(this);
+    bAgonesGameServer = IsRunningDedicatedServer()
+        && UGuiyangAgonesLifecycleSubsystem::IsAgonesRequested(
+            FCommandLine::Get(),
+            FPlatformMisc::GetEnvironmentVariable(TEXT("MAHJONG_ORCHESTRATOR")));
     bManagedGameServer = IsRunningDedicatedServer()
-        && FParse::Param(FCommandLine::Get(), TEXT("MahjongManagedGameServer"));
-    if (bManagedGameServer)
+        && (bAgonesGameServer || FParse::Param(FCommandLine::Get(), TEXT("MahjongManagedGameServer")));
+    if (bAgonesGameServer)
+    {
+        UGuiyangAgonesLifecycleSubsystem* Lifecycle = GetGameInstance()
+            ? GetGameInstance()->GetSubsystem<UGuiyangAgonesLifecycleSubsystem>()
+            : nullptr;
+        if (!Lifecycle || !Lifecycle->IsActive())
+        {
+            ErrorMessage = TEXT("AGONES_LIFECYCLE_UNAVAILABLE");
+            UE_LOG(LogMahjongServer, Error, TEXT("Agones GameServer lifecycle is unavailable"));
+            return;
+        }
+        Lifecycle->OnAllocationReady().AddUObject(
+            this, &ThisClass::HandleAgonesAllocationReady);
+        FGuiyangGameServerLaunchConfig Config;
+        if (Lifecycle->TryGetAllocationConfig(Config)) HandleAgonesAllocationReady(Config);
+    }
+    else if (bManagedGameServer)
     {
         FGuiyangGameServerLaunchConfig Config;
         const FString SigningKey = FPlatformMisc::GetEnvironmentVariable(TEXT("MAHJONG_JOIN_TICKET_SIGNING_KEY"));
@@ -57,14 +77,40 @@ void AGuiyangMahjongGameMode::InitGame(const FString& MapName, const FString& Op
             UE_LOG(LogMahjongServer, Error, TEXT("Managed GameServer configuration rejected: %s"), *ConfigError);
             return;
         }
-        GameServerBridge = NewObject<UGuiyangGameServerBridge>(this);
-        if (!GameServerBridge->Initialize(GetWorld(), Config, ConfigError))
-        {
-            ErrorMessage = ConfigError;
-            GameServerBridge = nullptr;
-            UE_LOG(LogMahjongServer, Error, TEXT("Managed GameServer bridge failed: %s"), *ConfigError);
-        }
+        InitializeManagedBridge(Config);
+        if (!GameServerBridge) ErrorMessage = TEXT("GAMESERVER_BRIDGE_INITIALIZATION_FAILED");
     }
+}
+
+void AGuiyangMahjongGameMode::InitializeManagedBridge(
+    const FGuiyangGameServerLaunchConfig& Config)
+{
+    if (GameServerBridge) return;
+    FString ConfigError;
+    UGuiyangGameServerBridge* Bridge = NewObject<UGuiyangGameServerBridge>(this);
+    if (!Bridge->Initialize(GetWorld(), Config, ConfigError))
+    {
+        UE_LOG(LogMahjongServer, Error, TEXT("Managed GameServer bridge failed: %s"), *ConfigError);
+        if (bAgonesGameServer)
+        {
+            if (UGameInstance* GameInstance = GetGameInstance())
+            {
+                if (UGuiyangAgonesLifecycleSubsystem* Lifecycle =
+                    GameInstance->GetSubsystem<UGuiyangAgonesLifecycleSubsystem>())
+                {
+                    Lifecycle->RequestShutdown();
+                }
+            }
+        }
+        return;
+    }
+    GameServerBridge = Bridge;
+}
+
+void AGuiyangMahjongGameMode::HandleAgonesAllocationReady(
+    const FGuiyangGameServerLaunchConfig& Config)
+{
+    InitializeManagedBridge(Config);
 }
 
 void AGuiyangMahjongGameMode::PreLogin(const FString& Options, const FString& Address,
@@ -189,6 +235,7 @@ void AGuiyangMahjongGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
         if (UGuiyangAgonesLifecycleSubsystem* Lifecycle =
             GameInstance->GetSubsystem<UGuiyangAgonesLifecycleSubsystem>())
         {
+            Lifecycle->OnAllocationReady().RemoveAll(this);
             Lifecycle->RequestShutdown();
         }
     }

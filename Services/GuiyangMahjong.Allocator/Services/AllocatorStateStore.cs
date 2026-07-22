@@ -27,7 +27,8 @@ public sealed record PersistedGameServerInstance(
     string? FailureReason,
     bool FailureNotified,
     DateTimeOffset? FailureNotificationAttemptedAtUtc,
-    bool PortReleased);
+    bool PortReleased,
+    string? OrchestratorResourceName = null);
 
 public sealed record AllocatorStateDocument(
     int SchemaVersion,

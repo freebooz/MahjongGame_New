@@ -85,6 +85,7 @@ internal sealed class GameServerInstance
     public bool FailureNotified { get; set; }
     public DateTimeOffset? FailureNotificationAttemptedAtUtc { get; set; }
     public bool PortReleased { get; set; }
+    public string? OrchestratorResourceName { get; set; }
 
     public GameServerInstanceSnapshot Snapshot() => new(
         ServerInstanceId,

@@ -5,6 +5,7 @@ using GuiyangMahjong.Allocator.Domain;
 using GuiyangMahjong.Allocator.Options;
 using GuiyangMahjong.Allocator.Security;
 using GuiyangMahjong.Allocator.Services;
+using Microsoft.Extensions.Options;
 
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -19,11 +20,18 @@ builder.Services
     .Bind(builder.Configuration.GetSection(AllocatorOptions.SectionName))
     .ValidateDataAnnotations()
     .Validate(options => options.PortEnd >= options.PortStart, "Allocator port range is invalid.")
-    .Validate(options => !IPAddress.TryParse(options.AdvertisedIp, out var address)
+    .Validate(options => options.Backend == AllocatorBackendMode.Agones
+                         || !IPAddress.TryParse(options.AdvertisedIp, out var address)
                          || (!IPAddress.Any.Equals(address) && !IPAddress.IPv6Any.Equals(address)),
         "Allocator AdvertisedIp must not be an unspecified address.")
-    .Validate(options => !string.IsNullOrWhiteSpace(options.GameServerExecutablePath),
-        "Allocator GameServerExecutablePath is required.")
+    .Validate(options => options.Backend == AllocatorBackendMode.Agones
+                         || !string.IsNullOrWhiteSpace(options.GameServerExecutablePath),
+        "Allocator GameServerExecutablePath is required for LocalProcess mode.")
+    .Validate(options => options.Backend != AllocatorBackendMode.Agones
+                         || (!string.IsNullOrWhiteSpace(options.Agones.Namespace)
+                             && !string.IsNullOrWhiteSpace(options.Agones.FleetName)
+                             && Uri.TryCreate(options.Agones.ApiServer, UriKind.Absolute, out _)),
+        "Allocator Agones namespace, fleet, and API server are required in Agones mode.")
     .ValidateOnStart();
 
 builder.Services.AddSingleton(TimeProvider.System);
@@ -33,6 +41,10 @@ builder.Services.AddSingleton<InstanceCredentialService>();
 builder.Services.AddSingleton<GameServerProcessLauncher>();
 builder.Services.AddSingleton<IGameServerProcessLauncher>(provider =>
     provider.GetRequiredService<GameServerProcessLauncher>());
+builder.Services.AddSingleton<IAgonesAllocationClient>(provider =>
+    provider.GetRequiredService<IOptions<AllocatorOptions>>().Value.Backend == AllocatorBackendMode.Agones
+        ? ActivatorUtilities.CreateInstance<KubernetesAgonesAllocationClient>(provider)
+        : new DisabledAgonesAllocationClient());
 builder.Services.AddSingleton<IInstanceFailureNotifier, LobbyInstanceFailureNotifier>();
 builder.Services.AddSingleton<IAllocatorStateStore, JsonAllocatorStateStore>();
 builder.Services.AddSingleton<MatchResultOutboxRecovery>();

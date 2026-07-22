@@ -2,9 +2,30 @@ using System.ComponentModel.DataAnnotations;
 
 namespace GuiyangMahjong.Allocator.Options;
 
+public enum AllocatorBackendMode
+{
+    LocalProcess,
+    Agones
+}
+
+public sealed class AgonesAllocatorOptions
+{
+    [Required] public string Namespace { get; init; } = "guiyang-mahjong";
+    [Required] public string FleetName { get; init; } = "guiyang-mahjong";
+    [Required] public string ApiServer { get; init; } = "https://kubernetes.default.svc";
+    [Required] public string ServiceAccountTokenPath { get; init; } =
+        "/var/run/secrets/kubernetes.io/serviceaccount/token";
+    [Required] public string ServiceAccountCaPath { get; init; } =
+        "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt";
+    [Range(1, 60)] public int RequestTimeoutSeconds { get; init; } = 10;
+}
+
 public sealed class AllocatorOptions
 {
     public const string SectionName = "Allocator";
+
+    public AllocatorBackendMode Backend { get; init; } = AllocatorBackendMode.LocalProcess;
+    [Required] public AgonesAllocatorOptions Agones { get; init; } = new();
 
     [Range(1024, 65535)] public int PortStart { get; init; } = 19000;
     [Range(1024, 65535)] public int PortEnd { get; init; } = 19099;

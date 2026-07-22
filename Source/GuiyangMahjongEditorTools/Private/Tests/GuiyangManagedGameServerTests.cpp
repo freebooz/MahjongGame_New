@@ -25,6 +25,43 @@ bool FGuiyangAgonesActivationTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Local allocator selection must not activate Agones"),
         UGuiyangAgonesLifecycleSubsystem::IsAgonesRequested(
             TEXT("-MahjongOrchestrator=Allocator"), TEXT("agones")));
+
+    FGameServerResponse Response;
+    Response.Status.State = TEXT("Allocated");
+    Response.Status.Address = TEXT("203.0.113.25");
+    FPort Port;
+    Port.Name = TEXT("game");
+    Port.Port = 30123;
+    Response.Status.Ports.Add(Port);
+    Response.ObjectMeta.Annotations = {
+        { TEXT("mahjong.freebooz/room-id"), TEXT("11111111-1111-1111-1111-111111111111") },
+        { TEXT("mahjong.freebooz/match-id"), TEXT("22222222-2222-2222-2222-222222222222") },
+        { TEXT("mahjong.freebooz/server-instance-id"), TEXT("33333333-3333-3333-3333-333333333333") },
+        { TEXT("mahjong.freebooz/registration-credential"), TEXT("registration-credential-long-enough") },
+        { TEXT("mahjong.freebooz/lobby-internal-url"), TEXT("http://mahjong-lobby:8080") },
+        { TEXT("mahjong.freebooz/build-version"), TEXT("test-build") }
+    };
+    FGuiyangGameServerLaunchConfig Config;
+    FString Error;
+    TestTrue(TEXT("Allocated metadata should produce a managed launch config"),
+        UGuiyangAgonesLifecycleSubsystem::TryBuildLaunchConfig(
+            Response,
+            TEXT("test-only-join-ticket-signing-key-long-enough"),
+            TEXT("/tmp/mahjong-result.json"),
+            Config,
+            Error));
+    TestEqual(TEXT("Agones route must use the allocated host port"), Config.Port, 30123);
+    TestEqual(TEXT("Agones route must use the allocated address"),
+        Config.AdvertisedIp, FString(TEXT("203.0.113.25")));
+
+    Response.ObjectMeta.Annotations.Remove(TEXT("mahjong.freebooz/room-id"));
+    TestFalse(TEXT("Incomplete allocation metadata must be rejected"),
+        UGuiyangAgonesLifecycleSubsystem::TryBuildLaunchConfig(
+            Response,
+            TEXT("test-only-join-ticket-signing-key-long-enough"),
+            TEXT("/tmp/mahjong-result.json"),
+            Config,
+            Error));
     return true;
 }
 

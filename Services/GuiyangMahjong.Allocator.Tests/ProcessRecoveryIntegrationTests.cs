@@ -224,6 +224,7 @@ public sealed class ProcessRecoveryIntegrationTests
             ports,
             new InstanceCredentialService(),
             new GameServerProcessLauncher(options, NullLogger<GameServerProcessLauncher>.Instance),
+            new DisabledAgonesAllocationClient(),
             new NoOpFailureNotifier(),
             stateStore,
             options,

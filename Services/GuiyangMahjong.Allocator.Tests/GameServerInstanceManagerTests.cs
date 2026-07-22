@@ -26,6 +26,31 @@ public sealed class GameServerInstanceManagerTests
     }
 
     [Fact]
+    public async Task AgonesAllocation_UsesReturnedRoute_RegistersAndDeletesGameServerOnDrain()
+    {
+        var agones = new FakeAgonesAllocationClient();
+        var fixture = CreateFixture(19000, 19000, AllocatorBackendMode.Agones, agones);
+        var allocation = await AllocateAsync(fixture, "room-agones");
+        var launch = Assert.Single(agones.Allocations);
+
+        Assert.Equal("203.0.113.25", fixture.Manager.Get(allocation.ServerInstanceId)?.AdvertisedIp);
+        Assert.Equal(30123, allocation.Port);
+        Assert.Equal(allocation.ServerInstanceId, launch.ServerInstanceId);
+
+        await fixture.Manager.ConfirmRegistrationAsync(
+            Guid.NewGuid().ToString(),
+            allocation.ServerInstanceId,
+            new ConfirmRegistrationRequest(
+                launch.RoomId, "203.0.113.25", 30123, launch.BuildVersion, launch.RegistrationCredential),
+            CancellationToken.None);
+        var stopped = await fixture.Manager.DrainAsync(allocation.ServerInstanceId, CancellationToken.None);
+
+        Assert.Equal(GameServerInstanceState.Stopped, stopped.State);
+        Assert.Equal(["guiyang-mahjong-test"], agones.Shutdowns);
+        Assert.Equal(1, fixture.Ports.AvailableCount);
+    }
+
+    [Fact]
     public async Task RegistrationCredential_IsOneTimeAndInvalidCredentialIsRejected()
     {
         var fixture = CreateFixture();
@@ -113,6 +138,7 @@ public sealed class GameServerInstanceManagerTests
             restartedPorts,
             new InstanceCredentialService(),
             fixture.Launcher,
+            new DisabledAgonesAllocationClient(),
             fixture.Notifier,
             fixture.StateStore,
             fixture.Options,
@@ -148,6 +174,7 @@ public sealed class GameServerInstanceManagerTests
             restartedPorts,
             new InstanceCredentialService(),
             fixture.Launcher,
+            new DisabledAgonesAllocationClient(),
             fixture.Notifier,
             fixture.StateStore,
             fixture.Options,
@@ -193,10 +220,15 @@ public sealed class GameServerInstanceManagerTests
         spec.BuildVersion,
         credential);
 
-    private static Fixture CreateFixture(int portStart = 19000, int portEnd = 19010)
+    private static Fixture CreateFixture(
+        int portStart = 19000,
+        int portEnd = 19010,
+        AllocatorBackendMode backend = AllocatorBackendMode.LocalProcess,
+        IAgonesAllocationClient? agones = null)
     {
         var allocatorOptions = Microsoft.Extensions.Options.Options.Create(new AllocatorOptions
         {
+            Backend = backend,
             PortStart = portStart,
             PortEnd = portEnd,
             RegistrationTimeoutSeconds = 30,
@@ -217,6 +249,7 @@ public sealed class GameServerInstanceManagerTests
             ports,
             new InstanceCredentialService(),
             launcher,
+            agones ?? new DisabledAgonesAllocationClient(),
             notifier,
             stateStore,
             allocatorOptions,
@@ -275,6 +308,32 @@ public sealed class GameServerInstanceManagerTests
             HasExited = true;
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class FakeAgonesAllocationClient : IAgonesAllocationClient
+    {
+        public List<AgonesAllocationSpec> Allocations { get; } = [];
+        public List<string> Shutdowns { get; } = [];
+
+        public Task<AgonesAllocationResult> AllocateAsync(
+            AgonesAllocationSpec spec, CancellationToken cancellationToken)
+        {
+            Allocations.Add(spec);
+            return Task.FromResult(new AgonesAllocationResult(
+                "guiyang-mahjong-test", "203.0.113.25", 30123));
+        }
+
+        public Task ShutdownAsync(string gameServerName, CancellationToken cancellationToken)
+        {
+            Shutdowns.Add(gameServerName);
+            return Task.CompletedTask;
+        }
+
+        public Task<string?> GetGameServerStateAsync(
+            string gameServerName, CancellationToken cancellationToken) =>
+            Task.FromResult<string?>("Allocated");
+
+        public Task<bool> CheckReadyAsync(CancellationToken cancellationToken) => Task.FromResult(true);
     }
 
     private sealed class InMemoryAllocatorStateStore : IAllocatorStateStore

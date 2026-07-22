@@ -60,6 +60,13 @@ spec:
                   value: agones
                 - name: MAHJONG_BUILD_VERSION
                   value: REPLACE_WITH_BUILD_VERSION
+                - name: MAHJONG_JOIN_TICKET_SIGNING_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: mahjong-secrets
+                      key: Allocator__JoinTicketSigningKey
+                - name: MAHJONG_MATCH_RESULT_OUTBOX_PATH
+                  value: /tmp/guiyang-mahjong-match-result.json
               ports:
                 - name: game
                   containerPort: 7777

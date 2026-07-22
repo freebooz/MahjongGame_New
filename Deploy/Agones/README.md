@@ -30,15 +30,16 @@ kubectl apply -f Deploy/Agones/guiyang-mahjong-autoscaler.yaml
 kubectl get fleet,gameserver,fleetautoscaler -n guiyang-mahjong
 ```
 
-Lobby 的分配器需要以 `guiyang-mahjong-allocation.yaml` 为模板，为每次分配写入唯一的 `room-id`
-和 `match-id`，提交 `GameServerAllocation`，再把响应中的地址与端口返回给客户端。
+将 `Allocator__Backend` 设为 `Agones` 后，Allocator 会通过集群内 Kubernetes API 创建
+`GameServerAllocation`，写入唯一的房间、对局、服务器实例和一次性注册元数据，再把响应中的地址与
+动态端口纳入原有持久化、注册、心跳和 Lobby 路由流程。`allocator-linux.yaml` 已包含最小 namespace
+级 RBAC。
 
 ## 当前集成边界
 
-Agones 适配器已经负责 SDK 连接、Ready、玩家计数和关闭通知。现有 Lobby/Allocator 模式仍负责
-房间事务、单活动房间约束、票据签发及服务注册。把 Lobby 分配器切换为 Agones API 时，还必须将
-Allocation 注解中的房间上下文接入 UE 的托管服务器注册流程；在完成该适配前，不应把此示例当作
-已启用加入票据强校验的生产清单。
+Agones 适配器负责 SDK 连接、Ready、Allocation Watch、玩家计数和关闭通知。Lobby/Allocator 继续
+负责房间事务、单活动房间约束、票据签发、服务注册及心跳。UE 只有在收到完整 Allocation 元数据并
+成功向 Allocator 注册后才接受带签名加入票据的玩家。
 
 ## 验证
 

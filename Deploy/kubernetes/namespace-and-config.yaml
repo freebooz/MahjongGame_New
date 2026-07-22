@@ -16,7 +16,11 @@ data:
   Lobby__Persistence__PostgresConnectionString: Host=postgres.database.svc;Port=5432;Database=mahjong;Username=mahjong
   Lobby__Allocator__Enabled: "true"
   Lobby__Allocator__BaseUrl: http://mahjong-allocator:8080
+  Allocator__Backend: Agones
   Allocator__LobbyInternalUrl: http://mahjong-lobby:8080
+  Allocator__Agones__Namespace: guiyang-mahjong
+  Allocator__Agones__FleetName: guiyang-mahjong
+  Allocator__Agones__ApiServer: https://kubernetes.default.svc
   Allocator__StateFilePath: /var/lib/guiyang-mahjong/state/instances.json
   Allocator__MatchResultOutboxDirectory: /var/lib/guiyang-mahjong/outbox
   Allocator__GameServerExecutablePath: /opt/guiyang-mahjong/server/GuiyangMahjongServer

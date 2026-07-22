@@ -13,6 +13,7 @@ public sealed class GameServerInstanceManager
     private readonly PortLeasePool ports;
     private readonly InstanceCredentialService credentials;
     private readonly IGameServerProcessLauncher launcher;
+    private readonly IAgonesAllocationClient agones;
     private readonly IInstanceFailureNotifier failureNotifier;
     private readonly IAllocatorStateStore stateStore;
     private readonly AllocatorOptions options;
@@ -27,6 +28,7 @@ public sealed class GameServerInstanceManager
         PortLeasePool ports,
         InstanceCredentialService credentials,
         IGameServerProcessLauncher launcher,
+        IAgonesAllocationClient agones,
         IInstanceFailureNotifier failureNotifier,
         IAllocatorStateStore stateStore,
         IOptions<AllocatorOptions> options,
@@ -36,6 +38,7 @@ public sealed class GameServerInstanceManager
         this.ports = ports;
         this.credentials = credentials;
         this.launcher = launcher;
+        this.agones = agones;
         this.failureNotifier = failureNotifier;
         this.stateStore = stateStore;
         this.options = options.Value;
@@ -64,12 +67,37 @@ public sealed class GameServerInstanceManager
                     continue;
                 }
 
-                if (!ports.TryReserve(instance.Port))
+                if (options.Backend == AllocatorBackendMode.LocalProcess && !ports.TryReserve(instance.Port))
                 {
                     throw new InvalidDataException(
                         $"Persisted allocator port {instance.Port} cannot be reserved safely.");
                 }
-                instance.PortReleased = false;
+                instance.PortReleased = options.Backend == AllocatorBackendMode.Agones;
+
+                if (options.Backend == AllocatorBackendMode.Agones)
+                {
+                    if (string.IsNullOrWhiteSpace(instance.OrchestratorResourceName))
+                    {
+                        await MarkFailedAsync(instance, "Agones resource missing during allocator reconciliation", cancellationToken);
+                    }
+                    else if (!string.Equals(
+                        await agones.GetGameServerStateAsync(instance.OrchestratorResourceName, cancellationToken),
+                        "Allocated",
+                        StringComparison.Ordinal))
+                    {
+                        await MarkFailedAsync(instance, "Agones GameServer is not allocated during reconciliation", cancellationToken);
+                    }
+                    else if (instance.State == GameServerInstanceState.Draining)
+                    {
+                        await agones.ShutdownAsync(instance.OrchestratorResourceName, cancellationToken);
+                        InstanceStateMachine.Transition(instance, GameServerInstanceState.Stopped);
+                    }
+                    else if (instance.State == GameServerInstanceState.Allocated)
+                    {
+                        instance.LastHeartbeatAtUtc = timeProvider.GetUtcNow();
+                    }
+                    continue;
+                }
 
                 if (persisted.ProcessId is not null && persisted.ProcessStartedAtUtc is not null)
                 {
@@ -139,25 +167,46 @@ public sealed class GameServerInstanceManager
                 && instance.State is not GameServerInstanceState.Stopped and not GameServerInstanceState.Failed);
             if (existing is not null) return ToAllocationResponse(requestId, existing);
 
-            var port = ports.Acquire();
             var registration = credentials.Generate();
             var now = timeProvider.GetUtcNow();
+            var serverInstanceId = Guid.NewGuid().ToString();
+            AgonesAllocationResult? agonesAllocation = null;
+            var port = 0;
+            var advertisedIp = options.AdvertisedIp;
+            if (options.Backend == AllocatorBackendMode.Agones)
+            {
+                agonesAllocation = await agones.AllocateAsync(new AgonesAllocationSpec(
+                    request.RoomId,
+                    request.MatchId,
+                    serverInstanceId,
+                    registration.Plaintext,
+                    options.LobbyInternalUrl,
+                    request.BuildVersion), cancellationToken);
+                port = agonesAllocation.Port;
+                advertisedIp = agonesAllocation.Address;
+            }
+            else
+            {
+                port = ports.Acquire();
+            }
             var instance = new GameServerInstance
             {
-                ServerInstanceId = Guid.NewGuid().ToString(),
+                ServerInstanceId = serverInstanceId,
                 RoomId = request.RoomId,
                 MatchId = request.MatchId,
                 Port = port,
-                AdvertisedIp = options.AdvertisedIp,
+                AdvertisedIp = advertisedIp,
                 RegistrationCredentialHash = registration.Hash,
                 RegistrationExpireAtUtc = now.AddSeconds(options.RegistrationTimeoutSeconds),
                 StartedAtUtc = now,
-                BuildVersion = request.BuildVersion
+                BuildVersion = request.BuildVersion,
+                PortReleased = options.Backend == AllocatorBackendMode.Agones,
+                OrchestratorResourceName = agonesAllocation?.GameServerName
             };
             instances[instance.ServerInstanceId] = instance;
             await PersistAsync(cancellationToken);
 
-            try
+            if (options.Backend == AllocatorBackendMode.LocalProcess) try
             {
                 instance.Process = await launcher.LaunchAsync(new GameServerLaunchSpec(
                     instance.RoomId,
@@ -288,6 +337,11 @@ public sealed class GameServerInstanceManager
                 await instance.Process.StopAsync(
                     TimeSpan.FromSeconds(options.DrainGraceSeconds), cancellationToken);
             }
+            else if (options.Backend == AllocatorBackendMode.Agones
+                     && !string.IsNullOrWhiteSpace(instance.OrchestratorResourceName))
+            {
+                await agones.ShutdownAsync(instance.OrchestratorResourceName, cancellationToken);
+            }
             InstanceStateMachine.Transition(instance, GameServerInstanceState.Stopped);
             ReleasePort(instance);
             await PersistAsync(cancellationToken);
@@ -362,6 +416,11 @@ public sealed class GameServerInstanceManager
         if (instance.Process is { HasExited: false })
         {
             await instance.Process.StopAsync(TimeSpan.Zero, cancellationToken);
+        }
+        if (options.Backend == AllocatorBackendMode.Agones
+            && !string.IsNullOrWhiteSpace(instance.OrchestratorResourceName))
+        {
+            await agones.ShutdownAsync(instance.OrchestratorResourceName, cancellationToken);
         }
         InstanceStateMachine.Transition(instance, GameServerInstanceState.Failed);
         instance.FailureReason = reason;
@@ -473,7 +532,8 @@ public sealed class GameServerInstanceManager
                 instance.FailureReason,
                 instance.FailureNotified,
                 instance.FailureNotificationAttemptedAtUtc,
-                instance.PortReleased))
+                instance.PortReleased,
+                instance.OrchestratorResourceName))
             .ToArray();
         await stateStore.SaveAsync(
             new AllocatorStateDocument(1, now, records), cancellationToken);
@@ -501,7 +561,8 @@ public sealed class GameServerInstanceManager
         FailureReason = persisted.FailureReason,
         FailureNotified = persisted.FailureNotified,
         FailureNotificationAttemptedAtUtc = persisted.FailureNotificationAttemptedAtUtc,
-        PortReleased = persisted.PortReleased
+        PortReleased = persisted.PortReleased,
+        OrchestratorResourceName = persisted.OrchestratorResourceName
     };
 
     private static AllocationResponse ToAllocationResponse(string requestId, GameServerInstance instance) => new(

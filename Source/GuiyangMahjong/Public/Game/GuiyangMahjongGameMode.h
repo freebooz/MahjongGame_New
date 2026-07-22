@@ -7,6 +7,7 @@
 #include "GuiyangMahjongGameMode.generated.h"
 
 struct FGuiyangManagedRoomDefinition;
+struct FGuiyangGameServerLaunchConfig;
 
 /** Dedicated Server 权威入口；为牌桌复制指定 GameState 和玩家请求入口。 */
 UCLASS()
@@ -52,6 +53,7 @@ private:
     TMap<FString, int64> PendingTicketExpiryByDigest;
     TMap<TObjectPtr<APlayerController>, FString> AuthorizedPlayerIdsByController;
     bool bManagedGameServer = false;
+    bool bAgonesGameServer = false;
     FTimerHandle ActionTimeoutHandle;
     int32 ArmedTimeoutRoundId = INDEX_NONE;
     int32 ArmedTimeoutTurnId = INDEX_NONE;
@@ -70,4 +72,6 @@ private:
     static FString HashJoinTicket(const FString& JoinTicket);
     static bool ConstantTimeDigestEquals(const FString& Left, const FString& Right);
     static FString ErrorToMessage(EMahjongRoomError Error);
+    void InitializeManagedBridge(const FGuiyangGameServerLaunchConfig& Config);
+    void HandleAgonesAllocationReady(const FGuiyangGameServerLaunchConfig& Config);
 };
