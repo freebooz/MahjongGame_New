@@ -1,0 +1,7 @@
+**
+!Contracts/
+!Contracts/**
+!Services/GuiyangMahjong.Auth/
+!Services/GuiyangMahjong.Auth/**
+Services/GuiyangMahjong.Auth/bin/
+Services/GuiyangMahjong.Auth/obj/

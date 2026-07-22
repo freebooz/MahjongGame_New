@@ -1,0 +1,7 @@
+**
+!Contracts/
+!Contracts/**
+!Services/GuiyangMahjong.Lobby/
+!Services/GuiyangMahjong.Lobby/**
+Services/GuiyangMahjong.Lobby/bin/
+Services/GuiyangMahjong.Lobby/obj/

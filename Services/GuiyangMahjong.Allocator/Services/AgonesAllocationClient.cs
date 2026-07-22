@@ -39,7 +39,10 @@ public sealed class KubernetesAgonesAllocationClient : IAgonesAllocationClient, 
         var handler = new HttpClientHandler();
         if (File.Exists(agones.ServiceAccountCaPath))
         {
-            var root = X509Certificate2.CreateFromPemFile(agones.ServiceAccountCaPath);
+            // Kubernetes projects a CA certificate only; CreateFromPemFile also attempts to
+            // locate a private key and rejects this valid service-account trust bundle.
+            var root = X509Certificate2.CreateFromPem(
+                File.ReadAllText(agones.ServiceAccountCaPath));
             handler.ServerCertificateCustomValidationCallback = (_, certificate, chain, errors) =>
             {
                 if (certificate is null || chain is null) return false;

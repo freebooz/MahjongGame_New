@@ -1,0 +1,101 @@
+# Local Docker Desktop/WSL integration dependencies only. Production Kubernetes must use
+# managed PostgreSQL and Redis endpoints supplied through mahjong-services/mahjong-secrets.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mahjong-postgres-data
+  namespace: guiyang-mahjong
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 5Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mahjong-postgres
+  namespace: guiyang-mahjong
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: mahjong-postgres}}
+  template:
+    metadata: {labels: {app: mahjong-postgres}}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          env:
+            - {name: POSTGRES_DB, value: mahjong}
+            - {name: POSTGRES_USER, value: mahjong}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: mahjong-secrets, key: POSTGRES_PASSWORD}}
+          ports: [{name: postgres, containerPort: 5432}]
+          readinessProbe:
+            exec: {command: [pg_isready, -U, mahjong, -d, mahjong]}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: mahjong-postgres-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: guiyang-mahjong
+spec:
+  selector: {app: mahjong-postgres}
+  ports: [{name: postgres, port: 5432, targetPort: postgres}]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mahjong-redis-data
+  namespace: guiyang-mahjong
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 2Gi}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mahjong-redis
+  namespace: guiyang-mahjong
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector: {matchLabels: {app: mahjong-redis}}
+  template:
+    metadata: {labels: {app: mahjong-redis}}
+    spec:
+      containers:
+        - name: redis
+          image: redis:8-alpine
+          args: [redis-server, --appendonly, "yes", --appendfsync, everysec]
+          ports: [{name: redis, containerPort: 6379}]
+          readinessProbe:
+            exec: {command: [redis-cli, ping]}
+            periodSeconds: 5
+          volumeMounts:
+            - {name: data, mountPath: /data}
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: "1", memory: 512Mi}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: mahjong-redis-data}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: guiyang-mahjong
+spec:
+  selector: {app: mahjong-redis}
+  ports: [{name: redis, port: 6379, targetPort: redis}]

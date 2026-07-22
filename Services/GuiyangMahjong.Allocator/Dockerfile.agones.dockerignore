@@ -1,0 +1,7 @@
+**
+!Contracts/
+!Contracts/**
+!Services/GuiyangMahjong.Allocator/
+!Services/GuiyangMahjong.Allocator/**
+Services/GuiyangMahjong.Allocator/bin/
+Services/GuiyangMahjong.Allocator/obj/

@@ -127,3 +127,7 @@ sudo ./Deploy/linux/deploy.sh restore --backup-file /path/to/backup.tar.gz --con
 - [控制平面加固状态](../claudedocs/phase7_control_plane_hardening_status.md)
 
 旧的 `Deploy/docker-compose.yml` 和 Windows Kubernetes Allocator 清单只保留作历史兼容；新部署必须使用 `Deploy/linux/compose.yaml`。
+
+Docker Desktop/WSL 的 Kubernetes 集成验收可额外应用
+`Deploy/kubernetes/local-dev-dependencies.yaml`。该清单仅提供本地 PostgreSQL/Redis，生产集群仍必须使用
+托管存储、外部 Secret 和不可变镜像摘要。

@@ -19,8 +19,11 @@ WORKDIR /opt/guiyang-mahjong
 # Build context must be the repository root. Build-LinuxServer.ps1 writes this directory.
 COPY --chown=mahjong:mahjong Artifacts/LinuxServer/ ./
 
+# Docker Desktop kind can expose an extremely large RLIMIT_NOFILE. libwebsockets sizes an
+# internal table from that value, so cap it before Unreal starts to prevent an OOM crash.
 RUN test -f ./GuiyangMahjongServer.sh \
     && test -f ./GuiyangMahjong/Binaries/Linux/GuiyangMahjongServer \
+    && sed -i '2i ulimit -n "${MAHJONG_NOFILE_LIMIT:-65536}"' ./GuiyangMahjongServer.sh \
     && chmod 0555 ./GuiyangMahjongServer.sh \
         ./GuiyangMahjong/Binaries/Linux/GuiyangMahjongServer
 

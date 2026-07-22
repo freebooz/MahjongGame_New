@@ -1,0 +1,17 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+COPY Services/GuiyangMahjong.Allocator/GuiyangMahjong.Allocator.csproj Services/GuiyangMahjong.Allocator/
+RUN dotnet restore Services/GuiyangMahjong.Allocator/GuiyangMahjong.Allocator.csproj
+COPY Contracts/ Contracts/
+COPY Services/GuiyangMahjong.Allocator/ Services/GuiyangMahjong.Allocator/
+RUN dotnet publish Services/GuiyangMahjong.Allocator/GuiyangMahjong.Allocator.csproj \
+      --configuration Release --output /output/allocator --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0
+WORKDIR /app
+COPY --from=build --chown=$APP_UID:$APP_UID /output/allocator/ ./
+ENV ASPNETCORE_URLS=http://+:8080 \
+    DOTNET_EnableDiagnostics=0
+EXPOSE 8080
+USER $APP_UID
+ENTRYPOINT ["dotnet", "GuiyangMahjong.Allocator.dll"]

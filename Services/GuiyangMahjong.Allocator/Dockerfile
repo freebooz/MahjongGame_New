@@ -34,7 +34,8 @@ RUN set -eux; \
     chmod 0755 /output/game-server/GuiyangMahjongServer
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
-RUN apt-get update \
+RUN sed -i 's|http://|https://|g' /etc/apt/sources.list.d/ubuntu.sources \
+    && apt-get -o Acquire::Retries=5 update \
     && apt-get install --yes --no-install-recommends curl tini util-linux \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
