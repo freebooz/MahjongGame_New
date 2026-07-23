@@ -17,7 +17,7 @@ public class GuiyangMahjongServer : ModuleRules
             // server-only lifecycle code while the server can actually open its port.
             "OnlineSubsystemUtils",
 
-            // MahjongServerMap contains NavigationSystemModuleConfig. Without this
+            // MahjongNetMap contains NavigationSystemModuleConfig. Without this
             // runtime module the cooked map has an unresolved class dependency.
             "NavigationSystem"
         });

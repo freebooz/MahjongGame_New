@@ -33,7 +33,12 @@ public sealed class LinuxProcessLauncherTests
                 AdvertisedIp = "127.0.0.1",
                 GameServerExecutablePath = "/bin/sh",
                 GameServerWorkingDirectory = directory,
-                GameServerPrefixArguments = [scriptPath, "   ", " /Game/Maps/MahjongRoomMap "],
+                GameServerPrefixArguments =
+                [
+                    scriptPath,
+                    "   ",
+                    " /Game/Maps/MahjongNetMap?game=/Script/GuiyangMahjongServer.GuiyangMahjongGameMode "
+                ],
                 MatchResultOutboxDirectory = Path.Combine(directory, "outbox"),
                 StateFilePath = Path.Combine(directory, "state", "instances.json"),
                 LobbyInternalUrl = "http://127.0.0.1:18080",
@@ -58,7 +63,9 @@ public sealed class LinuxProcessLauncherTests
             while (!File.Exists(argumentsPath)) await Task.Delay(50, timeout.Token);
             var arguments = await File.ReadAllLinesAsync(argumentsPath, timeout.Token);
 
-            Assert.Equal("/Game/Maps/MahjongRoomMap", arguments[0]);
+            Assert.Equal(
+                "/Game/Maps/MahjongNetMap?game=/Script/GuiyangMahjongServer.GuiyangMahjongGameMode?listen",
+                arguments[0]);
             Assert.Equal("-MahjongManagedGameServer", arguments[1]);
             Assert.DoesNotContain(string.Empty, arguments);
 

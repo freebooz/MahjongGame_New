@@ -51,7 +51,9 @@ void UGuiyangClientControllerBridgeImpl::InitializeClient(AGuiyangMahjongPlayerC
         }
     }
 
-    if (GetWorld() && GetWorld()->GetMapName().Contains(TEXT("MahjongRoomMap")))
+    if (GetWorld()
+        && (GetWorld()->GetMapName().Contains(TEXT("MahjongRoomMap"))
+            || GetWorld()->GetMapName().Contains(TEXT("MahjongNetMap"))))
     {
         EnsureRoomPresentation();
     }

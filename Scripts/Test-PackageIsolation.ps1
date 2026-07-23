@@ -37,7 +37,8 @@ if ($Role -in @('Client', 'Both')) {
     foreach ($config in @('Config\Windows\WindowsGame.ini', 'Config\Android\AndroidGame.ini')) {
         $text = Get-Content -LiteralPath (Join-Path $Root $config) -Raw
         if ($text -notmatch '/Game/UI' -or $text -notmatch '/Game/Art/Mahjong' -or
-            $text -notmatch '/Game/Maps/MahjongRoomMap') {
+            $text -notmatch '/Game/Maps/MahjongRoomMap' -or
+            $text -notmatch '/Game/Maps/MahjongNetMap') {
             throw "Client Cook allow-list is incomplete: $config"
         }
     }
@@ -46,7 +47,7 @@ if ($Role -in @('Server', 'Both')) {
     foreach ($config in @('Config\WindowsServer\WindowsServerGame.ini',
         'Config\LinuxServer\LinuxServerGame.ini')) {
         $text = Get-Content -LiteralPath (Join-Path $Root $config) -Raw
-        if ($text -notmatch '/Game/Maps/MahjongServerMap' -or $text -notmatch '/Game/UI' -or
+        if ($text -notmatch '/Game/Maps/MahjongNetMap' -or $text -notmatch '/Game/UI' -or
             $text -notmatch '/Game/Art') {
             throw "Server Cook isolation is incomplete: $config"
         }
@@ -73,13 +74,13 @@ function Assert-ReceiptClean {
 
 if ($Role -in @('Client', 'Both')) {
     Assert-ReceiptClean -Path $ClientReceipt -Role 'Client' `
-        -ForbiddenPatterns @('GuiyangMahjongServer', 'Agones') -RequiredPlugins @()
+        -ForbiddenPatterns @('GuiyangMahjongServer', 'Agones') -RequiredPlugins @('OnlineSubsystemUtils')
 }
 if ($Role -in @('Server', 'Both')) {
     Assert-ReceiptClean -Path $ServerReceipt -Role 'Server' `
         -ForbiddenPatterns @('GuiyangMahjongClient', 'GuiyangMahjongOnline', 'NNERuntimeORT', 'NNEDenoiser',
             'MsQuic', '[\\/]Content[\\/]UI[\\/]', '[\\/]Content[\\/]Art[\\/]', '[\\/]Content[\\/]Slate[\\/]') `
-        -RequiredPlugins @('Agones')
+        -RequiredPlugins @('Agones', 'OnlineSubsystemUtils')
 }
 
 Write-Host 'PACKAGE_ISOLATION_OK'
