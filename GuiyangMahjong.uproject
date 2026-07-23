@@ -3,6 +3,7 @@
   "EngineAssociation": "{BD6CAD1D-4F80-0F31-80D7-C9BB4901F400}",
   "Category": "Games",
   "Description": "UE 5.8 multiplayer Guiyang Mahjong with clean client/server targets.",
+  "DisableEnginePluginsByDefault": true,
   "Modules": [
     {
       "Name": "GuiyangMahjongCore",
@@ -27,7 +28,8 @@
     {
       "Name": "GuiyangMahjongServer",
       "Type": "ServerOnly",
-      "LoadingPhase": "Default"
+      "LoadingPhase": "Default",
+      "TargetAllowList": ["Server", "Editor"]
     },
     {
       "Name": "GuiyangMahjongEditorTools",
@@ -36,6 +38,11 @@
     }
   ],
   "Plugins": [
+    {
+      "Name": "EnhancedInput",
+      "Enabled": true,
+      "TargetAllowList": ["Game", "Client", "Editor"]
+    },
     {
       "Name": "PythonScriptPlugin",
       "Enabled": true,

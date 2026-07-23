@@ -90,8 +90,11 @@ if (!$PostProcessOnly) {
 
 $packageRoot = Join-Path $scratch 'LinuxServer'
 if (!(Test-Path -LiteralPath $packageRoot)) { $packageRoot = $scratch }
-$serverBinary = Get-ChildItem -LiteralPath $packageRoot -Recurse -File -Filter 'GuiyangMahjongServer' |
-    Where-Object { $_.FullName -match '[\\/]Binaries[\\/]Linux[\\/]GuiyangMahjongServer$' } |
+$serverBinary = Get-ChildItem -LiteralPath $packageRoot -Recurse -File -Filter 'GuiyangMahjongServer*' |
+    Where-Object {
+        $_.Name -notmatch '\.(debug|sym|target)$' -and
+        $_.FullName -match '[\\/]Binaries[\\/]Linux[\\/]GuiyangMahjongServer(?:-Linux-(?:Development|Shipping))?$'
+    } |
     Select-Object -First 1
 if ($null -eq $serverBinary) {
     throw "Packaged GuiyangMahjongServer ELF was not found below $packageRoot"
@@ -110,8 +113,20 @@ if ($IncludeDebugSymbols) {
     }
 }
 $packagePrefix = $packageRoot.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
-$relativeBinary = $serverBinary.FullName.Substring($packagePrefix.Length).Replace('\', '/')
+$sourceRelativeBinary = $serverBinary.FullName.Substring($packagePrefix.Length).Replace('\', '/')
+$relativeBinary = 'GuiyangMahjong/Binaries/Linux/GuiyangMahjongServer'
 $artifactBinary = Join-Path $artifact ($relativeBinary.Replace('/', [IO.Path]::DirectorySeparatorChar))
+$copiedBinary = Join-Path $artifact ($sourceRelativeBinary.Replace('/', [IO.Path]::DirectorySeparatorChar))
+if (![IO.Path]::GetFullPath($copiedBinary).Equals(
+        [IO.Path]::GetFullPath($artifactBinary), [StringComparison]::OrdinalIgnoreCase)) {
+    Move-Item -LiteralPath $copiedBinary -Destination $artifactBinary -Force
+}
+$launcher = Join-Path $artifact 'GuiyangMahjongServer.sh'
+if (Test-Path -LiteralPath $launcher) {
+    $launcherText = Get-Content -LiteralPath $launcher -Raw
+    $launcherText = $launcherText.Replace($serverBinary.Name, 'GuiyangMahjongServer')
+    [IO.File]::WriteAllText($launcher, $launcherText, [Text.UTF8Encoding]::new($false))
+}
 $binaryHash = (Get-FileHash -LiteralPath $artifactBinary -Algorithm SHA256).Hash.ToLowerInvariant()
 $checksumLine = "$binaryHash  $relativeBinary"
 $checksumLine | Set-Content -LiteralPath (Join-Path $artifact 'SHA256SUMS') -Encoding ascii
@@ -129,5 +144,9 @@ $manifest = [ordered]@{
     generatedAtUtc = [DateTimeOffset]::UtcNow.ToString('O')
 }
 $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifact 'build-manifest.json') -Encoding utf8
+
+$serverReceipt = Join-Path $root "Binaries\Linux\GuiyangMahjongServer-Linux-$Configuration.target"
+& (Join-Path $PSScriptRoot 'Test-PackageIsolation.ps1') -Root $root -Role Server `
+    -ServerReceipt $serverReceipt
 
 Write-Host "LINUX_SERVER_BUILD_OK artifact=$artifact executable=$relativeBinary toolchain=$toolchainVersion"

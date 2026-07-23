@@ -9,7 +9,6 @@ public class GuiyangMahjongServerTarget : TargetRules
         IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
         ExtraModuleNames.AddRange(["GuiyangMahjong", "GuiyangMahjongServer"]);
         bUsesSlate = false;
-        bCompileAgainstApplicationCore = false;
         bBuildDeveloperTools = false;
         DisablePlugins.AddRange([
             "Landmass", "Water", "Volumetrics", "NNERuntimeORT", "NNEDenoiser", "MsQuic"

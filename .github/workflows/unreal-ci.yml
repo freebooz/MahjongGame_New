@@ -7,7 +7,8 @@ on:
       - "Source/**"
       - "Config/**"
       - "GuiyangMahjong.uproject"
-      - "Scripts/Build-LinuxServer.ps1"
+      - "Scripts/**"
+      - "Content/Maps/MahjongServerMap.umap"
       - "Services/GuiyangMahjong.Allocator/Dockerfile"
       - ".github/workflows/unreal-ci.yml"
 
@@ -20,11 +21,17 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - name: Build Win64 game
+      - name: Validate target module graph
+        shell: powershell
+        run: >-
+          & "$env:GITHUB_WORKSPACE\Scripts\Test-TargetModuleGraph.ps1"
+          -EngineRoot "$env:UE_ROOT"
+          -Root "$env:GITHUB_WORKSPACE"
+      - name: Build Win64 client target
         shell: powershell
         run: >-
           & "$env:UE_ROOT\Engine\Build\BatchFiles\Build.bat"
-          GuiyangMahjong Win64 Development
+          GuiyangMahjongClient Win64 Development
           "-Project=$env:GITHUB_WORKSPACE\GuiyangMahjong.uproject"
           -WaitMutex -NoHotReloadFromIDE
       - name: Build Win64 dedicated server
@@ -34,6 +41,12 @@ jobs:
           GuiyangMahjongServer Win64 Development
           "-Project=$env:GITHUB_WORKSPACE\GuiyangMahjong.uproject"
           -WaitMutex -NoHotReloadFromIDE
+      - name: Enforce client/server package isolation
+        shell: powershell
+        run: >-
+          & "$env:GITHUB_WORKSPACE\Scripts\Test-PackageIsolation.ps1"
+          -Root "$env:GITHUB_WORKSPACE"
+          -Role Both
       - name: Run automation tests
         shell: powershell
         run: >-

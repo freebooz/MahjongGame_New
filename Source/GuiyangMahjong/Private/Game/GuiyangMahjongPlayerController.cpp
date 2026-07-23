@@ -187,9 +187,9 @@ void AGuiyangMahjongPlayerController::Server_RequestAction_Implementation(const 
 void AGuiyangMahjongPlayerController::Server_RequestIntegrationDisconnect_Implementation()
 {
 #if !UE_BUILD_SHIPPING
-    const AGuiyangMahjongPlayerState* Player = GetPlayerState<AGuiyangMahjongPlayerState>();
+    const AGuiyangMahjongPlayerState* MahjongPlayer = GetPlayerState<AGuiyangMahjongPlayerState>();
     if (!FParse::Param(FCommandLine::Get(), TEXT("MahjongEnableIntegrationHooks"))
-        || !Player || !Player->MahjongPlayerId.StartsWith(TEXT("integration-client-")))
+        || !MahjongPlayer || !MahjongPlayer->MahjongPlayerId.StartsWith(TEXT("integration-client-")))
     {
         UE_LOG(LogMahjongReconnect, Warning, TEXT("Rejected unauthorized integration disconnect request"));
         return;

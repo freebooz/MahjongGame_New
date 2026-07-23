@@ -60,6 +60,7 @@ $executable = Join-Path $StagingDirectory 'WindowsServer/GuiyangMahjong/Binaries
 if (-not (Test-Path -LiteralPath $executable)) {
     throw "Staged Dedicated Server executable was not found: $executable"
 }
+& (Join-Path $PSScriptRoot 'Test-PackageIsolation.ps1') -Root $root -Role Server
 [pscustomobject]@{
     Status = 'SERVER_STAGE_OK'
     Executable = (Resolve-Path -LiteralPath $executable).Path

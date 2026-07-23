@@ -12,7 +12,7 @@ public class GuiyangMahjongClient : ModuleRules
         PrivateDependencyModuleNames.AddRange(new[]
         {
             "InputCore", "EnhancedInput", "UMG", "Slate", "SlateCore", "ApplicationCore",
-            "HTTP", "Json", "JsonUtilities", "CinematicCamera"
+            "HTTP", "Json", "JsonUtilities", "CinematicCamera", "Networking"
         });
     }
 }

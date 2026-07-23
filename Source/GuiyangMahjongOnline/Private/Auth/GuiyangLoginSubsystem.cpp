@@ -18,19 +18,24 @@ namespace GuiyangAuthPrivate
 {
     constexpr const TCHAR* ConfigSection = TEXT("/Script/GuiyangMahjongOnline.GuiyangLoginSubsystem");
 
-    bool NormalizeBaseUrl(const FString& Candidate, FString& OutBaseUrl)
+    bool NormalizeBaseUrl(
+        const FString& Candidate, const bool bAllowInsecureLoopbackHttp, FString& OutBaseUrl)
     {
         OutBaseUrl = Candidate.TrimStartAndEnd();
         while (OutBaseUrl.EndsWith(TEXT("/"))) OutBaseUrl.LeftChopInline(1);
         if (OutBaseUrl.Contains(TEXT("@")) || OutBaseUrl.Contains(TEXT("?")) || OutBaseUrl.Contains(TEXT("#")))
             return false;
         if (OutBaseUrl.StartsWith(TEXT("https://"), ESearchCase::IgnoreCase)) return OutBaseUrl.Len() > 10;
-#if !UE_BUILD_SHIPPING
-        return OutBaseUrl.StartsWith(TEXT("http://127.0.0.1"), ESearchCase::IgnoreCase)
+        const bool bLoopbackHttp =
+            OutBaseUrl.StartsWith(TEXT("http://127.0.0.1"), ESearchCase::IgnoreCase)
             || OutBaseUrl.StartsWith(TEXT("http://localhost"), ESearchCase::IgnoreCase)
             || OutBaseUrl.StartsWith(TEXT("http://[::1]"), ESearchCase::IgnoreCase);
+#if !UE_BUILD_SHIPPING
+        return bLoopbackHttp;
 #else
-        return false;
+        // Shipping remains HTTPS-only unless a manual local-review process
+        // explicitly opts into loopback HTTP. Non-loopback HTTP is never accepted.
+        return bAllowInsecureLoopbackHttp && bLoopbackHttp;
 #endif
     }
 
@@ -87,7 +92,10 @@ void UGuiyangLoginSubsystem::Initialize(FSubsystemCollectionBase& Collection)
     FString CommandLineBaseUrl;
     if (FParse::Value(FCommandLine::Get(), TEXT("MahjongAuthBaseUrl="), CommandLineBaseUrl)) ConfiguredBaseUrl = MoveTemp(CommandLineBaseUrl);
     bUseRemoteAuth = AuthMode.Equals(TEXT("RemoteAuth"), ESearchCase::IgnoreCase);
-    if (bUseRemoteAuth && !GuiyangAuthPrivate::NormalizeBaseUrl(ConfiguredBaseUrl, AuthBaseUrl))
+    const bool bAllowInsecureLoopbackAuth =
+        FParse::Param(FCommandLine::Get(), TEXT("MahjongAllowInsecureLoopbackAuth"));
+    if (bUseRemoteAuth && !GuiyangAuthPrivate::NormalizeBaseUrl(
+            ConfiguredBaseUrl, bAllowInsecureLoopbackAuth, AuthBaseUrl))
     {
         AuthBaseUrl.Reset();
         UE_LOG(LogMahjongOnline, Error, TEXT("RemoteAuth 地址无效；正式环境必须使用 HTTPS，本机开发仅允许 loopback HTTP"));
@@ -133,6 +141,14 @@ void UGuiyangLoginSubsystem::LoginWithWechat()
 {
 #if PLATFORM_WINDOWS
     UE_LOG(LogMahjongOnline, Log, TEXT("PC 开发环境启用模拟微信授权，不代表正式微信开放平台登录"));
+    // Auth currently exposes a real Guest endpoint but no WeChat OAuth endpoint.
+    // PC manual review therefore obtains a server-issued guest session instead
+    // of falling back to local auth when RemoteAuth is selected.
+    if (bUseRemoteAuth)
+    {
+        BeginLogin(EGuiyangLoginProvider::Guest);
+        return;
+    }
     BeginLogin(EGuiyangLoginProvider::SimulatedWechat);
 #else
     FailLogin(TEXT("当前安装包尚未配置正式微信开放平台授权"));

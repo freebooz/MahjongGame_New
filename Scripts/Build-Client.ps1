@@ -36,6 +36,7 @@ foreach ($required in @($project, $uat)) {
     "-stagingdirectory=$StagingDirectory"
 if ($LASTEXITCODE -ne 0) { throw "Client package failed with exit code $LASTEXITCODE" }
 
-& (Join-Path $PSScriptRoot 'Test-PackageIsolation.ps1') -Root $root
+$clientReceipt = Join-Path $root "Binaries\$Platform\GuiyangMahjongClient-$Platform-$Configuration.target"
+& (Join-Path $PSScriptRoot 'Test-PackageIsolation.ps1') -Root $root -Role Client `
+    -ClientReceipt $clientReceipt
 Write-Host "CLIENT_PACKAGE_OK target=GuiyangMahjongClient platform=$Platform stage=$StagingDirectory"
-
