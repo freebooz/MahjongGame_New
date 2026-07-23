@@ -59,6 +59,11 @@
       "TargetAllowList": ["Server", "Editor"]
     },
     {
+      "Name": "OnlineSubsystemUtils",
+      "Enabled": true,
+      "TargetAllowList": ["Game", "Client", "Server", "Editor"]
+    },
+    {
       "Name": "Landmass",
       "Enabled": false
     },
