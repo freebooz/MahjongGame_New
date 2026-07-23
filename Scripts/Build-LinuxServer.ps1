@@ -69,7 +69,7 @@ if (!$PostProcessOnly) {
         '-noclient',
         '-serverplatform=Linux',
         "-serverconfig=$Configuration",
-        '-map=/Game/Maps/MahjongNetMap',
+        '-map=/Game/Maps/MahjongRoomMap',
         '-build',
         '-SkipCookingEditorContent',
         '-nodebuginfo',

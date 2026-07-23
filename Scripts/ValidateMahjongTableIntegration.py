@@ -11,7 +11,7 @@ import unreal
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MESH_PATH = "/Game/Art/Mahjong/Table/Meshes/SM_StandardMahjongTable"
 CONTENT_ROOT = "/Game/Art/Mahjong/Table"
-MAP_PATH = "/Game/Maps/MahjongRoomMap"
+MAP_PATH = "/Game/Maps/MahjongRoomVisualPreviewMap"
 ACTOR_LABEL = "MahjongRoomTable"
 RUNTIME_CLASS_PATH = "/Script/GuiyangMahjong.Mahjong3DTableActor"
 REPORT_PATH = PROJECT_ROOT / "Saved" / "Reports" / "MahjongTableValidationReport.json"

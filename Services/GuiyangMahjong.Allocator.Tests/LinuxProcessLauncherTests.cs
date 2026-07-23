@@ -37,7 +37,7 @@ public sealed class LinuxProcessLauncherTests
                 [
                     scriptPath,
                     "   ",
-                    " /Game/Maps/MahjongNetMap?game=/Script/GuiyangMahjongServer.GuiyangMahjongGameMode "
+                    " /Game/Maps/MahjongRoomMap?game=/Script/GuiyangMahjongServer.GuiyangMahjongGameMode "
                 ],
                 MatchResultOutboxDirectory = Path.Combine(directory, "outbox"),
                 StateFilePath = Path.Combine(directory, "state", "instances.json"),
@@ -64,7 +64,7 @@ public sealed class LinuxProcessLauncherTests
             var arguments = await File.ReadAllLinesAsync(argumentsPath, timeout.Token);
 
             Assert.Equal(
-                "/Game/Maps/MahjongNetMap?game=/Script/GuiyangMahjongServer.GuiyangMahjongGameMode?listen",
+                "/Game/Maps/MahjongRoomMap?game=/Script/GuiyangMahjongServer.GuiyangMahjongGameMode?listen",
                 arguments[0]);
             Assert.Equal("-MahjongManagedGameServer", arguments[1]);
             Assert.DoesNotContain(string.Empty, arguments);

@@ -58,7 +58,7 @@ void AMahjong3DTableActor::BeginPlay()
 {
     Super::BeginPlay();
 
-    // This actor is authored in MahjongRoomMap. Its resource caches are transient and therefore
+    // This actor is owned by the client room presentation. Its resource caches are transient and therefore
     // must not rely solely on values copied from the native constructor/CDO during map loading.
     // Rebuilding them here also replaces stale references saved by older room-map revisions.
     InitializePresentationAssets();

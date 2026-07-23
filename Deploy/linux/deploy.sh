@@ -254,8 +254,8 @@ validate_environment() {
   [[ "$variant" == fake || "$variant" == unreal ]] \
     || { echo "GAME_SERVER_VARIANT must be fake or unreal." >&2; exit 1; }
   game_server_map="$(env_value GAME_SERVER_MAP)"
-  if [[ "$variant" == unreal && "$game_server_map" != "/Game/Maps/MahjongNetMap?game=/Script/GuiyangMahjongServer.GuiyangMahjongGameMode" ]]; then
-    echo "GAME_SERVER_MAP must select MahjongNetMap and inject GuiyangMahjongGameMode for the Unreal server variant." >&2
+  if [[ "$variant" == unreal && "$game_server_map" != "/Game/Maps/MahjongRoomMap?game=/Script/GuiyangMahjongServer.GuiyangMahjongGameMode" ]]; then
+    echo "GAME_SERVER_MAP must select MahjongRoomMap and inject GuiyangMahjongGameMode for the Unreal server variant." >&2
     exit 1
   fi
   if [[ "$variant" == unreal && ( "$advertised_ip" == 127.* || "$advertised_ip" == "::1" ) ]]; then

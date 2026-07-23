@@ -5,7 +5,7 @@ from __future__ import annotations
 import unreal
 
 
-MAP_PATH = "/Game/Maps/MahjongRoomMap"
+MAP_PATH = "/Game/Maps/MahjongRoomVisualPreviewMap"
 
 
 def path_name(value):

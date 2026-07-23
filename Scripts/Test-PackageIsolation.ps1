@@ -38,7 +38,7 @@ if ($Role -in @('Client', 'Both')) {
         $text = Get-Content -LiteralPath (Join-Path $Root $config) -Raw
         if ($text -notmatch '/Game/UI' -or $text -notmatch '/Game/Art/Mahjong' -or
             $text -notmatch '/Game/Maps/MahjongRoomMap' -or
-            $text -notmatch '/Game/Maps/MahjongNetMap') {
+            $text -match '/Game/Maps/MahjongNetMap') {
             throw "Client Cook allow-list is incomplete: $config"
         }
     }
@@ -47,7 +47,8 @@ if ($Role -in @('Server', 'Both')) {
     foreach ($config in @('Config\WindowsServer\WindowsServerGame.ini',
         'Config\LinuxServer\LinuxServerGame.ini')) {
         $text = Get-Content -LiteralPath (Join-Path $Root $config) -Raw
-        if ($text -notmatch '/Game/Maps/MahjongNetMap' -or $text -notmatch '/Game/UI' -or
+        if ($text -notmatch '/Game/Maps/MahjongRoomMap' -or
+            $text -match '/Game/Maps/MahjongNetMap' -or $text -notmatch '/Game/UI' -or
             $text -notmatch '/Game/Art') {
             throw "Server Cook isolation is incomplete: $config"
         }

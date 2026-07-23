@@ -8,10 +8,11 @@ existing `GuiyangMahjong` modules, reflected classes, maps, or cooked asset path
 ## Architecture decision
 
 - `GuiyangMahjongServer.Target.cs` remains the dedicated-server target.
-- `MahjongNetMap` is the authoritative target-neutral replicated room map shared by client and
+- `MahjongRoomMap` is the authoritative target-neutral replicated room map shared by client and
   dedicated server. It serializes neither client-only nor server-only classes. The server injects
-  `GuiyangMahjongGameMode` in its launch URL, while the client creates presentation locally after
-  joining.
+  `GuiyangMahjongGameMode` in its launch URL, while the client creates
+  `MahjongRoomPresentationActor` locally after joining. Artists tune the same presentation actor
+  in the editor-only `MahjongRoomVisualPreviewMap`.
 - The existing durable Allocator remains the local/WSL orchestration backend.
 - Agones is an optional production lifecycle backend enabled with
   `-MahjongOrchestrator=Agones`; it must not become active accidentally on local servers.

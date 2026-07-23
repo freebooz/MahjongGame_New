@@ -7,6 +7,7 @@
 class ACameraActor;
 class AGuiyangMahjongPlayerController;
 class AMahjong3DTableActor;
+class AMahjongRoomPresentationActor;
 class UMobileRootHUDWidget;
 
 UCLASS(Transient)
@@ -33,6 +34,7 @@ public:
 private:
     UPROPERTY(Transient) TObjectPtr<AGuiyangMahjongPlayerController> Controller;
     UPROPERTY(Transient) TObjectPtr<UMobileRootHUDWidget> RootHUDInstance;
+    UPROPERTY(Transient) TObjectPtr<AMahjongRoomPresentationActor> RoomPresentationActor;
     UPROPERTY(Transient) TObjectPtr<AMahjong3DTableActor> RoomTableActor;
     UPROPERTY(Transient) TObjectPtr<ACameraActor> RoomCameraActor;
     UPROPERTY(Transient) FGuiyangGameServerRoute PendingAllocatedRoute;

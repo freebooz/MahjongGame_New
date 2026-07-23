@@ -8,6 +8,7 @@
 #include "Game/GuiyangMahjongPlayerState.h"
 #include "Game/Mahjong3DTableActor.h"
 #include "Game/MahjongRoomCameraActor.h"
+#include "Game/MahjongRoomPresentationActor.h"
 #include "GenericPlatform/GenericPlatformHttp.h"
 #include "GuiyangMahjong.h"
 #include "HAL/FileManager.h"
@@ -27,7 +28,6 @@
 namespace
 {
     constexpr double MinimumCreatingRoomLoadingSeconds = 1.5;
-    const FVector DefaultRoomCameraLocation(0.0f, -950.0f, 1320.0f);
 }
 
 UWorld* UGuiyangClientControllerBridgeImpl::GetWorld() const
@@ -51,9 +51,7 @@ void UGuiyangClientControllerBridgeImpl::InitializeClient(AGuiyangMahjongPlayerC
         }
     }
 
-    if (GetWorld()
-        && (GetWorld()->GetMapName().Contains(TEXT("MahjongRoomMap"))
-            || GetWorld()->GetMapName().Contains(TEXT("MahjongNetMap"))))
+    if (GetWorld() && GetWorld()->GetMapName().Contains(TEXT("MahjongRoomMap")))
     {
         EnsureRoomPresentation();
     }
@@ -117,36 +115,22 @@ void UGuiyangClientControllerBridgeImpl::InitializeClient(AGuiyangMahjongPlayerC
 AActor* UGuiyangClientControllerBridgeImpl::EnsureRoomPresentation()
 {
     if (!Controller || !Controller->IsLocalController() || !GetWorld()) return nullptr;
-    if (!IsValid(RoomTableActor))
+    if (!IsValid(RoomPresentationActor))
     {
-        TActorIterator<AMahjong3DTableActor> It(GetWorld());
-        if (It) RoomTableActor = *It;
-        if (!RoomTableActor)
+        TActorIterator<AMahjongRoomPresentationActor> It(GetWorld());
+        if (It) RoomPresentationActor = *It;
+        if (!RoomPresentationActor)
         {
             FActorSpawnParameters Parameters;
             Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-            RoomTableActor = GetWorld()->SpawnActor<AMahjong3DTableActor>(
-                AMahjong3DTableActor::StaticClass(), FTransform::Identity, Parameters);
+            RoomPresentationActor = GetWorld()->SpawnActor<AMahjongRoomPresentationActor>(
+                AMahjongRoomPresentationActor::StaticClass(), FTransform::Identity, Parameters);
         }
     }
-    if (!IsValid(RoomCameraActor))
+    if (RoomPresentationActor)
     {
-        for (TActorIterator<ACameraActor> It(GetWorld()); It; ++It)
-        {
-            if (It->ActorHasTag(AMahjongRoomCameraActor::RoomCameraTag))
-            {
-                RoomCameraActor = *It;
-                break;
-            }
-        }
-        if (!RoomCameraActor)
-        {
-            const FRotator Rotation = (FVector::ZeroVector - DefaultRoomCameraLocation).Rotation();
-            FActorSpawnParameters Parameters;
-            Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-            RoomCameraActor = GetWorld()->SpawnActor<AMahjongRoomCameraActor>(
-                AMahjongRoomCameraActor::StaticClass(), DefaultRoomCameraLocation, Rotation, Parameters);
-        }
+        RoomTableActor = RoomPresentationActor->GetTableActor();
+        RoomCameraActor = RoomPresentationActor->GetRoomCameraActor();
     }
     if (RoomCameraActor && Controller->GetViewTarget() != RoomCameraActor)
     {

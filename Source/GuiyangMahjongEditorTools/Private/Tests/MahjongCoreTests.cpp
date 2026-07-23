@@ -29,6 +29,7 @@
 #include "UI/MahjongUIScalingRule.h"
 #include "Game/Mahjong3DTableActor.h"
 #include "Game/MahjongRoomCameraActor.h"
+#include "Game/MahjongRoomPresentationActor.h"
 #include "CineCameraComponent.h"
 #include "Engine/Level.h"
 #include "Engine/World.h"
@@ -1341,8 +1342,8 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("三维牌桌 HUD 必须存在"), GameHUD);
     if (!GameHUD || !GameHUD->WidgetTree) return false;
 
-    // The serialized legacy UViewport is ignored at runtime. The table and camera now live in
-    // MahjongRoomMap, where artists can pilot and tune the camera directly in the editor.
+    // The serialized legacy UViewport is ignored at runtime. Artists tune the client-only
+    // presentation in MahjongRoomVisualPreviewMap; MahjongRoomMap stays target-neutral.
     const UWidget* LegacyBackground = GameHUD->WidgetTree->FindWidget(TEXT("Background_ComponentSlot"));
     TestTrue(TEXT("旧版绿色桌面背景若仍存在于序列化资源中，必须由 HUD 兼容绑定接管"),
         !LegacyBackground || FindFProperty<FObjectPropertyBase>(
@@ -1366,22 +1367,35 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
             CameraDefault->GetCineCameraComponent()->bConstrainAspectRatio);
     }
 
-    UWorld* RoomWorld = LoadObject<UWorld>(nullptr,
+    UWorld* SharedRoomWorld = LoadObject<UWorld>(nullptr,
         TEXT("/Game/Maps/MahjongRoomMap.MahjongRoomMap"));
-    TestNotNull(TEXT("麻将房间关卡必须可加载"), RoomWorld);
-    bool bHasRoomTable = false;
-    bool bHasRoomCamera = false;
-    if (RoomWorld && RoomWorld->PersistentLevel)
+    TestNotNull(TEXT("共享麻将房间关卡必须可加载"), SharedRoomWorld);
+    bool bSharedMapContainsClientPresentation = false;
+    if (SharedRoomWorld && SharedRoomWorld->PersistentLevel)
     {
-        for (const AActor* Actor : RoomWorld->PersistentLevel->Actors)
+        for (const AActor* Actor : SharedRoomWorld->PersistentLevel->Actors)
         {
-            bHasRoomTable |= IsValid(Actor) && Actor->IsA<AMahjong3DTableActor>();
-            bHasRoomCamera |= IsValid(Actor) && Actor->IsA<AMahjongRoomCameraActor>()
-                && Actor->ActorHasTag(AMahjongRoomCameraActor::RoomCameraTag);
+            bSharedMapContainsClientPresentation |= IsValid(Actor)
+                && (Actor->IsA<AMahjongRoomPresentationActor>()
+                    || Actor->IsA<AMahjong3DTableActor>()
+                    || Actor->IsA<AMahjongRoomCameraActor>());
         }
     }
-    TestTrue(TEXT("MahjongRoomMap 必须放置真实三维麻将桌"), bHasRoomTable);
-    TestTrue(TEXT("MahjongRoomMap 必须放置可编辑电影摄像机"), bHasRoomCamera);
+    TestFalse(TEXT("共享 MahjongRoomMap 不得序列化客户端展示类"),
+        bSharedMapContainsClientPresentation);
+
+    UWorld* PreviewWorld = LoadObject<UWorld>(nullptr,
+        TEXT("/Game/Maps/MahjongRoomVisualPreviewMap.MahjongRoomVisualPreviewMap"));
+    TestNotNull(TEXT("麻将房间视觉预览关卡必须可加载"), PreviewWorld);
+    bool bHasPresentation = false;
+    if (PreviewWorld && PreviewWorld->PersistentLevel)
+    {
+        for (const AActor* Actor : PreviewWorld->PersistentLevel->Actors)
+        {
+            bHasPresentation |= IsValid(Actor) && Actor->IsA<AMahjongRoomPresentationActor>();
+        }
+    }
+    TestTrue(TEXT("视觉预览关卡必须放置客户端房间展示 Actor"), bHasPresentation);
     UStaticMesh* TileMesh = LoadObject<UStaticMesh>(nullptr,
         TEXT("/Game/Art/Mahjong/Mahjong50/Tiles/SM_Mahjong50_Characters_1.SM_Mahjong50_Characters_1"));
     TestNotNull(TEXT("Mahjong50 PBR 麻将牌静态网格必须已导入"), TileMesh);

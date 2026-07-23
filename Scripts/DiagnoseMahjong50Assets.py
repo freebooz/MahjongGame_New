@@ -6,7 +6,7 @@ import unreal
 
 
 ROOT = "/Game/Art/Mahjong/Mahjong50"
-MAP = "/Game/Maps/MahjongRoomMap"
+MAP = "/Game/Maps/MahjongRoomVisualPreviewMap"
 
 
 def value(obj, name):
