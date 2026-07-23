@@ -10,6 +10,10 @@ public class GuiyangMahjongServerTarget : TargetRules
         ExtraModuleNames.AddRange(["GuiyangMahjong", "GuiyangMahjongServer"]);
         bUsesSlate = false;
         bBuildDeveloperTools = false;
+        // A headless production server still needs lifecycle and NetDriver diagnostics.
+        // Without Shipping logs an allocated-but-not-listening process is indistinguishable
+        // from a healthy room process to the local allocator.
+        bUseLoggingInShipping = true;
         DisablePlugins.AddRange([
             "Landmass", "Water", "Volumetrics", "NNERuntimeORT", "NNEDenoiser", "MsQuic"
         ]);

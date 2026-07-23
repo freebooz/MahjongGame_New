@@ -33,9 +33,25 @@ public sealed class GameServerProcessLauncher(
             WorkingDirectory = workingDirectory
         };
         if (OperatingSystem.IsLinux()) startInfo.ArgumentList.Add(executablePath);
+        var isUnrealDedicatedServer = Path.GetFileNameWithoutExtension(executablePath)
+            .StartsWith("GuiyangMahjongServer", StringComparison.OrdinalIgnoreCase);
         foreach (var argument in options.GameServerPrefixArguments)
         {
-            if (!string.IsNullOrWhiteSpace(argument)) startInfo.ArgumentList.Add(argument.Trim());
+            if (string.IsNullOrWhiteSpace(argument)) continue;
+            var normalizedArgument = argument.Trim();
+            if (isUnrealDedicatedServer
+                && normalizedArgument.StartsWith("/Game/", StringComparison.Ordinal)
+                && !normalizedArgument.Contains("?listen", StringComparison.OrdinalIgnoreCase))
+            {
+                normalizedArgument += "?listen";
+            }
+            startInfo.ArgumentList.Add(normalizedArgument);
+        }
+        if (isUnrealDedicatedServer)
+        {
+            startInfo.ArgumentList.Add("-unattended");
+            startInfo.ArgumentList.Add("-stdout");
+            startInfo.ArgumentList.Add("-FullStdOutLogOutput");
         }
         startInfo.ArgumentList.Add("-MahjongManagedGameServer");
         startInfo.ArgumentList.Add($"-RoomId={spec.RoomId}");

@@ -77,9 +77,19 @@ void AGuiyangMahjongGameMode::InitGame(const FString& MapName, const FString& Op
             UE_LOG(LogMahjongServer, Error, TEXT("Managed GameServer configuration rejected: %s"), *ConfigError);
             return;
         }
-        InitializeManagedBridge(Config);
-        if (!GameServerBridge) ErrorMessage = TEXT("GAMESERVER_BRIDGE_INITIALIZATION_FAILED");
+        // UEngine::LoadMap creates the listen NetDriver only after SetGameMode/InitGame
+        // returns. Registering here can therefore publish an endpoint which is not
+        // listening yet. Defer registration until BeginPlay, then require a NetDriver.
+        PendingManagedConfig = MoveTemp(Config);
+        bHasPendingManagedConfig = true;
     }
+}
+
+void AGuiyangMahjongGameMode::BeginPlay()
+{
+    Super::BeginPlay();
+    bManagedWorldReady = true;
+    TryInitializeManagedBridgeAfterListen();
 }
 
 void AGuiyangMahjongGameMode::InitializeManagedBridge(
@@ -107,10 +117,37 @@ void AGuiyangMahjongGameMode::InitializeManagedBridge(
     GameServerBridge = Bridge;
 }
 
+void AGuiyangMahjongGameMode::TryInitializeManagedBridgeAfterListen()
+{
+    if (!bManagedGameServer || !bManagedWorldReady || !bHasPendingManagedConfig || GameServerBridge)
+    {
+        return;
+    }
+    if (!GetWorld() || !GetWorld()->GetNetDriver())
+    {
+        UE_LOG(LogMahjongServer, Error,
+            TEXT("Managed GameServer refused registration because the listen NetDriver is unavailable"));
+        FPlatformMisc::RequestExitWithStatus(false, 78);
+        return;
+    }
+    InitializeManagedBridge(PendingManagedConfig);
+    if (!GameServerBridge)
+    {
+        UE_LOG(LogMahjongServer, Error,
+            TEXT("Managed GameServer bridge initialization failed after NetDriver startup"));
+        FPlatformMisc::RequestExitWithStatus(false, 78);
+        return;
+    }
+    bHasPendingManagedConfig = false;
+    PendingManagedConfig = {};
+}
+
 void AGuiyangMahjongGameMode::HandleAgonesAllocationReady(
     const FGuiyangGameServerLaunchConfig& Config)
 {
-    InitializeManagedBridge(Config);
+    PendingManagedConfig = Config;
+    bHasPendingManagedConfig = true;
+    TryInitializeManagedBridgeAfterListen();
 }
 
 void AGuiyangMahjongGameMode::PreLogin(const FString& Options, const FString& Address,
