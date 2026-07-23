@@ -7,7 +7,12 @@ public class GuiyangMahjongServerTarget : TargetRules
         Type = TargetType.Server;
         DefaultBuildSettings = BuildSettingsVersion.V7;
         IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-        ExtraModuleNames.Add("GuiyangMahjong");
-        DisablePlugins.AddRange(["Landmass", "Water", "Volumetrics"]);
+        ExtraModuleNames.AddRange(["GuiyangMahjong", "GuiyangMahjongServer"]);
+        bUsesSlate = false;
+        bCompileAgainstApplicationCore = false;
+        bBuildDeveloperTools = false;
+        DisablePlugins.AddRange([
+            "Landmass", "Water", "Volumetrics", "NNERuntimeORT", "NNEDenoiser", "MsQuic"
+        ]);
     }
 }

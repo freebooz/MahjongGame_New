@@ -7,7 +7,10 @@ public class GuiyangMahjongEditorTarget : TargetRules
         Type = TargetType.Editor;
         DefaultBuildSettings = BuildSettingsVersion.V7;
         IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-        ExtraModuleNames.Add("GuiyangMahjong");
+        ExtraModuleNames.AddRange([
+            "GuiyangMahjong", "GuiyangMahjongOnline", "GuiyangMahjongClient",
+            "GuiyangMahjongServer", "GuiyangMahjongEditorTools"
+        ]);
         DisablePlugins.AddRange(["Landmass", "Water", "Volumetrics"]);
     }
 }

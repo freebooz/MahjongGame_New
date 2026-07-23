@@ -297,7 +297,13 @@ namespace MahjongUIBuilder
             // The in-game HUD overlays the real MahjongRoomMap. It must not create any backing
             // brush, even a nominally transparent one, because serialized brush tint can survive
             // generator revisions and obscure the 3D world.
-            BackgroundScale->SetVisibility(ESlateVisibility::Collapsed);
+            // ConstructWidget registers objects with the WidgetTree even when they are detached.
+            // Move these unused compatibility nodes out of the tree so the compiler does not
+            // require variable GUIDs for widgets that can never render.
+            BackgroundScale->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors);
+            BackgroundSize->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors);
+            BackgroundScale = nullptr;
+            BackgroundSize = nullptr;
         }
         else if (BackgroundPath)
         {
@@ -336,7 +342,14 @@ namespace MahjongUIBuilder
         ViewportRoot->AddChildToOverlay(Safe);
 
         BP->WidgetTree->RootWidget = ViewportRoot;
-        MarkVariable(BP, ViewportRoot); MarkVariable(BP, BackgroundScale); MarkVariable(BP, BackgroundSize);
+        MarkVariable(BP, ViewportRoot);
+        // GameHUD deliberately has no background branch. Registering its detached compatibility
+        // widgets as variables leaves stale GUIDs after compilation and makes the asset fail QA.
+        if (Background)
+        {
+            MarkVariable(BP, BackgroundScale);
+            MarkVariable(BP, BackgroundSize);
+        }
         MarkVariable(BP, Safe); MarkVariable(BP, Scale); MarkVariable(BP, DesignSize); MarkVariable(BP, Canvas);
         return Canvas;
     }
@@ -478,7 +491,10 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     {
         UCanvasPanel* C = Root(Discard);
         UBorder* B = Border(Discard, TEXT("Border_Tile"), WarmWhite);
-        FSlateBrush TileBrush = TextureBrush(TEXT("/Game/UI/Textures/Tiles/T_Tile_Wan_01.T_Tile_Wan_01"));
+        FSlateBrush TileBrush = TextureBrush(TEXT("/Game/Art/Mahjong/Mahjong50/Textures/T_Mahjong50_FaceAtlas_BaseColor.T_Mahjong50_FaceAtlas_BaseColor"));
+        TileBrush.SetUVRegion(FBox2f(
+            FVector2f(160.0f / 8192.0f, 3.0f * 1024.0f / 4096.0f),
+            FVector2f((160.0f + 704.0f) / 8192.0f, 1.0f)));
         TileBrush.TintColor = FSlateColor(WarmWhite);
         B->SetBrush(TileBrush);
         B->SetPadding(FMargin(4.0f));
@@ -723,6 +739,13 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
         Place(C, Text(HUD, TEXT("Seat_Top"), TEXT("玩家\n13张\n0分"), 20), {1595,110}, {260,96});
         Place(C, Text(HUD, TEXT("Seat_Left"), TEXT("玩家\n13张\n0分"), 20), {30,285}, {180,96});
         Place(C, Text(HUD, TEXT("Seat_Right"), TEXT("玩家\n13张\n0分"), 20), {1710,285}, {180,96});
+
+        // 等待玩家和准备操作直接覆盖在三维牌桌上，不再使用独立 WBP_Room 页面。
+        Place(C, Button(HUD, TEXT("Btn_ReturnLobby"), TEXT("返回大厅")), {1640,40}, {230,64});
+        Place(C, Button(HUD, TEXT("Btn_Ready"), TEXT("准备")), {840,770}, {240,72});
+        UTextBlock* ReadyStatus = Text(HUD, TEXT("Txt_ReadyStatus"), TEXT("点击准备，满四人后自动开始"), 22);
+        ReadyStatus->SetJustification(ETextJustify::Center);
+        Place(C, ReadyStatus, {650,850}, {620,44});
 
         UBorder* TableCenter = Border(HUD, TEXT("Panel_TableCenter"), FLinearColor(0.025f, 0.13f, 0.11f, 0.96f));
         TableCenter->SetPadding(FMargin(12.0f));

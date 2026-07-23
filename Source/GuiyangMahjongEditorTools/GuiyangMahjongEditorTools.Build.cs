@@ -5,7 +5,11 @@ public class GuiyangMahjongEditorTools : ModuleRules
     public GuiyangMahjongEditorTools(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-        PublicDependencyModuleNames.AddRange(new[] { "Core", "CoreUObject", "Engine", "GuiyangMahjongCore", "GuiyangMahjongOnline", "GuiyangMahjong" });
+        PublicDependencyModuleNames.AddRange(new[]
+        {
+            "Core", "CoreUObject", "Engine", "GuiyangMahjongCore", "GuiyangMahjongOnline",
+            "GuiyangMahjong", "GuiyangMahjongClient", "GuiyangMahjongServer"
+        });
         PrivateDependencyModuleNames.AddRange(new[]
         {
             "UMG", "Slate", "SlateCore", "UnrealEd", "UMGEditor", "AssetRegistry", "Kismet", "Json",

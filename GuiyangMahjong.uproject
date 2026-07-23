@@ -2,7 +2,7 @@
   "FileVersion": 3,
   "EngineAssociation": "{BD6CAD1D-4F80-0F31-80D7-C9BB4901F400}",
   "Category": "Games",
-  "Description": "UE 5.8 贵阳捉鸡麻将服务端权威多人联机项目",
+  "Description": "UE 5.8 multiplayer Guiyang Mahjong with clean client/server targets.",
   "Modules": [
     {
       "Name": "GuiyangMahjongCore",
@@ -10,13 +10,23 @@
       "LoadingPhase": "Default"
     },
     {
-      "Name": "GuiyangMahjongOnline",
+      "Name": "GuiyangMahjong",
       "Type": "Runtime",
       "LoadingPhase": "Default"
     },
     {
-      "Name": "GuiyangMahjong",
-      "Type": "Runtime",
+      "Name": "GuiyangMahjongOnline",
+      "Type": "ClientOnly",
+      "LoadingPhase": "Default"
+    },
+    {
+      "Name": "GuiyangMahjongClient",
+      "Type": "ClientOnly",
+      "LoadingPhase": "PostDefault"
+    },
+    {
+      "Name": "GuiyangMahjongServer",
+      "Type": "ServerOnly",
       "LoadingPhase": "Default"
     },
     {
@@ -28,15 +38,18 @@
   "Plugins": [
     {
       "Name": "PythonScriptPlugin",
-      "Enabled": true
+      "Enabled": true,
+      "TargetAllowList": ["Editor"]
     },
     {
       "Name": "EditorScriptingUtilities",
-      "Enabled": true
+      "Enabled": true,
+      "TargetAllowList": ["Editor"]
     },
     {
       "Name": "Agones",
-      "Enabled": true
+      "Enabled": true,
+      "TargetAllowList": ["Server", "Editor"]
     },
     {
       "Name": "Landmass",
@@ -51,9 +64,5 @@
       "Enabled": false
     }
   ],
-  "TargetPlatforms": [
-    "Windows",
-    "Android",
-    "Linux"
-  ]
+  "TargetPlatforms": ["Windows", "Android", "Linux"]
 }

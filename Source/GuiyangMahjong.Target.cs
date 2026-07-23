@@ -7,7 +7,7 @@ public class GuiyangMahjongTarget : TargetRules
         Type = TargetType.Game;
         DefaultBuildSettings = BuildSettingsVersion.V7;
         IncludeOrderVersion = EngineIncludeOrderVersion.Latest;
-        ExtraModuleNames.Add("GuiyangMahjong");
-        DisablePlugins.AddRange(["Landmass", "Water", "Volumetrics"]);
+        ExtraModuleNames.AddRange(["GuiyangMahjong", "GuiyangMahjongOnline", "GuiyangMahjongClient"]);
+        DisablePlugins.AddRange(["Agones", "Landmass", "Water", "Volumetrics"]);
     }
 }

@@ -43,6 +43,7 @@ namespace GuiyangAuthPrivate
     }
 }
 
+#if 0 // Implemented by GuiyangMahjongCore so server builds do not link the client auth module.
 FString FGuiyangLoginProfile::GetProviderDisplayName() const
 {
     switch (Provider)
@@ -53,6 +54,8 @@ FString FGuiyangLoginProfile::GetProviderDisplayName() const
     default: return TEXT("未登录");
     }
 }
+
+#endif
 
 void UGuiyangLoginSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -161,8 +164,7 @@ void UGuiyangLoginSubsystem::BeginLogin(const EGuiyangLoginProvider Provider, co
 #if UE_BUILD_SHIPPING
     FailLogin(TEXT("正式包必须配置 RemoteAuth"));
     return;
-#endif
-
+#else
     const FString NewPlayerId = ExistingPlayerId.IsEmpty()
         ? FString::Printf(TEXT("%s-%s"), Provider == EGuiyangLoginProvider::Guest ? TEXT("guest") : TEXT("wxsim"), *FGuid::NewGuid().ToString(EGuidFormats::Digits))
         : ExistingPlayerId;
@@ -178,6 +180,7 @@ void UGuiyangLoginSubsystem::BeginLogin(const EGuiyangLoginProvider Provider, co
     {
         CompleteLogin(Provider, NewPlayerId, NewDisplayName);
     }
+#endif
 }
 
 void UGuiyangLoginSubsystem::CompleteLogin(const EGuiyangLoginProvider Provider, FString PlayerId, FString DisplayName)

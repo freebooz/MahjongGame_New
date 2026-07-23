@@ -2,7 +2,7 @@ param(
     [string]$EngineRoot = 'F:\UnrealEngine-5.8.0-release',
     [ValidateSet('Debug', 'DebugGame', 'Development', 'Shipping', 'Test')]
     [string]$Configuration = 'Development',
-    [string]$Map = '/Engine/Maps/Entry',
+    [string]$Map = '/Game/Maps/MahjongServerMap',
     [string]$StagingDirectory = ''
 )
 

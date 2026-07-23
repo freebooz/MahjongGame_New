@@ -185,6 +185,16 @@ bool FMahjongHudSeatMappingTest::RunTest(const FString& Parameters)
         UMobileRoomWidget::GetAbsoluteSeatForRelativePosition(2, 2), 0);
     TestEqual(TEXT("南方玩家上家必须映射到西方座位"),
         UMobileRoomWidget::GetAbsoluteSeatForRelativePosition(3, 2), 1);
+    TestEqual(TEXT("座位0看到绝对牌墙0位于南方"),
+        AMahjong3DTableActor::GetRelativeWallSide(0, 0), 0);
+    TestEqual(TEXT("座位1看到绝对牌墙0位于西方"),
+        AMahjong3DTableActor::GetRelativeWallSide(0, 1), 3);
+    TestEqual(TEXT("座位2看到绝对牌墙0位于北方"),
+        AMahjong3DTableActor::GetRelativeWallSide(0, 2), 2);
+    TestEqual(TEXT("座位3看到绝对牌墙0位于东方"),
+        AMahjong3DTableActor::GetRelativeWallSide(0, 3), 1);
+    TestEqual(TEXT("非法本地座位不得生成牌墙方位"),
+        AMahjong3DTableActor::GetRelativeWallSide(0, INDEX_NONE), INDEX_NONE);
     TestEqual(TEXT("牌局阶段显示中文"), UMobileMahjongHUDWidget::GetPhaseDisplayText(
         EMahjongTablePhase::WaitingForAction), FString(TEXT("等待碰杠胡")));
     return true;
@@ -198,15 +208,31 @@ bool FMahjongTileVisualMappingTest::RunTest(const FString& Parameters)
     Tile.Rank = 1;
     Tile.UniqueId = 1;
 
+    int32 Column = INDEX_NONE;
+    int32 Row = INDEX_NONE;
     Tile.Suit = EMahjongSuit::Characters;
-    TestTrue(TEXT("一万映射到万牌资源"), UMahjongTileVisualLibrary::GetFaceTexturePath(Tile).Contains(TEXT("T_Tile_Wan_01")));
+    TestTrue(TEXT("一万必须使用 Mahjong50 高清图集"),
+        UMahjongTileVisualLibrary::GetFaceTexturePath(Tile).Contains(TEXT("T_Mahjong50_FaceAtlas_BaseColor")));
+    TestTrue(TEXT("一万必须映射到图集格"),
+        UMahjongTileVisualLibrary::GetFaceAtlasCell(Tile, Column, Row));
+    TestEqual(TEXT("一万图集列"), Column, 0);
+    TestEqual(TEXT("一万图集行"), Row, 3);
     Tile.Suit = EMahjongSuit::Bamboo;
-    TestTrue(TEXT("一条映射到条牌资源"), UMahjongTileVisualLibrary::GetFaceTexturePath(Tile).Contains(TEXT("T_Tile_Tiao_01")));
+    TestTrue(TEXT("一条必须映射到图集格"),
+        UMahjongTileVisualLibrary::GetFaceAtlasCell(Tile, Column, Row));
+    TestEqual(TEXT("一条图集列"), Column, 0);
+    TestEqual(TEXT("一条图集行"), Row, 2);
     Tile.Suit = EMahjongSuit::Dots;
-    TestTrue(TEXT("一筒映射到筒牌资源"), UMahjongTileVisualLibrary::GetFaceTexturePath(Tile).Contains(TEXT("T_Tile_Tong_01")));
+    TestTrue(TEXT("一筒必须映射到图集格"),
+        UMahjongTileVisualLibrary::GetFaceAtlasCell(Tile, Column, Row));
+    TestEqual(TEXT("一筒图集列"), Column, 0);
+    TestEqual(TEXT("一筒图集行"), Row, 1);
 
     Tile.Type = EMahjongTileType::East;
-    TestTrue(TEXT("未提供独立牌面的字牌回退为文字"), UMahjongTileVisualLibrary::GetFaceTexturePath(Tile).IsEmpty());
+    TestTrue(TEXT("东风必须映射到字牌图集格"),
+        UMahjongTileVisualLibrary::GetFaceAtlasCell(Tile, Column, Row));
+    TestEqual(TEXT("东风图集列"), Column, 5);
+    TestEqual(TEXT("东风图集行"), Row, 0);
     return true;
 }
 
@@ -1321,6 +1347,12 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
     TestTrue(TEXT("旧版绿色桌面背景若仍存在于序列化资源中，必须由 HUD 兼容绑定接管"),
         !LegacyBackground || FindFProperty<FObjectPropertyBase>(
             UMobileMahjongHUDWidget::StaticClass(), TEXT("Background_ComponentSlot")) != nullptr);
+    TestNotNull(TEXT("等待阶段的准备按钮必须直接位于三维牌桌 HUD"),
+        GameHUD->WidgetTree->FindWidget(TEXT("Btn_Ready")));
+    TestNotNull(TEXT("三维牌桌 HUD 必须保留返回大厅按钮"),
+        GameHUD->WidgetTree->FindWidget(TEXT("Btn_ReturnLobby")));
+    TestNotNull(TEXT("准备状态提示必须直接位于三维牌桌 HUD"),
+        GameHUD->WidgetTree->FindWidget(TEXT("Txt_ReadyStatus")));
     TestNotNull(TEXT("三维牌桌 Actor 类必须可加载"), AMahjong3DTableActor::StaticClass());
     const AMahjongRoomCameraActor* CameraDefault = GetDefault<AMahjongRoomCameraActor>();
     TestNotNull(TEXT("房间电影摄像机预设类必须可加载"), CameraDefault);

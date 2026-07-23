@@ -49,7 +49,7 @@ spec:
               image: ghcr.io/freebooz/guiyang-mahjong-server:REPLACE_WITH_IMMUTABLE_TAG
               imagePullPolicy: IfNotPresent
               args:
-                - /Game/Maps/MahjongRoomMap
+                - /Game/Maps/MahjongServerMap
                 - -server
                 - -log
                 - -unattended

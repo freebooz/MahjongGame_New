@@ -112,12 +112,23 @@ def import_texture(source: Path):
 def configure_texture(texture, name: str) -> None:
     is_normal = name.endswith("_Normal")
     is_mask = name.endswith("_ORM") or name.endswith("_AO") or name.endswith("_Roughness") or name.endswith("_Height")
+    is_face_atlas = "_FaceAtlas_" in name
     set_prop(texture, "srgb", not (is_normal or is_mask))
     if is_normal:
         set_prop(texture, "compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
     elif is_mask:
         set_prop(texture, "compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
-    set_prop(texture, "lod_group", unreal.TextureGroup.TEXTUREGROUP_WORLD)
+    set_prop(
+        texture,
+        "lod_group",
+        unreal.TextureGroup.TEXTUREGROUP_CHARACTER if is_face_atlas else unreal.TextureGroup.TEXTUREGROUP_WORLD,
+    )
+    if is_face_atlas:
+        # Atlas cells occupy only part of the 8K texture. Preserve thin strokes at oblique angles.
+        set_prop(texture, "mip_gen_settings", unreal.TextureMipGenSettings.TMGS_SHARPEN4)
+        # UE 5.8 selects anisotropy through the texture group and r.MaxAnisotropy.
+        set_prop(texture, "filter", unreal.TextureFilter.TF_DEFAULT)
+        set_prop(texture, "lod_bias", 0)
     post_edit_change = getattr(texture, "post_edit_change", None)
     if post_edit_change:
         post_edit_change()

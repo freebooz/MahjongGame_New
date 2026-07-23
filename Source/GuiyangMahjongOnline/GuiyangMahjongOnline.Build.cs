@@ -7,7 +7,7 @@ public class GuiyangMahjongOnline : ModuleRules
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[]
         {
-            "Core", "CoreUObject", "Engine", "HTTP", "Json", "JsonUtilities"
+            "Core", "CoreUObject", "Engine", "GuiyangMahjongCore", "HTTP", "Json", "JsonUtilities"
         });
     }
 }
