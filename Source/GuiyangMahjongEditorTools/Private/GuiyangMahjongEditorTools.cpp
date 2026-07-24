@@ -1,7 +1,7 @@
 #include "GuiyangMahjongEditorTools.h"
 
 #include "BlueprintEditorModule.h"
-#include "BlueprintEditorModes.h"
+#include "BlueprintEditorTabs.h"
 #include "ContentBrowserModule.h"
 #include "Engine/Blueprint.h"
 #include "Framework/Docking/TabManager.h"
@@ -69,8 +69,8 @@ void FGuiyangMahjongEditorToolsModule::OpenRoomPresentationEditor()
             TSharedPtr<IToolkitHost>(),
             Blueprint,
             false);
-    BlueprintEditor->SetCurrentMode(
-        FBlueprintEditorApplicationModes::BlueprintComponentsMode);
+    BlueprintEditor->GetTabManager()->TryInvokeTab(
+        FBlueprintEditorTabs::SCSViewportID);
 
     UE_LOG(
         LogTemp,
