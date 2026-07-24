@@ -13,7 +13,7 @@ public class GuiyangMahjongEditorTools : ModuleRules
         PrivateDependencyModuleNames.AddRange(new[]
         {
             "UMG", "Slate", "SlateCore", "UnrealEd", "UMGEditor", "AssetRegistry", "Kismet", "Json",
-            "CinematicCamera"
+            "CinematicCamera", "ContentBrowser"
         });
     }
 }
