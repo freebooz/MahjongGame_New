@@ -1,9 +1,11 @@
 """Replace the legacy full Mahjong table with the Blender 5.2 tabletop-only asset.
 
-Run with UnrealEditor-Cmd and ``-ExecutePythonScript``.  The static mesh is
-reimported at the existing content path so native code, maps, and Blueprints keep
-their references.  Obsolete leg/controller materials and textures are removed
-only after the new two-slot mesh has been saved and validated.
+Run with UnrealEditor-Cmd and ``-ExecutePythonScript``.  The legacy static-mesh
+package is deleted before importing the new FBX at the same content path.  This
+prevents Unreal's reimport pipeline from retaining the old eleven-slot material
+layout while native code, maps, and Blueprints continue using the stable path.
+Obsolete leg/controller materials and textures are removed only after the new
+three-slot mesh has been saved and validated.
 """
 
 from __future__ import annotations
@@ -87,12 +89,32 @@ def ensure_sources() -> tuple[dict, dict]:
     return model_manifest, texture_manifest
 
 
+def delete_existing_table_assets() -> list[str]:
+    """Delete the previous table asset set before every full import."""
+
+    if not unreal.EditorAssetLibrary.does_directory_exist(DEST_ROOT):
+        return []
+    assets = list(unreal.EditorAssetLibrary.list_assets(DEST_ROOT, recursive=True))
+    deleted: list[str] = []
+    for asset_path in sorted(assets, reverse=True):
+        log(f"deleting previous table resource: {asset_path}")
+        if not unreal.EditorAssetLibrary.delete_asset(asset_path):
+            raise RuntimeError(f"Could not delete previous table resource {asset_path}")
+        deleted.append(asset_path)
+    return deleted
+
+
 def ensure_destination_folders() -> None:
     for path in (DEST_ROOT, MESH_DEST, TEXTURE_DEST, MATERIAL_DEST):
         unreal.EditorAssetLibrary.make_directory(path)
 
 
 def import_model():
+    if unreal.EditorAssetLibrary.does_asset_exist(MESH_PATH):
+        log(f"deleting legacy static mesh package before clean import: {MESH_PATH}")
+        if not unreal.EditorAssetLibrary.delete_asset(MESH_PATH):
+            raise RuntimeError(f"Could not delete legacy static mesh {MESH_PATH}")
+
     options = unreal.FbxImportUI()
     set_prop(options, "import_as_skeletal", False)
     set_prop(options, "mesh_type_to_import", unreal.FBXImportType.FBXIT_STATIC_MESH)
@@ -101,7 +123,9 @@ def import_model():
     set_prop(options, "automated_import_should_detect_type", False)
 
     static_data = options.get_editor_property("static_mesh_import_data")
-    set_prop(static_data, "import_uniform_scale", 1.0)
+    # Unreal consumes FBX geometry in centimeters; Blender authored this asset
+    # in meters, so apply the explicit 100x meter-to-centimeter conversion.
+    set_prop(static_data, "import_uniform_scale", 100.0)
     set_prop(static_data, "combine_meshes", True)
     set_prop(static_data, "auto_generate_collision", False)
     set_prop(static_data, "generate_lightmap_u_vs", True)
@@ -118,15 +142,15 @@ def import_model():
     task.destination_path = MESH_DEST
     task.destination_name = "SM_StandardMahjongTable"
     task.automated = True
-    task.replace_existing = True
-    task.replace_existing_settings = True
+    task.replace_existing = False
+    task.replace_existing_settings = False
     task.save = True
     task.options = options
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
 
     mesh = unreal.EditorAssetLibrary.load_asset(MESH_PATH)
     if not mesh:
-        raise RuntimeError(f"FBX import did not create or replace {MESH_PATH}")
+        raise RuntimeError(f"FBX import did not create {MESH_PATH}")
     set_prop(mesh, "allow_cpu_access", False)
     try:
         nanite = mesh.get_editor_property("nanite_settings")
@@ -416,6 +440,7 @@ def write_report(
 def main() -> None:
     log(f"replace source={MODEL_FILE} destination={MESH_PATH}")
     model_manifest, texture_manifest = ensure_sources()
+    deleted_assets = delete_existing_table_assets()
     ensure_destination_folders()
 
     mesh = import_model()
@@ -436,7 +461,7 @@ def main() -> None:
     unreal.EditorAssetLibrary.save_directory(
         DEST_ROOT, only_if_is_dirty=False, recursive=True
     )
-    deleted_assets = delete_obsolete_assets()
+    deleted_assets.extend(delete_obsolete_assets())
     unreal.EditorAssetLibrary.save_directory(
         DEST_ROOT, only_if_is_dirty=False, recursive=True
     )

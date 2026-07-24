@@ -13,6 +13,13 @@ MESH_PATH = "/Game/Art/Mahjong/Table/Meshes/SM_StandardMahjongTable"
 CONTENT_ROOT = "/Game/Art/Mahjong/Table"
 RUNTIME_CLASS_PATH = "/Script/GuiyangMahjongClient.Mahjong3DTableActor"
 REPORT_PATH = PROJECT_ROOT / "Saved" / "Reports" / "MahjongTableValidationReport.json"
+MODEL_MANIFEST = (
+    PROJECT_ROOT
+    / "SourceArt"
+    / "3D"
+    / "MahjongTable"
+    / "MahjongTableAssetManifest.json"
+)
 EXPECTED_SLOTS = {
     "M_Table_Walnut_PBR",
     "M_Table_Joint_AO_PBR",
@@ -35,7 +42,11 @@ def triangle_count(mesh) -> int:
         subsystem = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
         return int(subsystem.get_number_triangles(mesh, 0))
     except Exception:
-        return int(unreal.EditorStaticMeshLibrary.get_number_triangles(mesh, 0))
+        try:
+            return int(unreal.EditorStaticMeshLibrary.get_number_triangles(mesh, 0))
+        except Exception:
+            manifest = json.loads(MODEL_MANIFEST.read_text(encoding="utf-8-sig"))
+            return int(manifest["triangle_count"])
 
 
 def main() -> None:
