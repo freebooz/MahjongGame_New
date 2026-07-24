@@ -5,10 +5,10 @@
 
 EStretch::Type UMahjongResponsiveScaleBox::ResolveStretchForViewport(const FIntPoint ViewportSize)
 {
-    const int32 ShortSide = FMath::Max(1, FMath::Min(ViewportSize.X, ViewportSize.Y));
-    const int32 LongSide = FMath::Max(ViewportSize.X, ViewportSize.Y);
-    const float AspectRatio = static_cast<float>(LongSide) / static_cast<float>(ShortSide);
-    return AspectRatio < 1.72f ? EStretch::ScaleToFit : EStretch::Fill;
+    // Foreground controls must keep the authored 16:9 geometry on phones, tablets and desktop.
+    // Full-screen coverage is handled by the independent background layer; stretching the
+    // foreground changes hit targets and pushes edge controls outside the visible viewport.
+    return EStretch::ScaleToFit;
 }
 
 void UMahjongResponsiveScaleBox::SynchronizeProperties()

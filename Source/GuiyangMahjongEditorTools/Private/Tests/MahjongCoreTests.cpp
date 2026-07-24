@@ -1537,8 +1537,8 @@ bool FMahjongPhoneTabletScalingTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("20:9 手机必须使用 1.0 倍 UI"), PhoneScale, 1.0f);
     TestEqual(TEXT("16:10 平板必须使用 1.0 倍 UI"), Tablet16x10Scale, 1.0f);
     TestEqual(TEXT("4:3 平板必须使用 1.0 倍 UI"), Tablet4x3Scale, 1.0f);
-    TestEqual(TEXT("手机宽屏前景必须使用 Fill"),
-        UMahjongResponsiveScaleBox::ResolveStretchForViewport(FIntPoint(2700, 1224)), EStretch::Fill);
+    TestEqual(TEXT("手机宽屏前景必须保持比例"),
+        UMahjongResponsiveScaleBox::ResolveStretchForViewport(FIntPoint(2700, 1224)), EStretch::ScaleToFit);
     TestEqual(TEXT("16:10 平板前景必须保持比例"),
         UMahjongResponsiveScaleBox::ResolveStretchForViewport(FIntPoint(2560, 1600)), EStretch::ScaleToFit);
     TestEqual(TEXT("4:3 平板前景必须保持比例"),

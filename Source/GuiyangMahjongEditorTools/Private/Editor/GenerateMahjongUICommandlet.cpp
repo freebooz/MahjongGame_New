@@ -55,7 +55,6 @@
 namespace MahjongUIBuilder
 {
     static const FLinearColor Gold(0.92f, 0.66f, 0.20f, 1.0f);
-    static const FLinearColor DeepGreen(0.025f, 0.16f, 0.13f, 0.98f);
     static const FLinearColor PanelGreen(0.045f, 0.25f, 0.20f, 0.96f);
     static const FLinearColor WarmWhite(0.98f, 0.94f, 0.80f, 1.0f);
 
@@ -232,14 +231,42 @@ namespace MahjongUIBuilder
         return Widget;
     }
 
-    static void AddBackground(UWidgetBlueprint* BP, UCanvasPanel* Canvas, const TCHAR* ObjectPath)
+    static const TCHAR* ResolveBackgroundPath(const FString& BPName)
     {
-        UImage* Background = BP->WidgetTree->ConstructWidget<UImage>(UImage::StaticClass(), TEXT("Img_VisualBackground"));
-        Background->SetBrush(TextureBrush(ObjectPath));
-        MarkVariable(BP, Background);
-        UCanvasPanelSlot* Slot = Place(Canvas, Background, FVector2D::ZeroVector, FVector2D::ZeroVector, FAnchors(0, 0, 1, 1));
-        Slot->SetOffsets(FMargin(0));
-        Slot->SetZOrder(-10);
+        if (BPName == TEXT("WBP_Login"))
+        {
+            return TEXT("/Game/UI/Textures/Backgrounds/T_BG_Login_Guiyang.T_BG_Login_Guiyang");
+        }
+        if (BPName == TEXT("WBP_ConnectServer"))
+        {
+            return TEXT("/Game/UI/Textures/Backgrounds/T_BG_Login_Guiyang.T_BG_Login_Guiyang");
+        }
+        if (BPName == TEXT("WBP_Lobby"))
+        {
+            return TEXT("/Game/UI/Textures/Backgrounds/T_BG_Lobby_JiaxiuTower.T_BG_Lobby_JiaxiuTower");
+        }
+        if (BPName == TEXT("WBP_CreatingRoom"))
+        {
+            return TEXT("/Game/UI/Textures/Backgrounds/T_BG_CreatingRoom_GuiyangMoon.T_BG_CreatingRoom_GuiyangMoon");
+        }
+        if (BPName == TEXT("WBP_Room"))
+        {
+            return TEXT("/Game/UI/Textures/Backgrounds/T_BG_Room_GuiyangNight.T_BG_Room_GuiyangNight");
+        }
+        if (BPName == TEXT("WBP_CreateRoomDialog"))
+        {
+            return TEXT("/Game/UI/Textures/Backgrounds/T_BG_Rules_GuiyangCulture.T_BG_Rules_GuiyangCulture");
+        }
+        if (BPName == TEXT("WBP_Settings"))
+        {
+            return TEXT("/Game/UI/Textures/Backgrounds/T_BG_Settings_GuiyangPattern.T_BG_Settings_GuiyangPattern");
+        }
+        if (BPName == TEXT("WBP_Settlement"))
+        {
+            return TEXT("/Game/UI/Textures/Backgrounds/T_BG_Settlement_GuiyangRiver.T_BG_Settlement_GuiyangRiver");
+        }
+        // Root HUD, Game HUD, popup-only dialogs and reusable components are transparent.
+        return nullptr;
     }
 
     static UCanvasPanel* Root(UWidgetBlueprint* BP)
@@ -278,25 +305,19 @@ namespace MahjongUIBuilder
         UOverlay* ViewportRoot = BP->WidgetTree->ConstructWidget<UOverlay>(UOverlay::StaticClass(), TEXT("Overlay_ViewportRoot"));
         UScaleBox* BackgroundScale = BP->WidgetTree->ConstructWidget<UScaleBox>(UScaleBox::StaticClass(), TEXT("Scale_BackgroundFill"));
         USizeBox* BackgroundSize = BP->WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("Size_BackgroundDesign"));
-        BackgroundScale->SetStretch(EStretch::Fill);
+        BackgroundScale->SetStretch(EStretch::ScaleToFill);
         BackgroundScale->SetStretchDirection(EStretchDirection::Both);
         BackgroundScale->SetClipping(EWidgetClipping::ClipToBounds);
         BackgroundSize->SetWidthOverride(DesignResolution.X);
         BackgroundSize->SetHeightOverride(DesignResolution.Y);
 
-        const TCHAR* BackgroundPath = (BPName == TEXT("WBP_Login") || BPName == TEXT("WBP_ConnectServer"))
-            ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Login_Guiyang.T_BG_Login_Guiyang")
-            : BPName == TEXT("WBP_Lobby") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Lobby_JiaxiuTower.T_BG_Lobby_JiaxiuTower")
-            : BPName == TEXT("WBP_CreatingRoom") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_CreatingRoom_GuiyangMoon.T_BG_CreatingRoom_GuiyangMoon")
-            : BPName == TEXT("WBP_Room") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Room_GuiyangNight.T_BG_Room_GuiyangNight")
-            : BPName == TEXT("WBP_Settlement") ? TEXT("/Game/UI/Textures/Backgrounds/T_BG_Settlement_GuiyangRiver.T_BG_Settlement_GuiyangRiver")
-            : nullptr;
+        const TCHAR* BackgroundPath = ResolveBackgroundPath(BPName);
         UWidget* Background = nullptr;
-        if (BPName == TEXT("WBP_GameHUD"))
+        if (!BackgroundPath)
         {
-            // The in-game HUD overlays the real MahjongRoomMap. It must not create any backing
-            // brush, even a nominally transparent one, because serialized brush tint can survive
-            // generator revisions and obscure the 3D world.
+            // Runtime overlays and reusable components must not create a backing brush. The game
+            // HUD needs the real MahjongRoomMap to remain visible, and popup widgets need the
+            // underlying screen to remain visible.
             // ConstructWidget registers objects with the WidgetTree even when they are detached.
             // Move these unused compatibility nodes out of the tree so the compiler does not
             // require variable GUIDs for widgets that can never render.
@@ -312,10 +333,6 @@ namespace MahjongUIBuilder
             BackgroundImage->SetBrush(TextureBrush(BackgroundPath));
             MarkVariable(BP, BackgroundImage);
             Background = BackgroundImage;
-        }
-        else
-        {
-            Background = Border(BP, TEXT("Background_ComponentSlot"), DeepGreen);
         }
         if (Background)
         {
@@ -334,8 +351,8 @@ namespace MahjongUIBuilder
         Safe->AddChild(Scale);
         Scale->AddChild(DesignSize);
         DesignSize->AddChild(Canvas);
-        // 20:9 等移动端宽屏直接铺满可用区域；PC 16:9 设计分辨率下比例保持不变。
-        Scale->SetStretch(EStretch::Fill);
+        // 前景在手机、平板和桌面始终保持 16:9 设计比例；背景分支独立铺满屏幕。
+        Scale->SetStretch(EStretch::ScaleToFit);
         Scale->SetStretchDirection(EStretchDirection::Both);
         DesignSize->SetWidthOverride(DesignResolution.X);
         DesignSize->SetHeightOverride(DesignResolution.Y);
@@ -649,11 +666,53 @@ int32 UGenerateMahjongUICommandlet::Main(const FString& Params)
     Finish(RootHUD);
 
     UWidgetBlueprint* Connect = Create(TEXT("Screens"), TEXT("WBP_ConnectServer"), UMobileConnectServerWidget::StaticClass());
-    { UCanvasPanel* C=Root(Connect); Place(C,Text(Connect,TEXT("Title"),TEXT("贵阳捉鸡麻将"),54),{0,120},{700,80},FAnchors(0.5f,0),{0.5f,0}); Place(C,Edit(Connect,TEXT("Txt_ServerIP"),TEXT("服务器 IP，例如 127.0.0.1")),{-230,300},{460,64},FAnchors(0.5f,0)); Place(C,Edit(Connect,TEXT("Txt_ServerPort"),TEXT("端口 7777")),{-230,380},{460,64},FAnchors(0.5f,0)); Place(C,Edit(Connect,TEXT("Txt_PlayerName"),TEXT("请输入中文昵称")),{-230,460},{460,64},FAnchors(0.5f,0)); UCheckBox* Chk=Connect->WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass(),TEXT("Chk_RememberAddress")); MarkVariable(Connect,Chk); Place(C,Chk,{-230,540},{44,44},FAnchors(0.5f,0)); UButton* Btn=Button(Connect,TEXT("Btn_Connect"),TEXT("")); Place(C,Btn,{-230,620},{460,76},FAnchors(0.5f,0)); ReplaceButtonContent(Connect, Btn, Text(Connect,TEXT("Txt_ConnectButton"),TEXT("连接服务器"),30)); Place(C,Text(Connect,TEXT("Txt_Version"),TEXT("版本 0.1.0 · UE 5.8"),20),{24,-52},{340,36},FAnchors(0,1)); }
+    {
+        UCanvasPanel* C = Root(Connect);
+        UBorder* FormPanel = Border(Connect, TEXT("Panel_ConnectForm"), FLinearColor(0.02f, 0.14f, 0.12f, 0.92f));
+        Place(C, FormPanel, {0, 210}, {620, 590}, FAnchors(0.5f, 0), {0.5f, 0})->SetZOrder(-1);
+        Place(C, Text(Connect, TEXT("Title"), TEXT("连接游戏服务"), 48),
+            {0, 245}, {520, 72}, FAnchors(0.5f, 0), {0.5f, 0});
+        Place(C, Edit(Connect, TEXT("Txt_ServerIP"), TEXT("服务器 IP，例如 127.0.0.1")),
+            {-230, 340}, {460, 64}, FAnchors(0.5f, 0));
+        Place(C, Edit(Connect, TEXT("Txt_ServerPort"), TEXT("端口 7777")),
+            {-230, 425}, {460, 64}, FAnchors(0.5f, 0));
+        Place(C, Edit(Connect, TEXT("Txt_PlayerName"), TEXT("请输入中文昵称")),
+            {-230, 510}, {460, 64}, FAnchors(0.5f, 0));
+        UCheckBox* Remember = Connect->WidgetTree->ConstructWidget<UCheckBox>(
+            UCheckBox::StaticClass(), TEXT("Chk_RememberAddress"));
+        MarkVariable(Connect, Remember);
+        Place(C, Remember, {-230, 600}, {44, 44}, FAnchors(0.5f, 0));
+        Place(C, Text(Connect, TEXT("Txt_RememberAddressLabel"), TEXT("记住服务器地址"), 22),
+            {-170, 603}, {280, 40}, FAnchors(0.5f, 0));
+        UButton* ConnectButton = Button(Connect, TEXT("Btn_Connect"), TEXT(""));
+        Place(C, ConnectButton, {-230, 680}, {460, 76}, FAnchors(0.5f, 0));
+        ReplaceButtonContent(Connect, ConnectButton,
+            Text(Connect, TEXT("Txt_ConnectButton"), TEXT("连接服务器"), 30));
+        Place(C, Text(Connect, TEXT("Txt_Version"), TEXT("版本 0.2.0 · UE 5.8"), 20),
+            {30, -54}, {360, 36}, FAnchors(0, 1));
+    }
     Finish(Connect);
 
     UWidgetBlueprint* Lobby = Create(TEXT("Screens"), TEXT("WBP_Lobby"), UMobileLobbyWidget::StaticClass());
-    { UCanvasPanel* C=Root(Lobby); Place(C,Text(Lobby,TEXT("Txt_PlayerName"),TEXT("玩家昵称"),34),{80,70},{420,54}); Place(C,Text(Lobby,TEXT("Txt_PlayerId"),TEXT("玩家ID：--"),22),{80,130},{420,40}); Place(C,Text(Lobby,TEXT("Txt_OnlineCount"),TEXT("在线人数：0"),22),{80,180},{420,40}); Place(C,Button(Lobby,TEXT("Btn_QuickStart"),TEXT("快速开始")),{710,320},{500,110}); Place(C,Button(Lobby,TEXT("Btn_CreateRoom"),TEXT("创建房间")),{710,460},{240,82}); Place(C,Button(Lobby,TEXT("Btn_JoinRoom"),TEXT("加入房间")),{970,460},{240,82}); Place(C,Button(Lobby,TEXT("Btn_Setting"),TEXT("设置")),{1660,60},{180,64}); }
+    {
+        UCanvasPanel* C = Root(Lobby);
+        UBorder* PlayerPanel = Border(Lobby, TEXT("Panel_PlayerInfo"), FLinearColor(0.02f, 0.14f, 0.12f, 0.88f));
+        Place(C, PlayerPanel, {48, 42}, {520, 210})->SetZOrder(-1);
+        Place(C, Text(Lobby, TEXT("Txt_PlayerName"), TEXT("玩家昵称"), 34), {82, 70}, {430, 54});
+        Place(C, Text(Lobby, TEXT("Txt_PlayerId"), TEXT("玩家ID：--"), 22), {82, 132}, {430, 40});
+        Place(C, Text(Lobby, TEXT("Txt_OnlineCount"), TEXT("在线人数：0"), 22), {82, 184}, {430, 40});
+
+        UBorder* ActionPanel = Border(Lobby, TEXT("Panel_LobbyActions"), FLinearColor(0.02f, 0.14f, 0.12f, 0.78f));
+        Place(C, ActionPanel, {0, 300}, {620, 320}, FAnchors(0.5f, 0), {0.5f, 0})->SetZOrder(-1);
+        Place(C, Button(Lobby, TEXT("Btn_QuickStart"), TEXT("快速开始")),
+            {0, 340}, {500, 110}, FAnchors(0.5f, 0), {0.5f, 0});
+        Place(C, Button(Lobby, TEXT("Btn_CreateRoom"), TEXT("创建房间")),
+            {-260, 490}, {240, 82}, FAnchors(0.5f, 0));
+        Place(C, Button(Lobby, TEXT("Btn_JoinRoom"), TEXT("加入房间")),
+            {20, 490}, {240, 82}, FAnchors(0.5f, 0));
+        Place(C, Button(Lobby, TEXT("Btn_Setting"), TEXT("设置")),
+            {-220, 60}, {180, 64}, FAnchors(1, 0));
+    }
     Finish(Lobby);
 
     UWidgetBlueprint* Room = Create(TEXT("Screens"), TEXT("WBP_Room"), UMobileRoomWidget::StaticClass());
