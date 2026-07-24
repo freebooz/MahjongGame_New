@@ -56,9 +56,9 @@ class TabletopDimensions:
     bullnose_bottom_z: float = -0.030
     outer_corner_radius: float = 0.024
     outer_corner_arc_segments: int = 5
-    miter_joint_width: float = 0.0065
-    miter_joint_center_line_width: float = 0.0045
-    miter_joint_recess: float = 0.0012
+    miter_joint_width: float = 0.0030
+    miter_joint_center_line_width: float = 0.0018
+    miter_joint_recess: float = 0.0015
     felt_corner_radius: float = 0.012
     felt_corner_segments: int = 16
 
@@ -131,14 +131,18 @@ def configure_scene() -> None:
             continue
     scene.render.image_settings.color_mode = "RGBA"
     try:
-        scene.view_settings.look = "AgX - Medium High Contrast"
+        scene.view_settings.view_transform = "Standard"
+        scene.view_settings.look = "None"
     except TypeError:
-        pass
+        scene.view_settings.look = "None"
 
     world = bpy.data.worlds.new("MahjongTableTop_World")
     world.use_nodes = True
     scene.world = world
-    background = world.node_tree.nodes.get("Background")
+    background = next(
+        (node for node in world.node_tree.nodes if node.type == "BACKGROUND"),
+        None,
+    )
     if background:
         background.inputs["Color"].default_value = (0.0, 0.0, 0.0, 1.0)
         background.inputs["Strength"].default_value = 0.0
@@ -227,9 +231,9 @@ def create_felt_material() -> bpy.types.Material:
     material, shader, tree = principled_material(
         "M_Table_Felt_Green_PBR", (0.002, 0.075, 0.009, 1.0), 0.86
     )
-    set_input(shader, "Sheen Weight", 0.075)
+    set_input(shader, "Sheen Weight", 0.015)
     set_input(shader, "Sheen Roughness", 0.92)
-    set_input(shader, "Specular IOR Level", 0.12)
+    set_input(shader, "Specular IOR Level", 0.010)
     nodes, links = tree.nodes, tree.links
 
     texcoord = nodes.new("ShaderNodeTexCoord")
@@ -242,7 +246,7 @@ def create_felt_material() -> bpy.types.Material:
     warp.location = (-620.0, 150.0)
     warp.wave_type = "BANDS"
     warp.bands_direction = "X"
-    set_input(warp, "Scale", 110.0)
+    set_input(warp, "Scale", 420.0)
     set_input(warp, "Distortion", 1.8)
     set_input(warp, "Detail", 3.0)
     set_input(warp, "Detail Scale", 2.0)
@@ -251,7 +255,7 @@ def create_felt_material() -> bpy.types.Material:
     weft.location = (-620.0, -80.0)
     weft.wave_type = "BANDS"
     weft.bands_direction = "Y"
-    set_input(weft, "Scale", 96.0)
+    set_input(weft, "Scale", 380.0)
     set_input(weft, "Distortion", 1.4)
     set_input(weft, "Detail", 3.0)
 
@@ -273,8 +277,8 @@ def create_felt_material() -> bpy.types.Material:
 
     ramp = nodes.new("ShaderNodeValToRGB")
     ramp.location = (20.0, 130.0)
-    ramp.color_ramp.elements[0].color = (0.00005, 0.004, 0.00025, 1.0)
-    ramp.color_ramp.elements[1].color = (0.0005, 0.020, 0.0016, 1.0)
+    ramp.color_ramp.elements[0].color = (0.0002, 0.008, 0.0008, 1.0)
+    ramp.color_ramp.elements[1].color = (0.0010, 0.035, 0.0030, 1.0)
 
     roughness = nodes.new("ShaderNodeMapRange")
     roughness.location = (20.0, -260.0)
@@ -285,7 +289,7 @@ def create_felt_material() -> bpy.types.Material:
 
     bump = nodes.new("ShaderNodeBump")
     bump.location = (220.0, -90.0)
-    bump.inputs["Strength"].default_value = 0.14
+    bump.inputs["Strength"].default_value = 0.055
     bump.inputs["Distance"].default_value = 0.00018
 
     links.new(texcoord.outputs["UV"], mapping.inputs["Vector"])
@@ -446,15 +450,14 @@ def create_miter_joint_grooves(
     material: bpy.types.Material,
     collection: bpy.types.Collection,
 ) -> bpy.types.Object:
-    """Create four narrow recessed strips that remain readable under flat lighting."""
+    """Create dark recessed inserts below the four real geometric joint gaps."""
 
     half = dimensions.size * 0.5
     inner = dimensions.playing_size * 0.5
-    width = dimensions.miter_joint_width
+    width = dimensions.miter_joint_width * 0.60
     center_width = dimensions.miter_joint_center_line_width
-    top_z = dimensions.frame_top
-    center_z = top_z - dimensions.miter_joint_recess
-    line_z = top_z + 0.00002
+    top_z = dimensions.frame_top - dimensions.miter_joint_recess
+    bottom_z = dimensions.frame_bottom + 0.0002
     rounded_miter = (
         half
         - dimensions.outer_corner_radius
@@ -471,46 +474,32 @@ def create_miter_joint_grooves(
     for start, end in diagonals:
         direction = Vector((end[0] - start[0], end[1] - start[1]))
         direction_normalized = direction.normalized()
-        start_point = Vector(start) + direction_normalized * (width * 0.5)
-        end_point = Vector(end) - direction_normalized * (width * 0.5)
+        start_point = Vector(start) + direction_normalized * 0.0004
+        end_point = Vector(end) - direction_normalized * 0.0004
         perpendicular = Vector((-direction.y, direction.x)).normalized() * (width * 0.5)
-        center_perpendicular = (
-            Vector((-direction.y, direction.x)).normalized() * (center_width * 0.5)
-        )
         base = len(vertices)
         vertices.extend(
             (
+                (start_point.x + perpendicular.x, start_point.y + perpendicular.y, bottom_z),
+                (end_point.x + perpendicular.x, end_point.y + perpendicular.y, bottom_z),
+                (end_point.x - perpendicular.x, end_point.y - perpendicular.y, bottom_z),
+                (start_point.x - perpendicular.x, start_point.y - perpendicular.y, bottom_z),
                 (start_point.x + perpendicular.x, start_point.y + perpendicular.y, top_z),
                 (end_point.x + perpendicular.x, end_point.y + perpendicular.y, top_z),
-                (end_point.x, end_point.y, center_z),
-                (start_point.x, start_point.y, center_z),
                 (end_point.x - perpendicular.x, end_point.y - perpendicular.y, top_z),
                 (start_point.x - perpendicular.x, start_point.y - perpendicular.y, top_z),
-                (
-                    start_point.x + center_perpendicular.x,
-                    start_point.y + center_perpendicular.y,
-                    line_z,
-                ),
-                (
-                    end_point.x + center_perpendicular.x,
-                    end_point.y + center_perpendicular.y,
-                    line_z,
-                ),
-                (
-                    end_point.x - center_perpendicular.x,
-                    end_point.y - center_perpendicular.y,
-                    line_z,
-                ),
-                (
-                    start_point.x - center_perpendicular.x,
-                    start_point.y - center_perpendicular.y,
-                    line_z,
-                ),
             )
         )
-        faces.append((base, base + 1, base + 2, base + 3))
-        faces.append((base + 3, base + 2, base + 4, base + 5))
-        faces.append((base + 6, base + 7, base + 8, base + 9))
+        faces.extend(
+            (
+                (base, base + 3, base + 2, base + 1),
+                (base + 4, base + 5, base + 6, base + 7),
+                (base, base + 1, base + 5, base + 4),
+                (base + 1, base + 2, base + 6, base + 5),
+                (base + 2, base + 3, base + 7, base + 6),
+                (base + 3, base, base + 4, base + 7),
+            )
+        )
     mesh = bpy.data.meshes.new("Miter_Joint_Grooves_Mesh")
     mesh.from_pydata(vertices, [], faces)
     mesh.materials.append(material)
@@ -518,8 +507,9 @@ def create_miter_joint_grooves(
     grooves = bpy.data.objects.new("Miter_Joint_Grooves", mesh)
     collection.objects.link(grooves)
     grooves["asset_role"] = "miter_joint_recess_and_ao"
-    grooves["joint_width_mm"] = width * 1000.0
+    grooves["joint_width_mm"] = dimensions.miter_joint_width * 1000.0
     grooves["joint_center_line_width_mm"] = center_width * 1000.0
+    grooves["physical_gap"] = True
     return grooves
 
 
@@ -598,6 +588,11 @@ def create_mitered_frame(
             )
         # Edge 1 and the closing edge are the two miter cuts; every other outline
         # edge receives the same longitudinal bullnose treatment.
+        trim = dimensions.miter_joint_width / math.sqrt(2.0)
+        points[0] = (points[0][0] + trim, points[0][1])
+        points[1] = (points[1][0] - trim, points[1][1])
+        points[2] = (points[2][0] - trim, points[2][1])
+        points[-1] = (points[-1][0] + trim, points[-1][1])
         bevel_edges = tuple(index for index in range(len(points)) if index not in {1, len(points) - 1})
         return points, bevel_edges
 
@@ -750,7 +745,7 @@ def mesh_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector]:
 
 def create_preview(dimensions: TabletopDimensions, collection: bpy.types.Collection) -> None:
     for name, location, energy, size, color in (
-        ("Key_Softbox", (-1.7, -1.8, 2.2), 650.0, 2.8, (1.0, 0.74, 0.52)),
+        ("Key_Softbox", (-1.7, -1.8, 2.2), 420.0, 2.8, (1.0, 0.74, 0.52)),
         ("Fill_Softbox", (1.6, -0.2, 1.4), 45.0, 2.2, (0.78, 0.86, 1.0)),
         ("Rim_Softbox", (0.2, 1.7, 1.9), 110.0, 1.8, (0.70, 1.0, 0.82)),
     ):
@@ -765,9 +760,10 @@ def create_preview(dimensions: TabletopDimensions, collection: bpy.types.Collect
 
     camera_data = bpy.data.cameras.new("Preview_Camera")
     camera = bpy.data.objects.new("Preview_Camera", camera_data)
-    camera.location = (1.92, -2.06, 1.12)
-    camera.data.lens = 60.0
+    camera.location = (1.92, -2.06, 0.78)
+    camera.data.lens = 62.0
     camera.data.sensor_width = 36.0
+    camera.data.shift_y = -0.09
     collection.objects.link(camera)
     target = Vector((0.0, 0.0, -0.010))
     camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()

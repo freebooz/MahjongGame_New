@@ -44,12 +44,12 @@
     "maximum": [
       575.0,
       575.0,
-      5.02
+      5.0
     ],
     "size": [
       1150.0,
       1150.0,
-      65.02
+      65.0
     ]
   },
   "playing_surface_mm": [
@@ -61,9 +61,9 @@
   "mesh_object_count": 2,
   "geometry": {
     "SM_Mahjong_Table_Frame_MiterJoint": {
-      "vertices": 1272,
-      "polygons": 2444,
-      "triangles": 2456,
+      "vertices": 1264,
+      "polygons": 2456,
+      "triangles": 2480,
       "material": "M_Table_Walnut_PBR",
       "material_slots": [
         "M_Table_Walnut_PBR",
@@ -80,7 +80,7 @@
       ]
     }
   },
-  "triangle_count": 2712,
+  "triangle_count": 2736,
   "mobile_triangle_budget": 5000,
   "materials": [
     "M_Table_Walnut_PBR",
@@ -103,32 +103,32 @@
     "bullnose_bottom_z": -0.03,
     "outer_corner_radius": 0.024,
     "outer_corner_arc_segments": 5,
-    "miter_joint_width": 0.0065,
-    "miter_joint_center_line_width": 0.0045,
-    "miter_joint_recess": 0.0012,
+    "miter_joint_width": 0.003,
+    "miter_joint_center_line_width": 0.0018,
+    "miter_joint_recess": 0.0015,
     "felt_corner_radius": 0.012,
     "felt_corner_segments": 16
   },
   "files": [
     {
       "path": "SourceArt/3D/MahjongTable/SM_StandardMahjongTable.blend",
-      "bytes": 167931,
-      "sha256": "643284fe3eed12518f28cf325fe6c21d341d29ac449ebe4548aab8396ff68921"
+      "bytes": 169187,
+      "sha256": "298a1e902d2bf700985f2c86de7825edf2be90a99e7c250a2d816e791252ca1b"
     },
     {
       "path": "SourceArt/3D/MahjongTable/SM_StandardMahjongTable.fbx",
-      "bytes": 302300,
-      "sha256": "1a95ee1201861f233fe63e352141b2145555394b45b32d374e71ab983a0422fb"
+      "bytes": 302476,
+      "sha256": "a5f51fe9c5dbc34703918f316e2e7347dd7ab99b255e152902fc84c05d6910df"
     },
     {
       "path": "SourceArt/3D/MahjongTable/SM_StandardMahjongTable.glb",
-      "bytes": 219152,
-      "sha256": "c155aaafd50f33bd053b286e35237556783d270d6f8c88675bef8333454cd2eb"
+      "bytes": 222436,
+      "sha256": "9a8770e5c7607a5811aefd49db20e5d8c4195678a9ddf7f78fbc735771f2a905"
     },
     {
       "path": "SourceArt/3D/MahjongTable/StandardMahjongTable_Preview.png",
-      "bytes": 1521902,
-      "sha256": "d4dd6f6a1890387c7e0bf49638852b3997c8159a81e16843cfe977594e5737a4"
+      "bytes": 843005,
+      "sha256": "aae726c7fd5d18db3a52a22f954cc416b5796d4c2041e6ff7a37f328ec08cf66"
     }
   ]
 }
