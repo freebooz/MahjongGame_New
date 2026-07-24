@@ -11,7 +11,10 @@ import unreal
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MESH_PATH = "/Game/Art/Mahjong/Table/Meshes/SM_StandardMahjongTable"
 CONTENT_ROOT = "/Game/Art/Mahjong/Table"
-RUNTIME_CLASS_PATH = "/Script/GuiyangMahjongClient.Mahjong3DTableActor"
+RUNTIME_CLASS_PATH = (
+    "/Game/Client/Room/Presentation/BP_MahjongRoomPresentation."
+    "BP_MahjongRoomPresentation_C"
+)
 REPORT_PATH = PROJECT_ROOT / "Saved" / "Reports" / "MahjongTableValidationReport.json"
 MODEL_MANIFEST = (
     PROJECT_ROOT
@@ -89,10 +92,26 @@ def main() -> None:
     runtime_class = unreal.load_class(None, RUNTIME_CLASS_PATH)
     if not runtime_class:
         raise RuntimeError(f"Could not load runtime table class {RUNTIME_CLASS_PATH}")
-    runtime_cdo = unreal.get_default_object(runtime_class)
-    if not runtime_cdo:
-        raise RuntimeError("Runtime Mahjong3DTableActor CDO could not be constructed")
-    table_components = runtime_cdo.get_components_by_class(unreal.StaticMeshComponent)
+    preview_world = unreal.EditorLoadingAndSavingUtils.load_map(
+        "/Game/Maps/MahjongRoomVisualPreviewMap"
+    )
+    if not preview_world:
+        raise RuntimeError("Could not load MahjongRoomVisualPreviewMap")
+    runtime_instance = next(
+        (
+            actor
+            for actor in unreal.get_editor_subsystem(
+                unreal.EditorActorSubsystem
+            ).get_all_level_actors()
+            if actor.get_class() == runtime_class
+        ),
+        None,
+    )
+    if not runtime_instance:
+        raise RuntimeError("Runtime BP_MahjongRoomPresentation instance is missing")
+    table_components = runtime_instance.get_components_by_class(
+        unreal.StaticMeshComponent
+    )
     table_component = next(
         (
             component

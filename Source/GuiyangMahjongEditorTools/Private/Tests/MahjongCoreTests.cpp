@@ -1398,6 +1398,21 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
     UClass* ConfiguredPresentationClass = PresentationSettings
         ? PresentationSettings->PresentationClass.LoadSynchronous() : nullptr;
     TestNotNull(TEXT("客户端房间展示蓝图必须可加载"), ConfiguredPresentationClass);
+    UWorld* PreviewWorld = LoadObject<UWorld>(nullptr,
+        TEXT("/Game/Maps/MahjongRoomVisualPreviewMap.MahjongRoomVisualPreviewMap"));
+    TestNotNull(TEXT("麻将房间视觉预览关卡必须可加载"), PreviewWorld);
+    const AMahjongRoomPresentationActor* PresentationInstance = nullptr;
+    if (PreviewWorld && PreviewWorld->PersistentLevel && ConfiguredPresentationClass)
+    {
+        for (const AActor* Actor : PreviewWorld->PersistentLevel->Actors)
+        {
+            if (IsValid(Actor) && Actor->GetClass() == ConfiguredPresentationClass)
+            {
+                PresentationInstance = Cast<AMahjongRoomPresentationActor>(Actor);
+                break;
+            }
+        }
+    }
     if (ConfiguredPresentationClass)
     {
         TestTrue(TEXT("配置的展示蓝图必须继承客户端 Presentation 基类"),
@@ -1407,13 +1422,11 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
             FString(TEXT("/Game/Client/Room/Presentation/BP_MahjongRoomPresentation."
                          "BP_MahjongRoomPresentation_C")));
 
-        const AMahjongRoomPresentationActor* PresentationDefault =
-            ConfiguredPresentationClass->GetDefaultObject<AMahjongRoomPresentationActor>();
-        TestNotNull(TEXT("房间展示蓝图默认对象必须存在"), PresentationDefault);
-        if (PresentationDefault)
+        TestNotNull(TEXT("预览关卡必须包含房间展示蓝图实例"), PresentationInstance);
+        if (PresentationInstance)
         {
             const UDirectionalLightComponent* Directional =
-                PresentationDefault->FindComponentByClass<UDirectionalLightComponent>();
+                PresentationInstance->FindComponentByClass<UDirectionalLightComponent>();
             TestNotNull(TEXT("运行时展示必须包含跨平台主方向光"), Directional);
             if (Directional)
             {
@@ -1424,7 +1437,7 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
                 TestFalse(TEXT("移动端稳定主光默认不得投射高成本阴影"), Directional->CastShadows);
             }
             const USkyLightComponent* Sky =
-                PresentationDefault->FindComponentByClass<USkyLightComponent>();
+                PresentationInstance->FindComponentByClass<USkyLightComponent>();
             TestNotNull(TEXT("运行时展示必须包含环境补光"), Sky);
             if (Sky)
             {
@@ -1432,7 +1445,7 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
                     Sky->CreationMethod, EComponentCreationMethod::SimpleConstructionScript);
             }
             TArray<USpotLightComponent*> SpotLights;
-            PresentationDefault->GetComponents<USpotLightComponent>(SpotLights);
+            PresentationInstance->GetComponents<USpotLightComponent>(SpotLights);
             TestEqual(TEXT("运行时展示必须包含主灯与补光灯"), SpotLights.Num(), 2);
             for (const USpotLightComponent* Spot : SpotLights)
             {
@@ -1444,7 +1457,7 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
                 TestFalse(TEXT("移动端本地灯默认不得投射高成本阴影"), Spot->CastShadows);
             }
             const UCineCameraComponent* PresentationCamera =
-                PresentationDefault->FindComponentByClass<UCineCameraComponent>();
+                PresentationInstance->FindComponentByClass<UCineCameraComponent>();
             TestNotNull(TEXT("展示蓝图必须直接拥有可编辑电影摄像机"), PresentationCamera);
             if (PresentationCamera)
             {
@@ -1453,7 +1466,7 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
                     EComponentCreationMethod::SimpleConstructionScript);
             }
             TArray<UStaticMeshComponent*> StaticMeshes;
-            PresentationDefault->GetComponents<UStaticMeshComponent>(StaticMeshes);
+            PresentationInstance->GetComponents<UStaticMeshComponent>(StaticMeshes);
             const UStaticMeshComponent* TableMeshComponent = nullptr;
             for (const UStaticMeshComponent* Component : StaticMeshes)
             {
@@ -1469,11 +1482,11 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
                 TestEqual(TEXT("麻将桌模型必须由展示蓝图拥有"),
                     TableMeshComponent->CreationMethod,
                     EComponentCreationMethod::SimpleConstructionScript);
-                TestNotNull(TEXT("麻将桌模型组件必须配置静态网格"),
-                    TableMeshComponent->GetStaticMesh());
+                TestTrue(TEXT("麻将桌模型组件必须配置静态网格"),
+                    TableMeshComponent->GetStaticMesh() != nullptr);
             }
             TArray<UChildActorComponent*> ChildActors;
-            PresentationDefault->GetComponents<UChildActorComponent>(ChildActors);
+            PresentationInstance->GetComponents<UChildActorComponent>(ChildActors);
             TestEqual(TEXT("展示蓝图只保留一个动态麻将牌布局 Child Actor"),
                 ChildActors.Num(), 1);
             if (ChildActors.Num() == 1)
@@ -1481,15 +1494,12 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
                 TestEqual(TEXT("麻将牌布局 Child Actor 必须由展示蓝图拥有"),
                     ChildActors[0]->CreationMethod,
                     EComponentCreationMethod::SimpleConstructionScript);
-                TestEqual(TEXT("麻将牌布局必须使用运行时 AMahjong3DTableActor"),
-                    ChildActors[0]->GetChildActorClass(), AMahjong3DTableActor::StaticClass());
+                TestTrue(TEXT("麻将牌布局必须使用运行时 AMahjong3DTableActor"),
+                    ChildActors[0]->GetChildActorClass() == AMahjong3DTableActor::StaticClass());
             }
         }
     }
 
-    UWorld* PreviewWorld = LoadObject<UWorld>(nullptr,
-        TEXT("/Game/Maps/MahjongRoomVisualPreviewMap.MahjongRoomVisualPreviewMap"));
-    TestNotNull(TEXT("麻将房间视觉预览关卡必须可加载"), PreviewWorld);
     bool bHasPresentation = false;
     bool bHasIndependentKeyLight = false;
     if (PreviewWorld && PreviewWorld->PersistentLevel)

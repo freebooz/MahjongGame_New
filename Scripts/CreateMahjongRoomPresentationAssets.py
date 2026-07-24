@@ -11,6 +11,8 @@ LEGACY_LABEL_PATH = f"{ASSET_DIR}/PAL_MahjongRoomPresentation_Client"
 MAP_PATH = "/Game/Maps/MahjongRoomVisualPreviewMap"
 NATIVE_CLASS_PATH = "/Script/GuiyangMahjongClient.MahjongRoomPresentationActor"
 TABLE_CLASS_PATH = "/Script/GuiyangMahjongClient.Mahjong3DTableActor"
+SCHEMA_METADATA_TAG = "MahjongPresentationSchemaVersion"
+SCHEMA_VERSION = "2"
 TABLE_MESH_PATH = (
     "/Game/Art/Mahjong/Table/Meshes/"
     "SM_StandardMahjongTable.SM_StandardMahjongTable"
@@ -162,7 +164,7 @@ _, directional, directional_created = add_component(
     blueprint,
     root_handle,
     unreal.DirectionalLightComponent,
-    "StableDirectionalLight",
+    "BP_DirectionalLight",
 )
 if directional_created:
     configure_new_component(
@@ -170,7 +172,7 @@ if directional_created:
         {
             "relative_rotation": unreal.Rotator(-105.0, -31.0, -14.0),
             "intensity": 10.0,
-            "light_color": unreal.Color(255, 246, 230, 255),
+            "light_color": unreal.Color(r=255, g=246, b=230, a=255),
             "cast_shadows": False,
             "mobility": unreal.ComponentMobility.MOVABLE,
         },
@@ -181,14 +183,14 @@ _, sky, sky_created = add_component(
     blueprint,
     root_handle,
     unreal.SkyLightComponent,
-    "StableSkyLight",
+    "BP_SkyLight",
 )
 if sky_created:
     configure_new_component(
         sky,
         {
             "intensity": 0.25,
-            "light_color": unreal.Color(199, 219, 255, 255),
+            "light_color": unreal.Color(r=199, g=219, b=255, a=255),
             "cast_shadows": False,
             "mobility": unreal.ComponentMobility.MOVABLE,
         },
@@ -199,7 +201,7 @@ _, key, key_created = add_component(
     blueprint,
     root_handle,
     unreal.SpotLightComponent,
-    "StableKeyLight",
+    "BP_KeyLight",
 )
 if key_created:
     configure_new_component(
@@ -212,7 +214,7 @@ if key_created:
             "attenuation_radius": 3000.0,
             "inner_cone_angle": 40.0,
             "outer_cone_angle": 65.0,
-            "light_color": unreal.Color(255, 245, 224, 255),
+            "light_color": unreal.Color(r=255, g=245, b=224, a=255),
             "cast_shadows": False,
             "mobility": unreal.ComponentMobility.MOVABLE,
         },
@@ -223,7 +225,7 @@ _, fill, fill_created = add_component(
     blueprint,
     root_handle,
     unreal.SpotLightComponent,
-    "StableFillLight",
+    "BP_FillLight",
 )
 if fill_created:
     configure_new_component(
@@ -236,10 +238,52 @@ if fill_created:
             "attenuation_radius": 2200.0,
             "inner_cone_angle": 45.0,
             "outer_cone_angle": 75.0,
-            "light_color": unreal.Color(209, 230, 255, 255),
+            "light_color": unreal.Color(r=209, g=230, b=255, a=255),
             "cast_shadows": False,
             "mobility": unreal.ComponentMobility.MOVABLE,
         },
+    )
+
+# Apply the safe migration defaults exactly once. Subsequent script runs preserve
+# every value edited by an artist in the Blueprint.
+if (
+    unreal.EditorAssetLibrary.get_metadata_tag(blueprint, SCHEMA_METADATA_TAG)
+    != SCHEMA_VERSION
+):
+    configure_new_component(
+        directional,
+        {
+            "intensity": 10.0,
+            "light_color": unreal.Color(r=255, g=246, b=230, a=255),
+            "cast_shadows": False,
+        },
+    )
+    configure_new_component(
+        sky,
+        {
+            "intensity": 0.25,
+            "light_color": unreal.Color(r=199, g=219, b=255, a=255),
+            "cast_shadows": False,
+        },
+    )
+    configure_new_component(
+        key,
+        {
+            "intensity": 600.0,
+            "light_color": unreal.Color(r=255, g=245, b=224, a=255),
+            "cast_shadows": False,
+        },
+    )
+    configure_new_component(
+        fill,
+        {
+            "intensity": 200.0,
+            "light_color": unreal.Color(r=209, g=230, b=255, a=255),
+            "cast_shadows": False,
+        },
+    )
+    unreal.EditorAssetLibrary.set_metadata_tag(
+        blueprint, SCHEMA_METADATA_TAG, SCHEMA_VERSION
     )
 
 unreal.BlueprintEditorLibrary.compile_blueprint(blueprint)
@@ -296,6 +340,6 @@ unreal.log(f"MAHJONG_PRESENTATION_RUNTIME_CLASS={presentation.get_class().get_pa
 unreal.log(
     "MAHJONG_PRESENTATION_BLUEPRINT_COMPONENTS_OK="
     "PresentationRoot,MahjongTableMesh,MahjongTileLayout,MahjongRoomCamera,"
-    "StableDirectionalLight,StableSkyLight,StableKeyLight,StableFillLight"
+    "BP_DirectionalLight,BP_SkyLight,BP_KeyLight,BP_FillLight"
 )
 unreal.log("MAHJONG_PRESENTATION_ASSETS_OK")
