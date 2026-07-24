@@ -1,6 +1,7 @@
 #include "Game/GuiyangClientControllerBridgeImpl.h"
 
 #include "Auth/GuiyangLoginSubsystem.h"
+#include "Engine/AssetManager.h"
 #include "Camera/CameraActor.h"
 #include "EngineUtils.h"
 #include "Game/GuiyangMahjongGameState.h"
@@ -21,6 +22,7 @@
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "Network/GuiyangReconnectSubsystem.h"
+#include "Settings/MahjongRoomPresentationSettings.h"
 #include "TimerManager.h"
 #include "UI/MobileRootHUDWidget.h"
 #include "UnrealClient.h"
@@ -28,6 +30,16 @@
 namespace
 {
     constexpr double MinimumCreatingRoomLoadingSeconds = 1.5;
+}
+
+void UGuiyangClientControllerBridgeImpl::BeginDestroy()
+{
+    if (PresentationLoadHandle.IsValid())
+    {
+        PresentationLoadHandle->CancelHandle();
+        PresentationLoadHandle.Reset();
+    }
+    Super::BeginDestroy();
 }
 
 UWorld* UGuiyangClientControllerBridgeImpl::GetWorld() const
@@ -53,6 +65,7 @@ void UGuiyangClientControllerBridgeImpl::InitializeClient(AGuiyangMahjongPlayerC
 
     if (GetWorld() && GetWorld()->GetMapName().Contains(TEXT("MahjongRoomMap")))
     {
+        RequestRoomPresentationClassLoad();
         EnsureRoomPresentation();
     }
 
@@ -121,10 +134,25 @@ AActor* UGuiyangClientControllerBridgeImpl::EnsureRoomPresentation()
         if (It) RoomPresentationActor = *It;
         if (!RoomPresentationActor)
         {
-            FActorSpawnParameters Parameters;
-            Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-            RoomPresentationActor = GetWorld()->SpawnActor<AMahjongRoomPresentationActor>(
-                AMahjongRoomPresentationActor::StaticClass(), FTransform::Identity, Parameters);
+            const UMahjongRoomPresentationSettings* Settings =
+                GetDefault<UMahjongRoomPresentationSettings>();
+            UClass* PresentationClass = Settings ? Settings->PresentationClass.Get() : nullptr;
+            if (PresentationClass)
+            {
+                RoomPresentationActor = SpawnRoomPresentation(*PresentationClass);
+            }
+            else if (!bPresentationLoadFailed && Settings && !Settings->PresentationClass.IsNull())
+            {
+                RequestRoomPresentationClassLoad();
+                return nullptr;
+            }
+            else
+            {
+                UE_LOG(LogMahjongUI, Warning,
+                    TEXT("Configured room presentation is unavailable; spawning native fallback"));
+                RoomPresentationActor = SpawnRoomPresentation(
+                    *AMahjongRoomPresentationActor::StaticClass());
+            }
         }
     }
     if (RoomPresentationActor)
@@ -132,11 +160,94 @@ AActor* UGuiyangClientControllerBridgeImpl::EnsureRoomPresentation()
         RoomTableActor = RoomPresentationActor->GetTableActor();
         RoomCameraActor = RoomPresentationActor->GetRoomCameraActor();
     }
-    if (RoomCameraActor && Controller->GetViewTarget() != RoomCameraActor)
+    ApplyRoomPresentationViewTarget();
+    return RoomTableActor;
+}
+
+void UGuiyangClientControllerBridgeImpl::RequestRoomPresentationClassLoad()
+{
+    const UMahjongRoomPresentationSettings* Settings =
+        GetDefault<UMahjongRoomPresentationSettings>();
+    if (!Settings || Settings->PresentationClass.IsNull())
+    {
+        bPresentationLoadFailed = true;
+        return;
+    }
+    if (Settings->PresentationClass.Get())
+    {
+        bPresentationLoadFailed = false;
+        return;
+    }
+    if (PresentationLoadHandle.IsValid() && !PresentationLoadHandle->HasLoadCompleted())
+    {
+        return;
+    }
+
+    bPresentationLoadFailed = false;
+    PresentationLoadHandle = UAssetManager::GetStreamableManager().RequestAsyncLoad(
+        Settings->PresentationClass.ToSoftObjectPath(),
+        FStreamableDelegate::CreateUObject(
+            this, &ThisClass::HandleRoomPresentationClassLoaded),
+        FStreamableManager::AsyncLoadHighPriority);
+    if (!PresentationLoadHandle.IsValid())
+    {
+        bPresentationLoadFailed = true;
+        UE_LOG(LogMahjongUI, Error, TEXT("Unable to start async room presentation load: %s"),
+            *Settings->PresentationClass.ToString());
+    }
+}
+
+void UGuiyangClientControllerBridgeImpl::HandleRoomPresentationClassLoaded()
+{
+    PresentationLoadHandle.Reset();
+    const UMahjongRoomPresentationSettings* Settings =
+        GetDefault<UMahjongRoomPresentationSettings>();
+    UClass* LoadedClass = Settings ? Settings->PresentationClass.Get() : nullptr;
+    bPresentationLoadFailed = LoadedClass == nullptr;
+    if (!LoadedClass)
+    {
+        UE_LOG(LogMahjongUI, Error, TEXT("Async room presentation load failed; native fallback will be used"));
+    }
+    else
+    {
+        UE_LOG(LogMahjongUI, Display, TEXT("Room presentation class loaded: %s"),
+            *LoadedClass->GetPathName());
+    }
+
+    if (GetWorld() && GetWorld()->GetMapName().Contains(TEXT("MahjongRoomMap")))
+    {
+        EnsureRoomPresentation();
+    }
+}
+
+AMahjongRoomPresentationActor* UGuiyangClientControllerBridgeImpl::SpawnRoomPresentation(
+    UClass& PresentationClass)
+{
+    if (!GetWorld() || !PresentationClass.IsChildOf(AMahjongRoomPresentationActor::StaticClass()))
+    {
+        UE_LOG(LogMahjongUI, Error, TEXT("Rejected invalid room presentation class: %s"),
+            *PresentationClass.GetPathName());
+        return nullptr;
+    }
+    FActorSpawnParameters Parameters;
+    Parameters.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+    AMahjongRoomPresentationActor* Spawned =
+        GetWorld()->SpawnActor<AMahjongRoomPresentationActor>(
+            &PresentationClass, FTransform::Identity, Parameters);
+    if (Spawned)
+    {
+        UE_LOG(LogMahjongUI, Display, TEXT("Spawned local room presentation: %s"),
+            *Spawned->GetClass()->GetPathName());
+    }
+    return Spawned;
+}
+
+void UGuiyangClientControllerBridgeImpl::ApplyRoomPresentationViewTarget()
+{
+    if (RoomCameraActor && Controller && Controller->GetViewTarget() != RoomCameraActor)
     {
         Controller->SetViewTarget(RoomCameraActor);
     }
-    return RoomTableActor;
 }
 
 void UGuiyangClientControllerBridgeImpl::ConnectToServer(
@@ -293,6 +404,7 @@ void UGuiyangClientControllerBridgeImpl::ReturnToLobby()
 void UGuiyangClientControllerBridgeImpl::ShowCreatingRoomLoading()
 {
     if (!Controller) return;
+    RequestRoomPresentationClassLoad();
     CreatingRoomLoadingShownAtSeconds = FPlatformTime::Seconds();
     PendingAllocatedRoute = {};
     Controller->GetWorldTimerManager().ClearTimer(CreatingRoomTravelDelayTimer);

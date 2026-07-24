@@ -36,6 +36,24 @@ foreach ($required in @($project, $uat)) {
     "-stagingdirectory=$StagingDirectory"
 if ($LASTEXITCODE -ne 0) { throw "Client package failed with exit code $LASTEXITCODE" }
 
+$clientContainer = Get-ChildItem -LiteralPath $StagingDirectory -Recurse -File `
+    -Filter 'GuiyangMahjong-*Client.utoc' | Select-Object -First 1
+if ($null -eq $clientContainer) {
+    throw "Client IoStore container was not found below $StagingDirectory"
+}
+$unrealPak = Join-Path $EngineRoot 'Engine\Binaries\Win64\UnrealPak.exe'
+$containerListing = @(& $unrealPak $clientContainer.FullName -List 2>&1)
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not inspect client IoStore container (exit code $LASTEXITCODE)."
+}
+if (!($containerListing -match 'GuiyangMahjong/Content/Client/Room/Presentation/BP_MahjongRoomPresentation.uasset')) {
+    throw 'Client content validation failed: BP_MahjongRoomPresentation is absent.'
+}
+if ($containerListing -match 'MahjongRoomVisualPreviewMap') {
+    throw 'Client content validation failed: editor-only room preview map is packaged.'
+}
+Write-Host 'CLIENT_CONTENT_ISOLATION_OK'
+
 $clientReceipt = Join-Path $root "Binaries\$Platform\GuiyangMahjongClient-$Platform-$Configuration.target"
 & (Join-Path $PSScriptRoot 'Test-PackageIsolation.ps1') -Root $root -Role Client `
     -ClientReceipt $clientReceipt

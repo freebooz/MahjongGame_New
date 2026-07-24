@@ -20,8 +20,5 @@ public:
     static const FName RoomCameraTag;
 
 protected:
-    virtual void BeginPlay() override;
-
-private:
     void ConfigureStablePostProcess();
 };

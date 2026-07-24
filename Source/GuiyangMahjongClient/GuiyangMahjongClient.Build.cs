@@ -7,7 +7,8 @@ public class GuiyangMahjongClient : ModuleRules
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
         PublicDependencyModuleNames.AddRange(new[]
         {
-            "Core", "CoreUObject", "Engine", "GuiyangMahjongCore", "GuiyangMahjongOnline", "GuiyangMahjong"
+            "Core", "CoreUObject", "Engine", "DeveloperSettings",
+            "GuiyangMahjongCore", "GuiyangMahjongOnline", "GuiyangMahjong"
         });
         PrivateDependencyModuleNames.AddRange(new[]
         {

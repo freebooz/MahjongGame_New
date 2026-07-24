@@ -90,6 +90,30 @@ if (!$PostProcessOnly) {
 
 $packageRoot = Join-Path $scratch 'LinuxServer'
 if (!(Test-Path -LiteralPath $packageRoot)) { $packageRoot = $scratch }
+$serverContainer = Get-ChildItem -LiteralPath $packageRoot -Recurse -File `
+    -Filter 'GuiyangMahjong-LinuxServer.utoc' | Select-Object -First 1
+if ($null -eq $serverContainer) {
+    throw "LinuxServer IoStore container was not found below $packageRoot"
+}
+$unrealPak = Join-Path $engine 'Engine\Binaries\Win64\UnrealPak.exe'
+$containerListing = @(& $unrealPak $serverContainer.FullName -List 2>&1)
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not inspect LinuxServer IoStore container (exit code $LASTEXITCODE)."
+}
+foreach ($forbiddenPath in @(
+    'GuiyangMahjong/Content/Client/',
+    'GuiyangMahjong/Content/UI/',
+    'GuiyangMahjong/Content/Art/',
+    'MahjongRoomVisualPreviewMap')) {
+    if ($containerListing -match [regex]::Escape($forbiddenPath)) {
+        throw "LinuxServer content isolation failed: $forbiddenPath is packaged."
+    }
+}
+if (!($containerListing -match 'GuiyangMahjong/Content/Maps/MahjongRoomMap.umap')) {
+    throw 'LinuxServer content isolation failed: MahjongRoomMap is absent.'
+}
+Write-Host 'LINUX_SERVER_CONTENT_ISOLATION_OK'
+
 $serverBinary = Get-ChildItem -LiteralPath $packageRoot -Recurse -File -Filter 'GuiyangMahjongServer*' |
     Where-Object {
         $_.Name -notmatch '\.(debug|sym|target)$' -and

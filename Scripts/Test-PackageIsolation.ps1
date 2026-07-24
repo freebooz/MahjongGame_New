@@ -10,8 +10,18 @@ param(
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($Root)) { $Root = Split-Path -Parent $PSScriptRoot }
 $Root = [IO.Path]::GetFullPath($Root)
-if (!$ClientReceipt) { $ClientReceipt = Join-Path $Root 'Binaries\Win64\GuiyangMahjongClient.target' }
-if (!$ServerReceipt) { $ServerReceipt = Join-Path $Root 'Binaries\Win64\GuiyangMahjongServer.target' }
+if (!$ClientReceipt) {
+    $ClientReceipt = Get-ChildItem -LiteralPath (Join-Path $Root 'Binaries\Win64') `
+        -Filter 'GuiyangMahjongClient*.target' -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
+}
+if (!$ServerReceipt) {
+    $ServerReceipt = Get-ChildItem -LiteralPath @(
+        (Join-Path $Root 'Binaries\Linux'),
+        (Join-Path $Root 'Binaries\Win64')) `
+        -Filter 'GuiyangMahjongServer*.target' -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending | Select-Object -First 1 -ExpandProperty FullName
+}
 
 $projectDescriptor = Get-Content -LiteralPath (Join-Path $Root 'GuiyangMahjong.uproject') -Raw | ConvertFrom-Json
 if (!$projectDescriptor.DisableEnginePluginsByDefault) {
@@ -32,24 +42,54 @@ $defaultGame = Get-Content -LiteralPath (Join-Path $Root 'Config\DefaultGame.ini
 if ($defaultGame -match 'DirectoriesToAlwaysCook|MapsToCook') {
     throw 'DefaultGame.ini contains global Cook roots; move them to target-platform configs.'
 }
+$defaultEngine = Get-Content -LiteralPath (Join-Path $Root 'Config\DefaultEngine.ini') -Raw
+if ($defaultEngine -notmatch 'MobileLocalLightSetting=LOCAL_LIGHTS_ENABLED' -or
+    $defaultEngine -notmatch 'bMobileAllowMovableSpotlightShadows=False') {
+    throw 'Mobile room lighting shader policy is not explicitly configured.'
+}
 
 if ($Role -in @('Client', 'Both')) {
+    foreach ($asset in @(
+        'Content\Client\Room\Presentation\BP_MahjongRoomPresentation.uasset')) {
+        if (!(Test-Path -LiteralPath (Join-Path $Root $asset))) {
+            throw "Client presentation asset is missing: $asset"
+        }
+    }
     foreach ($config in @('Config\Windows\WindowsGame.ini', 'Config\Android\AndroidGame.ini')) {
         $text = Get-Content -LiteralPath (Join-Path $Root $config) -Raw
         if ($text -notmatch '/Game/UI' -or $text -notmatch '/Game/Art/Mahjong' -or
+            $text -notmatch '/Game/Client/Room/Presentation' -or
             $text -notmatch '/Game/Maps/MahjongRoomMap' -or
+            $text -notmatch 'DisallowedConfigFiles=GuiyangMahjong/Config/DefaultServer.ini' -or
+            $text -notmatch 'DisallowedConfigFiles=GuiyangMahjong/Config/(WindowsServer|LinuxServer)/' -or
+            $text -match '/Game/Maps/MahjongRoomVisualPreviewMap' -or
             $text -match '/Game/Maps/MahjongNetMap') {
             throw "Client Cook allow-list is incomplete: $config"
         }
     }
 }
 if ($Role -in @('Server', 'Both')) {
+    $pakRules = Get-Content -LiteralPath (Join-Path $Root 'Config\DefaultPakFileRules.ini') -Raw
+    foreach ($pattern in @(
+        'Platforms="Linux"',
+        'bExcludeFromPaks=true',
+        'Content/Client/',
+        'Content/UI/',
+        'Content/Art/',
+        'MahjongRoomVisualPreviewMap')) {
+        if ($pakRules -notmatch [regex]::Escape($pattern)) {
+            throw "Linux server Pak exclusion rule is missing: $pattern"
+        }
+    }
     foreach ($config in @('Config\WindowsServer\WindowsServerGame.ini',
         'Config\LinuxServer\LinuxServerGame.ini')) {
         $text = Get-Content -LiteralPath (Join-Path $Root $config) -Raw
         if ($text -notmatch '/Game/Maps/MahjongRoomMap' -or
             $text -match '/Game/Maps/MahjongNetMap' -or $text -notmatch '/Game/UI' -or
-            $text -notmatch '/Game/Art') {
+            $text -notmatch '/Game/Art' -or $text -notmatch '/Game/Client' -or
+            $text -notmatch 'DisallowedConfigFiles=GuiyangMahjong/Config/Windows/WindowsGame.ini' -or
+            $text -notmatch 'DisallowedConfigFiles=GuiyangMahjong/Config/Android/AndroidGame.ini' -or
+            $text -match '/Game/Maps/MahjongRoomVisualPreviewMap') {
             throw "Server Cook isolation is incomplete: $config"
         }
     }

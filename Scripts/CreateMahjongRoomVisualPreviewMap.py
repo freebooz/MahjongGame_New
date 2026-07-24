@@ -4,7 +4,10 @@ import unreal
 
 
 MAP_PATH = "/Game/Maps/MahjongRoomVisualPreviewMap"
-PRESENTATION_CLASS = "/Script/GuiyangMahjongClient.MahjongRoomPresentationActor"
+PRESENTATION_CLASS = (
+    "/Game/Client/Room/Presentation/BP_MahjongRoomPresentation."
+    "BP_MahjongRoomPresentation_C"
+)
 
 
 world = unreal.EditorLoadingAndSavingUtils.new_blank_map(False)

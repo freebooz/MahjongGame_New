@@ -30,8 +30,14 @@
 #include "Game/Mahjong3DTableActor.h"
 #include "Game/MahjongRoomCameraActor.h"
 #include "Game/MahjongRoomPresentationActor.h"
+#include "Settings/MahjongRoomPresentationSettings.h"
 #include "CineCameraComponent.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Components/SkyLightComponent.h"
+#include "Components/SpotLightComponent.h"
+#include "Engine/DirectionalLight.h"
 #include "Engine/Level.h"
+#include "Engine/SkyLight.h"
 #include "Engine/World.h"
 #include "UObject/UnrealType.h"
 #include "Sound/SoundBase.h"
@@ -1384,18 +1390,64 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("共享 MahjongRoomMap 不得序列化客户端展示类"),
         bSharedMapContainsClientPresentation);
 
+    const UMahjongRoomPresentationSettings* PresentationSettings =
+        GetDefault<UMahjongRoomPresentationSettings>();
+    TestNotNull(TEXT("客户端房间展示设置必须存在"), PresentationSettings);
+    UClass* ConfiguredPresentationClass = PresentationSettings
+        ? PresentationSettings->PresentationClass.LoadSynchronous() : nullptr;
+    TestNotNull(TEXT("客户端房间展示蓝图必须可加载"), ConfiguredPresentationClass);
+    if (ConfiguredPresentationClass)
+    {
+        TestTrue(TEXT("配置的展示蓝图必须继承客户端 Presentation 基类"),
+            ConfiguredPresentationClass->IsChildOf(AMahjongRoomPresentationActor::StaticClass()));
+        TestEqual(TEXT("运行时必须配置设计师可编辑的 BP_MahjongRoomPresentation"),
+            ConfiguredPresentationClass->GetPathName(),
+            FString(TEXT("/Game/Client/Room/Presentation/BP_MahjongRoomPresentation."
+                         "BP_MahjongRoomPresentation_C")));
+
+        const AMahjongRoomPresentationActor* PresentationDefault =
+            ConfiguredPresentationClass->GetDefaultObject<AMahjongRoomPresentationActor>();
+        TestNotNull(TEXT("房间展示蓝图默认对象必须存在"), PresentationDefault);
+        if (PresentationDefault)
+        {
+            const UDirectionalLightComponent* Directional =
+                PresentationDefault->FindComponentByClass<UDirectionalLightComponent>();
+            TestNotNull(TEXT("运行时展示必须包含跨平台主方向光"), Directional);
+            if (Directional)
+            {
+                TestTrue(TEXT("主方向光强度必须足以照亮牌桌"), Directional->Intensity >= 500.0f);
+                TestFalse(TEXT("移动端稳定主光默认不得投射高成本阴影"), Directional->CastShadows);
+            }
+            const USkyLightComponent* Sky =
+                PresentationDefault->FindComponentByClass<USkyLightComponent>();
+            TestNotNull(TEXT("运行时展示必须包含环境补光"), Sky);
+            TArray<USpotLightComponent*> SpotLights;
+            PresentationDefault->GetComponents<USpotLightComponent>(SpotLights);
+            TestEqual(TEXT("运行时展示必须包含主灯与补光灯"), SpotLights.Num(), 2);
+            for (const USpotLightComponent* Spot : SpotLights)
+            {
+                TestEqual(TEXT("本地灯必须使用明确的流明单位"), Spot->IntensityUnits, ELightUnits::Lumens);
+                TestFalse(TEXT("移动端本地灯默认不得投射高成本阴影"), Spot->CastShadows);
+            }
+        }
+    }
+
     UWorld* PreviewWorld = LoadObject<UWorld>(nullptr,
         TEXT("/Game/Maps/MahjongRoomVisualPreviewMap.MahjongRoomVisualPreviewMap"));
     TestNotNull(TEXT("麻将房间视觉预览关卡必须可加载"), PreviewWorld);
     bool bHasPresentation = false;
+    bool bHasIndependentKeyLight = false;
     if (PreviewWorld && PreviewWorld->PersistentLevel)
     {
         for (const AActor* Actor : PreviewWorld->PersistentLevel->Actors)
         {
-            bHasPresentation |= IsValid(Actor) && Actor->IsA<AMahjongRoomPresentationActor>();
+            if (!IsValid(Actor)) continue;
+            bHasPresentation |= Actor->GetClass() == ConfiguredPresentationClass;
+            bHasIndependentKeyLight |= Actor->IsA<ADirectionalLight>() || Actor->IsA<ASkyLight>();
         }
     }
-    TestTrue(TEXT("视觉预览关卡必须放置客户端房间展示 Actor"), bHasPresentation);
+    TestTrue(TEXT("视觉预览关卡必须放置与运行时相同的展示蓝图"), bHasPresentation);
+    TestFalse(TEXT("关键灯光必须属于展示蓝图，预览关卡不得保留独立实例"), bHasIndependentKeyLight);
     UStaticMesh* TileMesh = LoadObject<UStaticMesh>(nullptr,
         TEXT("/Game/Art/Mahjong/Mahjong50/Tiles/SM_Mahjong50_Characters_1.SM_Mahjong50_Characters_1"));
     TestNotNull(TEXT("Mahjong50 PBR 麻将牌静态网格必须已导入"), TileMesh);

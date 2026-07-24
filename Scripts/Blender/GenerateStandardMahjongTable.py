@@ -1,28 +1,18 @@
-"""Blender 5.2：按参考图生成深色木纹单柱全自动麻将桌与程序化 PBR 材质。
+"""Blender 5.2 generator for the mobile-ready Mahjong tabletop.
 
-默认成品尺寸：940 x 940 x 780 mm（桌面宽 x 深 x 高），底座 550 x 550 mm。
+The generated asset intentionally contains only:
 
-本脚本是幂等资产生成器，默认会清空当前场景。直接在 Blender 的“脚本”
-工作区打开并运行即可；也可以通过命令行执行：
+* four independently machined walnut rails with 45-degree miter joints;
+* one inset green felt mesh.
 
-    blender --background --python GenerateStandardMahjongTable.py
+It contains no legs, center controller, tiles, or mechanical parts.  The playing
+surface is authored at Z=0 so the Unreal runtime can place tiles directly on the
+asset pivot.  The complete tabletop occupies 1150 x 1150 x 65 mm.
 
-项目内推荐命令：
+Command line:
 
-    blender --background \
-        --python Scripts/Blender/GenerateStandardMahjongTable.py \
-        -- H:/MahjongGame
-
-可选参数（必须放在 Blender 的 ``--`` 之后）：
-
-    --output-dir PATH   指定输出目录
-    --no-render         不渲染预览图
-    --no-save           不保存 .blend 文件
-    --export-fbx        额外导出供 Unreal Engine 使用的 FBX
-    --export-glb        额外导出 GLB（程序化纹理在 GLB 中可能被简化）
-    --keep-scene        保留当前场景，只替换同名生成集合
-
-生成结果默认位于 ``SourceArt/3D/MahjongTable``。
+    blender --background --python Scripts/Blender/GenerateStandardMahjongTable.py \
+        -- H:/MahjongGame --render --export-fbx --export-glb
 """
 
 from __future__ import annotations
@@ -34,111 +24,88 @@ import math
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable
 
 import bpy
 from mathutils import Vector
 
 
-SCRIPT_VERSION = "2.0.0"
-MODEL_COLLECTION_NAME = "MG_MahjongTable"
-PRESENTATION_COLLECTION_NAME = "MG_MahjongTable_Presentation"
-MODEL_ROOT_NAME = "SM_StandardMahjongTable"
+SCRIPT_VERSION = "3.2.0"
+MODEL_COLLECTION = "MG_MahjongTableTop"
+PRESENTATION_COLLECTION = "MG_MahjongTableTop_Presentation"
+ASSET_NAME = "SM_StandardMahjongTable"
+FRAME_OBJECT_NAME = "SM_Mahjong_Table_Frame_MiterJoint"
+FRAME_PART_NAMES = ("Frame_Front", "Frame_Back", "Frame_Left", "Frame_Right")
+FELT_NAME = "Mahjong_Felt_Surface"
 
 
 @dataclass(frozen=True)
-class TableDimensions:
-    """参考图全自动麻将桌的公制尺寸；所有数值均为米。"""
+class TabletopDimensions:
+    """Production dimensions in meters."""
 
-    outer_width: float = 0.940
-    outer_depth: float = 0.940
-    tabletop_height: float = 0.780
-    bezel_width: float = 0.070
-    bumper_width: float = 0.020
-    bezel_height: float = 0.032
-    felt_thickness: float = 0.012
-    felt_top: float = 0.765
-    shroud_top: float = 0.748
-    shroud_bottom: float = 0.595
-    shroud_bottom_width: float = 0.900
-    shroud_bottom_depth: float = 0.900
-    corner_chamfer: float = 0.035
-    side_panel_width: float = 0.720
-    side_panel_height: float = 0.082
-    side_panel_depth: float = 0.008
-    pedestal_width: float = 0.190
-    pedestal_depth: float = 0.190
-    pedestal_bottom: float = 0.115
-    pedestal_top: float = 0.595
-    plinth_width: float = 0.550
-    plinth_depth: float = 0.550
-    plinth_height: float = 0.040
-    plinth_slope_height: float = 0.070
-    center_lift_radius: float = 0.062
+    size: float = 1.150
+    thickness: float = 0.065
+    frame_width: float = 0.090
+    felt_thickness: float = 0.006
+    frame_lip_above_felt: float = 0.005
+    rail_edge_bevel: float = 0.012
+    rail_bevel_segments: int = 6
+    base_band_inset: float = 0.003
+    base_band_bevel: float = 0.0035
+    base_band_bevel_segments: int = 3
+    base_band_top_z: float = -0.018
+    bullnose_bottom_z: float = -0.030
+    outer_corner_radius: float = 0.024
+    outer_corner_arc_segments: int = 5
+    miter_joint_width: float = 0.0065
+    miter_joint_center_line_width: float = 0.0045
+    miter_joint_recess: float = 0.0012
+    felt_corner_radius: float = 0.012
+    felt_corner_segments: int = 16
 
     @property
-    def playing_width(self) -> float:
-        return self.outer_width - 2.0 * (self.bezel_width + self.bumper_width)
+    def playing_size(self) -> float:
+        return self.size - 2.0 * self.frame_width
 
     @property
-    def playing_depth(self) -> float:
-        return self.outer_depth - 2.0 * (self.bezel_width + self.bumper_width)
+    def felt_top(self) -> float:
+        return 0.0
+
+    @property
+    def frame_top(self) -> float:
+        return self.frame_lip_above_felt
+
+    @property
+    def frame_bottom(self) -> float:
+        return self.frame_top - self.thickness
 
 
-def blender_arguments() -> argparse.Namespace:
+def arguments() -> argparse.Namespace:
     argv = sys.argv[sys.argv.index("--") + 1 :] if "--" in sys.argv else []
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "project_root",
-        nargs="?",
-        help="项目根目录；默认按脚本所在的 Scripts/Blender 向上推导",
-    )
-    parser.add_argument("--output-dir", help="生成文件输出目录")
-    parser.add_argument("--no-render", action="store_true", help="不生成预览图")
-    parser.add_argument("--no-save", action="store_true", help="不保存 Blender 文件")
-    parser.add_argument("--export-fbx", action="store_true", help="额外导出 Unreal Engine 用 FBX")
-    parser.add_argument("--export-glb", action="store_true", help="额外导出 GLB")
-    parser.add_argument("--keep-scene", action="store_true", help="保留场景中的非生成对象")
+    parser.add_argument("project_root", nargs="?", help="Mahjong project root")
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--render", action="store_true", help="Render the preview PNG")
+    parser.add_argument("--export-fbx", action="store_true")
+    parser.add_argument("--export-glb", action="store_true")
+    parser.add_argument("--no-save", action="store_true")
     return parser.parse_args(argv)
 
 
-def inferred_project_root() -> Path:
-    try:
-        return Path(__file__).resolve().parents[2]
-    except (NameError, IndexError):
-        if bpy.data.filepath:
-            return Path(bpy.data.filepath).resolve().parent
-        return Path.cwd()
+def project_root_from_script() -> Path:
+    return Path(__file__).resolve().parents[2]
 
 
-def remove_collection(name: str) -> None:
-    collection = bpy.data.collections.get(name)
-    if collection is None:
-        return
-    for obj in list(collection.all_objects):
-        bpy.data.objects.remove(obj, do_unlink=True)
-    bpy.data.collections.remove(collection)
-
-
-def reset_scene(keep_scene: bool) -> None:
-    if keep_scene:
-        remove_collection(MODEL_COLLECTION_NAME)
-        remove_collection(PRESENTATION_COLLECTION_NAME)
-        for material in list(bpy.data.materials):
-            if material.users == 0 and material.get("generator") == "GenerateStandardMahjongTable.py":
-                bpy.data.materials.remove(material)
-        return
-
+def clean_scene() -> None:
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.object.delete(use_global=False)
     for collection in list(bpy.data.collections):
         bpy.data.collections.remove(collection)
     for datablocks in (
         bpy.data.meshes,
-        bpy.data.curves,
         bpy.data.materials,
         bpy.data.cameras,
         bpy.data.lights,
+        bpy.data.worlds,
     ):
         for datablock in list(datablocks):
             if datablock.users == 0:
@@ -147,35 +114,34 @@ def reset_scene(keep_scene: bool) -> None:
 
 def configure_scene() -> None:
     scene = bpy.context.scene
-    scene.name = "MahjongTable_AssetScene"
+    scene.name = "MahjongTableTop_AssetScene"
     scene.unit_settings.system = "METRIC"
-    scene.unit_settings.length_unit = "CENTIMETERS"
+    scene.unit_settings.length_unit = "METERS"
     scene.unit_settings.scale_length = 1.0
-    scene.render.resolution_x = 960
-    scene.render.resolution_y = 960
+    scene.render.resolution_x = 1600
+    scene.render.resolution_y = 900
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
     scene.render.film_transparent = False
-
-    for engine in ("BLENDER_EEVEE_NEXT", "BLENDER_EEVEE"):
+    for engine in ("BLENDER_EEVEE", "BLENDER_EEVEE_NEXT"):
         try:
             scene.render.engine = engine
             break
         except TypeError:
             continue
-
+    scene.render.image_settings.color_mode = "RGBA"
     try:
         scene.view_settings.look = "AgX - Medium High Contrast"
     except TypeError:
         pass
 
-    world = scene.world or bpy.data.worlds.new("MahjongTable_World")
-    scene.world = world
+    world = bpy.data.worlds.new("MahjongTableTop_World")
     world.use_nodes = True
+    scene.world = world
     background = world.node_tree.nodes.get("Background")
     if background:
-        background.inputs["Color"].default_value = (0.012, 0.018, 0.016, 1.0)
-        background.inputs["Strength"].default_value = 0.14
+        background.inputs["Color"].default_value = (0.0, 0.0, 0.0, 1.0)
+        background.inputs["Strength"].default_value = 0.0
 
 
 def create_collection(name: str) -> bpy.types.Collection:
@@ -184,1207 +150,817 @@ def create_collection(name: str) -> bpy.types.Collection:
     return collection
 
 
-def move_to_collection(obj: bpy.types.Object, collection: bpy.types.Collection) -> None:
-    for owner in list(obj.users_collection):
-        owner.objects.unlink(obj)
-    collection.objects.link(obj)
-
-
-def set_node_input(node: bpy.types.Node, name: str, value) -> None:
+def set_input(node: bpy.types.Node, name: str, value) -> None:
     socket = node.inputs.get(name)
     if socket is not None:
         socket.default_value = value
 
 
-def base_material(
+def principled_material(
     name: str,
-    color: tuple[float, float, float, float],
-    metallic: float,
+    base_color: tuple[float, float, float, float],
     roughness: float,
 ) -> tuple[bpy.types.Material, bpy.types.Node, bpy.types.NodeTree]:
     material = bpy.data.materials.new(name)
     material.use_nodes = True
-    material.diffuse_color = color
+    material.diffuse_color = base_color
     nodes = material.node_tree.nodes
     links = material.node_tree.links
     nodes.clear()
 
     output = nodes.new("ShaderNodeOutputMaterial")
-    output.name = "Material Output"
-    output.label = "PBR Output"
-    output.location = (680.0, 0.0)
-
+    output.location = (620.0, 0.0)
     shader = nodes.new("ShaderNodeBsdfPrincipled")
-    shader.name = "Principled BSDF"
-    shader.label = "PBR Principled BSDF"
-    shader.location = (380.0, 0.0)
-    set_node_input(shader, "Base Color", color)
-    set_node_input(shader, "Metallic", metallic)
-    set_node_input(shader, "Roughness", roughness)
-    set_node_input(shader, "IOR", 1.46)
+    shader.location = (320.0, 0.0)
+    set_input(shader, "Base Color", base_color)
+    set_input(shader, "Metallic", 0.0)
+    set_input(shader, "Roughness", roughness)
+    set_input(shader, "IOR", 1.46)
     links.new(shader.outputs["BSDF"], output.inputs["Surface"])
-
+    material["generator"] = Path(__file__).name
     material["pbr_workflow"] = "metallic_roughness"
-    material["generator"] = "GenerateStandardMahjongTable.py"
     return material, shader, material.node_tree
 
 
-def create_felt_material() -> bpy.types.Material:
-    material, shader, tree = base_material(
-        "M_Table_Felt_Green_PBR",
-        (0.018, 0.205, 0.087, 1.0),
-        metallic=0.0,
-        roughness=0.82,
+def create_walnut_material() -> bpy.types.Material:
+    material, shader, tree = principled_material(
+        "M_Table_Walnut_PBR", (0.070, 0.015, 0.003, 1.0), 0.27
     )
+    set_input(shader, "Coat Weight", 0.34)
+    set_input(shader, "Coat Roughness", 0.19)
     nodes, links = tree.nodes, tree.links
-    set_node_input(shader, "Sheen Weight", 0.025)
-    set_node_input(shader, "Sheen Roughness", 0.82)
-    # Blender 5.2 的公开输入名为 Specular IOR Level；同时保留旧名称兼容预览版。
-    set_node_input(shader, "Specular IOR Level", 0.02)
-    set_node_input(shader, "IOR Level", 0.02)
 
     texcoord = nodes.new("ShaderNodeTexCoord")
-    texcoord.location = (-760.0, 40.0)
-    noise = nodes.new("ShaderNodeTexNoise")
-    noise.name = "Felt Microfiber"
-    noise.label = "Felt Microfiber"
-    noise.location = (-550.0, 40.0)
-    set_node_input(noise, "Scale", 185.0)
-    set_node_input(noise, "Detail", 3.0)
-    set_node_input(noise, "Roughness", 0.68)
-
-    ramp = nodes.new("ShaderNodeValToRGB")
-    ramp.name = "Felt Green Variation"
-    ramp.location = (-280.0, 100.0)
-    ramp.color_ramp.elements[0].position = 0.22
-    ramp.color_ramp.elements[0].color = (0.0002, 0.008, 0.0005, 1.0)
-    ramp.color_ramp.elements[1].position = 0.78
-    ramp.color_ramp.elements[1].color = (0.0012, 0.080, 0.008, 1.0)
-    middle = ramp.color_ramp.elements.new(0.50)
-    middle.color = (0.0005, 0.035, 0.0025, 1.0)
-
-    bump = nodes.new("ShaderNodeBump")
-    bump.name = "Felt Fiber Normal"
-    bump.location = (80.0, -150.0)
-    bump.inputs["Strength"].default_value = 0.24
-    bump.inputs["Distance"].default_value = 0.0011
-
-    links.new(texcoord.outputs["Generated"], noise.inputs["Vector"])
-    links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
-    links.new(ramp.outputs["Color"], shader.inputs["Base Color"])
-    links.new(noise.outputs["Fac"], bump.inputs["Height"])
-    links.new(bump.outputs["Normal"], shader.inputs["Normal"])
-    material["surface"] = "woven_wool_felt"
-    return material
-
-
-
-
-def create_powder_metal_material() -> bpy.types.Material:
-    material, shader, tree = base_material(
-        "M_Table_BlackPowderMetal_PBR",
-        (0.018, 0.022, 0.021, 1.0),
-        metallic=0.72,
-        roughness=0.31,
-    )
-    nodes, links = tree.nodes, tree.links
-    texcoord = nodes.new("ShaderNodeTexCoord")
-    texcoord.location = (-550.0, 0.0)
-    noise = nodes.new("ShaderNodeTexNoise")
-    noise.name = "Powder Coat Grain"
-    noise.location = (-340.0, 0.0)
-    set_node_input(noise, "Scale", 145.0)
-    set_node_input(noise, "Detail", 2.2)
-    set_node_input(noise, "Roughness", 0.64)
-    bump = nodes.new("ShaderNodeBump")
-    bump.name = "Powder Coat Normal"
-    bump.location = (80.0, -140.0)
-    bump.inputs["Strength"].default_value = 0.10
-    bump.inputs["Distance"].default_value = 0.00045
-    links.new(texcoord.outputs["Generated"], noise.inputs["Vector"])
-    links.new(noise.outputs["Fac"], bump.inputs["Height"])
-    links.new(bump.outputs["Normal"], shader.inputs["Normal"])
-    material["surface"] = "powder_coated_steel"
-    return material
-
-
-
-
-def create_glossy_black_material() -> bpy.types.Material:
-    material, shader, _tree = base_material(
-        "M_Table_PianoBlackMetal_PBR",
-        (0.006, 0.008, 0.008, 1.0),
-        metallic=0.52,
-        roughness=0.19,
-    )
-    set_node_input(shader, "Coat Weight", 0.38)
-    set_node_input(shader, "Coat Roughness", 0.14)
-    material["surface"] = "gloss_black_painted_metal"
-    return material
-
-
-def create_wood_material() -> bpy.types.Material:
-    material, shader, tree = base_material(
-        "M_Table_SmokedOak_PBR",
-        (0.105, 0.055, 0.026, 1.0),
-        metallic=0.0,
-        roughness=0.38,
-    )
-    nodes, links = tree.nodes, tree.links
-    set_node_input(shader, "Coat Weight", 0.24)
-    set_node_input(shader, "Coat Roughness", 0.28)
-    texcoord = nodes.new("ShaderNodeTexCoord")
-    texcoord.location = (-860.0, 40.0)
+    texcoord.location = (-900.0, 50.0)
     mapping = nodes.new("ShaderNodeMapping")
-    mapping.name = "Horizontal Wood Grain"
-    mapping.location = (-670.0, 40.0)
-    mapping.inputs["Scale"].default_value = (1.0, 5.5, 2.5)
+    mapping.location = (-710.0, 50.0)
+    mapping.inputs["Scale"].default_value = (7.0, 0.65, 2.0)
     noise = nodes.new("ShaderNodeTexNoise")
-    noise.name = "Oak Pores"
-    noise.location = (-440.0, 20.0)
-    set_node_input(noise, "Scale", 4.2)
-    set_node_input(noise, "Detail", 6.0)
-    set_node_input(noise, "Roughness", 0.72)
+    noise.location = (-500.0, 50.0)
+    set_input(noise, "Scale", 4.6)
+    set_input(noise, "Detail", 7.0)
+    set_input(noise, "Roughness", 0.72)
     ramp = nodes.new("ShaderNodeValToRGB")
-    ramp.name = "Smoked Oak Color"
-    ramp.location = (-160.0, 90.0)
-    ramp.color_ramp.elements[0].color = (0.018, 0.014, 0.010, 1.0)
-    ramp.color_ramp.elements[1].color = (0.110, 0.078, 0.052, 1.0)
-    middle = ramp.color_ramp.elements.new(0.52)
-    middle.color = (0.052, 0.038, 0.026, 1.0)
+    ramp.location = (-250.0, 100.0)
+    ramp.color_ramp.elements[0].color = (0.003, 0.0007, 0.0002, 1.0)
+    ramp.color_ramp.elements[0].position = 0.18
+    ramp.color_ramp.elements[1].color = (0.125, 0.027, 0.0045, 1.0)
+    ramp.color_ramp.elements[1].position = 0.82
+    middle = ramp.color_ramp.elements.new(0.50)
+    middle.color = (0.028, 0.0055, 0.0012, 1.0)
     bump = nodes.new("ShaderNodeBump")
-    bump.name = "Wood Grain Normal"
-    bump.location = (100.0, -150.0)
-    bump.inputs["Strength"].default_value = 0.14
-    bump.inputs["Distance"].default_value = 0.0007
-    links.new(texcoord.outputs["Generated"], mapping.inputs["Vector"])
+    bump.location = (70.0, -150.0)
+    bump.inputs["Strength"].default_value = 0.18
+    bump.inputs["Distance"].default_value = 0.00065
+
+    links.new(texcoord.outputs["UV"], mapping.inputs["Vector"])
     links.new(mapping.outputs["Vector"], noise.inputs["Vector"])
     links.new(noise.outputs["Fac"], ramp.inputs["Fac"])
     links.new(ramp.outputs["Color"], shader.inputs["Base Color"])
     links.new(noise.outputs["Fac"], bump.inputs["Height"])
     links.new(bump.outputs["Normal"], shader.inputs["Normal"])
-    material["surface"] = "smoked_oak_veneer"
+    material["surface"] = "polished_dark_walnut"
     return material
 
 
-def create_grille_material() -> bpy.types.Material:
-    material, shader, tree = base_material(
-        "M_Table_PerforatedGrille_PBR",
-        (0.055, 0.060, 0.058, 1.0),
-        metallic=0.30,
-        roughness=0.40,
+def create_felt_material() -> bpy.types.Material:
+    material, shader, tree = principled_material(
+        "M_Table_Felt_Green_PBR", (0.002, 0.075, 0.009, 1.0), 0.86
     )
+    set_input(shader, "Sheen Weight", 0.075)
+    set_input(shader, "Sheen Roughness", 0.92)
+    set_input(shader, "Specular IOR Level", 0.12)
     nodes, links = tree.nodes, tree.links
+
     texcoord = nodes.new("ShaderNodeTexCoord")
-    texcoord.location = (-620.0, 20.0)
-    brick = nodes.new("ShaderNodeTexBrick")
-    brick.name = "Perforation Grid"
-    brick.location = (-400.0, 20.0)
-    brick.offset = 0.5
-    brick.offset_frequency = 2
-    set_node_input(brick, "Color1", (0.28, 0.30, 0.29, 1.0))
-    set_node_input(brick, "Color2", (0.14, 0.16, 0.15, 1.0))
-    set_node_input(brick, "Mortar", (0.001, 0.001, 0.001, 1.0))
-    set_node_input(brick, "Scale", 62.0)
-    set_node_input(brick, "Mortar Size", 0.025)
-    set_node_input(brick, "Mortar Smooth", 0.02)
+    texcoord.location = (-980.0, 20.0)
+    mapping = nodes.new("ShaderNodeMapping")
+    mapping.location = (-810.0, 20.0)
+    mapping.inputs["Scale"].default_value = (1.0, 1.0, 1.0)
+
+    warp = nodes.new("ShaderNodeTexWave")
+    warp.location = (-620.0, 150.0)
+    warp.wave_type = "BANDS"
+    warp.bands_direction = "X"
+    set_input(warp, "Scale", 110.0)
+    set_input(warp, "Distortion", 1.8)
+    set_input(warp, "Detail", 3.0)
+    set_input(warp, "Detail Scale", 2.0)
+
+    weft = nodes.new("ShaderNodeTexWave")
+    weft.location = (-620.0, -80.0)
+    weft.wave_type = "BANDS"
+    weft.bands_direction = "Y"
+    set_input(weft, "Scale", 96.0)
+    set_input(weft, "Distortion", 1.4)
+    set_input(weft, "Detail", 3.0)
+
+    weave = nodes.new("ShaderNodeMixRGB")
+    weave.location = (-390.0, 90.0)
+    weave.blend_type = "MULTIPLY"
+    weave.inputs["Fac"].default_value = 1.0
+
+    noise = nodes.new("ShaderNodeTexNoise")
+    noise.location = (-610.0, -310.0)
+    set_input(noise, "Scale", 220.0)
+    set_input(noise, "Detail", 2.3)
+    set_input(noise, "Roughness", 0.78)
+
+    fiber = nodes.new("ShaderNodeMixRGB")
+    fiber.location = (-170.0, 20.0)
+    fiber.blend_type = "MULTIPLY"
+    fiber.inputs["Fac"].default_value = 0.28
+
+    ramp = nodes.new("ShaderNodeValToRGB")
+    ramp.location = (20.0, 130.0)
+    ramp.color_ramp.elements[0].color = (0.00005, 0.004, 0.00025, 1.0)
+    ramp.color_ramp.elements[1].color = (0.0005, 0.020, 0.0016, 1.0)
+
+    roughness = nodes.new("ShaderNodeMapRange")
+    roughness.location = (20.0, -260.0)
+    set_input(roughness, "From Min", 0.0)
+    set_input(roughness, "From Max", 1.0)
+    set_input(roughness, "To Min", 0.80)
+    set_input(roughness, "To Max", 0.94)
+
     bump = nodes.new("ShaderNodeBump")
-    bump.name = "Recessed Perforations"
-    bump.location = (80.0, -120.0)
-    bump.invert = True
-    bump.inputs["Strength"].default_value = 0.34
-    bump.inputs["Distance"].default_value = 0.0012
-    links.new(texcoord.outputs["Generated"], brick.inputs["Vector"])
-    links.new(brick.outputs["Color"], shader.inputs["Base Color"])
-    links.new(brick.outputs["Fac"], bump.inputs["Height"])
+    bump.location = (220.0, -90.0)
+    bump.inputs["Strength"].default_value = 0.14
+    bump.inputs["Distance"].default_value = 0.00018
+
+    links.new(texcoord.outputs["UV"], mapping.inputs["Vector"])
+    links.new(mapping.outputs["Vector"], warp.inputs["Vector"])
+    links.new(mapping.outputs["Vector"], weft.inputs["Vector"])
+    links.new(mapping.outputs["Vector"], noise.inputs["Vector"])
+    links.new(warp.outputs["Color"], weave.inputs[1])
+    links.new(weft.outputs["Color"], weave.inputs[2])
+    links.new(weave.outputs["Color"], fiber.inputs[1])
+    links.new(noise.outputs["Fac"], fiber.inputs[2])
+    links.new(fiber.outputs["Color"], ramp.inputs["Fac"])
+    links.new(ramp.outputs["Color"], shader.inputs["Base Color"])
+    links.new(fiber.outputs["Color"], bump.inputs["Height"])
     links.new(bump.outputs["Normal"], shader.inputs["Normal"])
-    material["surface"] = "perforated_metal_grille"
+    links.new(noise.outputs["Fac"], roughness.inputs["Value"])
+    links.new(roughness.outputs["Result"], shader.inputs["Roughness"])
+    material["surface"] = "premium_green_wool_felt"
     return material
 
 
-
-
-def create_simple_materials() -> dict[str, bpy.types.Material]:
-    felt = create_felt_material()
-    metal = create_powder_metal_material()
-    glossy_black = create_glossy_black_material()
-    wood = create_wood_material()
-    grille = create_grille_material()
-
-    rubber, _shader, _tree = base_material(
-        "M_Table_Rubber_PBR",
-        (0.010, 0.012, 0.011, 1.0),
-        metallic=0.0,
-        roughness=0.78,
+def create_joint_material() -> bpy.types.Material:
+    material, shader, _tree = principled_material(
+        "M_Table_Joint_AO_PBR", (0.0012, 0.00028, 0.00008, 1.0), 0.88
     )
-    rubber["surface"] = "anti_slip_rubber"
+    set_input(shader, "Specular IOR Level", 0.08)
+    material["surface"] = "recessed_miter_joint"
+    return material
 
-    chrome, chrome_shader, _tree = base_material(
-        "M_Table_Chrome_PBR",
-        (0.62, 0.67, 0.69, 1.0),
-        metallic=1.0,
-        roughness=0.13,
+
+def rounded_rectangle(
+    width: float,
+    depth: float,
+    radius: float,
+    z: float,
+    corner_segments: int,
+) -> list[tuple[float, float, float]]:
+    half_x = width * 0.5
+    half_y = depth * 0.5
+    radius = min(radius, half_x - 0.001, half_y - 0.001)
+    centers_and_starts = (
+        ((half_x - radius, -half_y + radius), -math.pi * 0.5),
+        ((half_x - radius, half_y - radius), 0.0),
+        ((-half_x + radius, half_y - radius), math.pi * 0.5),
+        ((-half_x + radius, -half_y + radius), math.pi),
     )
-    set_node_input(chrome_shader, "Coat Weight", 0.18)
-    chrome["surface"] = "polished_chrome"
-
-    deck, _shader, _tree = base_material(
-        "M_Table_DeckComposite_PBR",
-        (0.020, 0.030, 0.025, 1.0),
-        metallic=0.0,
-        roughness=0.62,
-    )
-    deck["surface"] = "sealed_composite"
-
-    indicator_red, red_shader, _tree = base_material(
-        "M_Table_IndicatorRed_PBR",
-        (0.32, 0.003, 0.004, 1.0),
-        metallic=0.0,
-        roughness=0.18,
-    )
-    set_node_input(red_shader, "Coat Weight", 0.38)
-    indicator_red["surface"] = "red_indicator_lens"
-
-    indicator_green, green_shader, _tree = base_material(
-        "M_Table_IndicatorGreen_PBR",
-        (0.002, 0.30, 0.018, 1.0),
-        metallic=0.0,
-        roughness=0.18,
-    )
-    set_node_input(green_shader, "Coat Weight", 0.38)
-    indicator_green["surface"] = "green_indicator_lens"
-
-    controller_face, face_shader, _tree = base_material(
-        "M_Table_ControllerFace_PBR",
-        (0.34, 0.37, 0.36, 1.0),
-        metallic=0.30,
-        roughness=0.29,
-    )
-    set_node_input(face_shader, "Coat Weight", 0.18)
-    controller_face["surface"] = "satin_controller_face"
-
-    floor, _shader, _tree = base_material(
-        "M_PreviewFloor_Neutral",
-        (0.055, 0.060, 0.056, 1.0),
-        metallic=0.0,
-        roughness=0.70,
-    )
-    return {
-        "felt": felt,
-        "metal": metal,
-        "glossy_black": glossy_black,
-        "wood": wood,
-        "grille": grille,
-        "rubber": rubber,
-        "chrome": chrome,
-        "deck": deck,
-        "indicator_red": indicator_red,
-        "indicator_green": indicator_green,
-        "controller_face": controller_face,
-        "floor": floor,
-    }
+    points: list[tuple[float, float, float]] = []
+    for (center_x, center_y), angle_start in centers_and_starts:
+        for index in range(corner_segments):
+            angle = angle_start + (math.pi * 0.5) * index / corner_segments
+            points.append(
+                (
+                    center_x + math.cos(angle) * radius,
+                    center_y + math.sin(angle) * radius,
+                    z,
+                )
+            )
+    return points
 
 
-def apply_bevel(obj: bpy.types.Object, width: float, segments: int = 5) -> None:
-    if width <= 0.0:
-        return
-    modifier = obj.modifiers.new("ProductionBevel", "BEVEL")
-    modifier.width = width
-    modifier.segments = segments
-    modifier.limit_method = "ANGLE"
-    modifier.angle_limit = math.radians(24.0)
-    modifier.harden_normals = True
+def create_beveled_prism(
+    name: str,
+    outline: list[tuple[float, float]],
+    z_bottom: float,
+    z_top: float,
+    bevel_width: float,
+    bevel_segments: int,
+    material: bpy.types.Material,
+    collection: bpy.types.Collection,
+    long_edge_indices: tuple[int, int] | None = None,
+) -> bpy.types.Object:
+    point_count = len(outline)
+    vertices = [(x, y, z_bottom) for x, y in outline]
+    vertices.extend((x, y, z_top) for x, y in outline)
+    faces: list[tuple[int, ...]] = [
+        tuple(reversed(range(point_count))),
+        tuple(range(point_count, point_count * 2)),
+    ]
+    for index in range(point_count):
+        following = (index + 1) % point_count
+        faces.append((index, following, point_count + following, point_count + index))
+
+    mesh = bpy.data.meshes.new(f"{name}_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.materials.append(material)
+    mesh.validate()
+    mesh.update(calc_edges=True)
+    obj = bpy.data.objects.new(name, mesh)
+    collection.objects.link(obj)
+
+    bevel = obj.modifiers.new("MachinedEdgeRoundover", "BEVEL")
+    bevel.width = bevel_width
+    bevel.segments = bevel_segments
+    if long_edge_indices:
+        weights = mesh.attributes.new("bevel_weight_edge", "FLOAT", "EDGE")
+        for edge in mesh.edges:
+            first, second = edge.vertices
+            if (first < point_count) != (second < point_count):
+                continue
+            local_pair = {first % point_count, second % point_count}
+            if any(
+                local_pair == {index, (index + 1) % point_count}
+                for index in long_edge_indices
+            ):
+                weights.data[edge.index].value = 1.0
+        bevel.limit_method = "WEIGHT"
+    else:
+        bevel.limit_method = "ANGLE"
+        bevel.angle_limit = math.radians(20.0)
+    bevel.harden_normals = True
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
-    bpy.ops.object.modifier_apply(modifier=modifier.name)
+    bpy.ops.object.modifier_apply(modifier=bevel.name)
+    triangulate = obj.modifiers.new("GameReadyTriangulation", "TRIANGULATE")
+    triangulate.quad_method = "BEAUTY"
+    triangulate.ngon_method = "BEAUTY"
+    bpy.ops.object.modifier_apply(modifier=triangulate.name)
+    obj.select_set(False)
+    return obj
+
+
+def apply_directional_wood_uv(obj: bpy.types.Object, grain_axis: str) -> None:
+    """Map V along the rail so the walnut grain follows the machined piece."""
+
+    mesh = obj.data
+    uv_layer = mesh.uv_layers.get("UVMap") or mesh.uv_layers.new(name="UVMap")
+    x_values = [vertex.co.x for vertex in mesh.vertices]
+    y_values = [vertex.co.y for vertex in mesh.vertices]
+    z_values = [vertex.co.z for vertex in mesh.vertices]
+    min_x, max_x = min(x_values), max(x_values)
+    min_y, max_y = min(y_values), max(y_values)
+    min_z, max_z = min(z_values), max(z_values)
+    length_min, length_max = (min_x, max_x) if grain_axis == "X" else (min_y, max_y)
+    cross_min, cross_max = (min_y, max_y) if grain_axis == "X" else (min_x, max_x)
+
+    def normalized(value: float, minimum: float, maximum: float) -> float:
+        return (value - minimum) / max(maximum - minimum, 1e-6)
+
+    for polygon in mesh.polygons:
+        horizontal = abs(polygon.normal.z) > 0.70
+        for loop_index in polygon.loop_indices:
+            vertex = mesh.vertices[mesh.loops[loop_index].vertex_index].co
+            length_value = vertex.x if grain_axis == "X" else vertex.y
+            cross_value = vertex.y if grain_axis == "X" else vertex.x
+            v = normalized(length_value, length_min, length_max) * 4.0
+            u = (
+                normalized(cross_value, cross_min, cross_max)
+                if horizontal
+                else normalized(vertex.z, min_z, max_z)
+            )
+            uv_layer.data[loop_index].uv = (u, v)
+    obj["wood_grain_axis"] = grain_axis
+    obj["wood_grain_orientation"] = "longitudinal"
+    obj["wood_uv_v_tiles"] = 4.0
+
+
+def create_miter_joint_grooves(
+    dimensions: TabletopDimensions,
+    material: bpy.types.Material,
+    collection: bpy.types.Collection,
+) -> bpy.types.Object:
+    """Create four narrow recessed strips that remain readable under flat lighting."""
+
+    half = dimensions.size * 0.5
+    inner = dimensions.playing_size * 0.5
+    width = dimensions.miter_joint_width
+    center_width = dimensions.miter_joint_center_line_width
+    top_z = dimensions.frame_top
+    center_z = top_z - dimensions.miter_joint_recess
+    line_z = top_z + 0.00002
+    rounded_miter = (
+        half
+        - dimensions.outer_corner_radius
+        + dimensions.outer_corner_radius / math.sqrt(2.0)
+    )
+    diagonals = (
+        ((inner, inner), (rounded_miter, rounded_miter)),
+        ((-inner, inner), (-rounded_miter, rounded_miter)),
+        ((-inner, -inner), (-rounded_miter, -rounded_miter)),
+        ((inner, -inner), (rounded_miter, -rounded_miter)),
+    )
+    vertices: list[tuple[float, float, float]] = []
+    faces: list[tuple[int, int, int, int]] = []
+    for start, end in diagonals:
+        direction = Vector((end[0] - start[0], end[1] - start[1]))
+        direction_normalized = direction.normalized()
+        start_point = Vector(start) + direction_normalized * (width * 0.5)
+        end_point = Vector(end) - direction_normalized * (width * 0.5)
+        perpendicular = Vector((-direction.y, direction.x)).normalized() * (width * 0.5)
+        center_perpendicular = (
+            Vector((-direction.y, direction.x)).normalized() * (center_width * 0.5)
+        )
+        base = len(vertices)
+        vertices.extend(
+            (
+                (start_point.x + perpendicular.x, start_point.y + perpendicular.y, top_z),
+                (end_point.x + perpendicular.x, end_point.y + perpendicular.y, top_z),
+                (end_point.x, end_point.y, center_z),
+                (start_point.x, start_point.y, center_z),
+                (end_point.x - perpendicular.x, end_point.y - perpendicular.y, top_z),
+                (start_point.x - perpendicular.x, start_point.y - perpendicular.y, top_z),
+                (
+                    start_point.x + center_perpendicular.x,
+                    start_point.y + center_perpendicular.y,
+                    line_z,
+                ),
+                (
+                    end_point.x + center_perpendicular.x,
+                    end_point.y + center_perpendicular.y,
+                    line_z,
+                ),
+                (
+                    end_point.x - center_perpendicular.x,
+                    end_point.y - center_perpendicular.y,
+                    line_z,
+                ),
+                (
+                    start_point.x - center_perpendicular.x,
+                    start_point.y - center_perpendicular.y,
+                    line_z,
+                ),
+            )
+        )
+        faces.append((base, base + 1, base + 2, base + 3))
+        faces.append((base + 3, base + 2, base + 4, base + 5))
+        faces.append((base + 6, base + 7, base + 8, base + 9))
+    mesh = bpy.data.meshes.new("Miter_Joint_Grooves_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.materials.append(material)
+    mesh.update(calc_edges=True)
+    grooves = bpy.data.objects.new("Miter_Joint_Grooves", mesh)
+    collection.objects.link(grooves)
+    grooves["asset_role"] = "miter_joint_recess_and_ao"
+    grooves["joint_width_mm"] = width * 1000.0
+    grooves["joint_center_line_width_mm"] = center_width * 1000.0
+    return grooves
+
+
+def join_frame_segments(
+    segment_parts: dict[str, list[bpy.types.Object]],
+    grooves: bpy.types.Object,
+) -> bpy.types.Object:
+    """Join four objects while preserving four disconnected geometry islands."""
+
+    groove_width_mm = float(grooves.get("joint_width_mm", 0.0))
+    bpy.ops.object.select_all(action="DESELECT")
+    active = None
+    for segment_name, parts in segment_parts.items():
+        for part in parts:
+            group = part.vertex_groups.new(name=segment_name)
+            group.add(range(len(part.data.vertices)), 1.0, "REPLACE")
+            part.select_set(True)
+            active = active or part
+    groove_group = grooves.vertex_groups.new(name="Miter_Joint_Grooves")
+    groove_group.add(range(len(grooves.data.vertices)), 1.0, "REPLACE")
+    grooves.select_set(True)
+    bpy.context.view_layer.objects.active = active
+    bpy.ops.object.join()
+    frame = bpy.context.object
+    frame.name = FRAME_OBJECT_NAME
+    frame.data.name = f"{FRAME_OBJECT_NAME}_Mesh"
+    frame["asset_role"] = "four_segment_mitered_wood_frame"
+    frame["segment_names"] = ",".join(FRAME_PART_NAMES)
+    frame["segment_count"] = 4
+    frame["joint_angle_degrees"] = 45.0
+    frame["joint_groove_width_mm"] = groove_width_mm
+    frame["shared_uv"] = True
+    frame["mobile_game_ready"] = True
+    frame.select_set(False)
+    return frame
+
+
+def create_mitered_frame(
+    dimensions: TabletopDimensions,
+    wood_material: bpy.types.Material,
+    joint_material: bpy.types.Material,
+    collection: bpy.types.Collection,
+) -> bpy.types.Object:
+    """Create four discrete rails meeting at exact 45-degree miter seams."""
+
+    half = dimensions.size * 0.5
+    inner = dimensions.playing_size * 0.5
+    z_bottom = dimensions.frame_bottom
+    z_top = dimensions.frame_top
+
+    def front_outline(
+        outer: float,
+        opening: float,
+        radius: float,
+        segments: int,
+    ) -> tuple[list[tuple[float, float]], tuple[int, ...]]:
+        center_right = Vector((outer - radius, -outer + radius))
+        center_left = Vector((-outer + radius, -outer + radius))
+        points = [(-opening, -opening), (opening, -opening)]
+        for index in range(segments + 1):
+            angle = math.radians(-45.0 - 45.0 * index / segments)
+            points.append(
+                (
+                    center_right.x + math.cos(angle) * radius,
+                    center_right.y + math.sin(angle) * radius,
+                )
+            )
+        points.append((-outer + radius, -outer))
+        for index in range(1, segments + 1):
+            angle = math.radians(-90.0 - 45.0 * index / segments)
+            points.append(
+                (
+                    center_left.x + math.cos(angle) * radius,
+                    center_left.y + math.sin(angle) * radius,
+                )
+            )
+        # Edge 1 and the closing edge are the two miter cuts; every other outline
+        # edge receives the same longitudinal bullnose treatment.
+        bevel_edges = tuple(index for index in range(len(points)) if index not in {1, len(points) - 1})
+        return points, bevel_edges
+
+    def rotate_outline(
+        outline: list[tuple[float, float]], quarter_turns: int
+    ) -> list[tuple[float, float]]:
+        result = []
+        for x, y in outline:
+            for _ in range(quarter_turns % 4):
+                x, y = -y, x
+            result.append((x, y))
+        return result
+
+    cap_front, cap_bevel_edges = front_outline(
+        half,
+        inner,
+        dimensions.outer_corner_radius,
+        dimensions.outer_corner_arc_segments,
+    )
+    base_outer = half - dimensions.base_band_inset
+    base_inner = inner + dimensions.base_band_inset
+    base_front, base_bevel_edges = front_outline(
+        base_outer,
+        base_inner,
+        max(0.006, dimensions.outer_corner_radius - dimensions.base_band_inset),
+        dimensions.outer_corner_arc_segments,
+    )
+    quarter_turns = (0, 2, 3, 1)
+    cap_outlines = tuple(rotate_outline(cap_front, turns) for turns in quarter_turns)
+    base_outlines = tuple(rotate_outline(base_front, turns) for turns in quarter_turns)
+    grain_axes = ("X", "X", "Y", "Y")
+    segment_parts: dict[str, list[bpy.types.Object]] = {}
+    for name, cap_outline, base_outline, grain_axis in zip(
+        FRAME_PART_NAMES, cap_outlines, base_outlines, grain_axes
+    ):
+        base = create_beveled_prism(
+            f"{name}_BaseBand",
+            base_outline,
+            z_bottom,
+            dimensions.base_band_top_z,
+            dimensions.base_band_bevel,
+            dimensions.base_band_bevel_segments,
+            wood_material,
+            collection,
+            base_bevel_edges,
+        )
+        cap = create_beveled_prism(
+            f"{name}_BullnoseCap",
+            cap_outline,
+            dimensions.bullnose_bottom_z,
+            z_top,
+            dimensions.rail_edge_bevel,
+            dimensions.rail_bevel_segments,
+            wood_material,
+            collection,
+            cap_bevel_edges,
+        )
+        for part in (base, cap):
+            part["asset_role"] = "independent_mitered_wood_rail"
+            part["joint_angle_degrees"] = 45.0
+            part["mobile_game_ready"] = True
+            apply_directional_wood_uv(part, grain_axis)
+        segment_parts[name] = [base, cap]
+    grooves = create_miter_joint_grooves(dimensions, joint_material, collection)
+    return join_frame_segments(segment_parts, grooves)
+
+
+def create_felt_surface(
+    dimensions: TabletopDimensions,
+    material: bpy.types.Material,
+    collection: bpy.types.Collection,
+) -> bpy.types.Object:
+    segments = dimensions.felt_corner_segments
+    top = rounded_rectangle(
+        dimensions.playing_size - 0.004,
+        dimensions.playing_size - 0.004,
+        dimensions.felt_corner_radius,
+        dimensions.felt_top,
+        segments,
+    )
+    bottom = rounded_rectangle(
+        dimensions.playing_size - 0.006,
+        dimensions.playing_size - 0.006,
+        dimensions.felt_corner_radius - 0.001,
+        dimensions.felt_top - dimensions.felt_thickness,
+        segments,
+    )
+    vertices = top + bottom
+    point_count = len(top)
+    top_center = len(vertices)
+    vertices.append((0.0, 0.0, dimensions.felt_top))
+    bottom_center = len(vertices)
+    vertices.append((0.0, 0.0, dimensions.felt_top - dimensions.felt_thickness))
+
+    faces: list[tuple[int, ...]] = []
+    for index in range(point_count):
+        following = (index + 1) % point_count
+        faces.append((top_center, index, following))
+        faces.append((bottom_center, point_count + following, point_count + index))
+        faces.append((index, point_count + index, point_count + following, following))
+
+    mesh = bpy.data.meshes.new(f"{FELT_NAME}_Mesh")
+    mesh.from_pydata(vertices, [], faces)
+    mesh.materials.append(material)
+    mesh.update(calc_edges=True)
+    obj = bpy.data.objects.new(FELT_NAME, mesh)
+    collection.objects.link(obj)
+    for polygon in mesh.polygons:
+        polygon.use_smooth = polygon.loop_total == 4
+    obj["asset_role"] = "inset_playing_surface"
+    obj["mobile_game_ready"] = True
+    return obj
+
+
+def smart_uv(obj: bpy.types.Object) -> None:
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(
+        angle_limit=math.radians(55.0),
+        island_margin=0.025,
+        area_weight=0.15,
+        correct_aspect=True,
+        scale_to_bounds=True,
+    )
+    bpy.ops.object.mode_set(mode="OBJECT")
     obj.select_set(False)
 
 
-def create_rounded_box(
-    name: str,
-    dimensions: tuple[float, float, float],
-    location: tuple[float, float, float],
-    material: bpy.types.Material,
-    bevel: float,
-    collection: bpy.types.Collection,
-    parent: bpy.types.Object,
-) -> bpy.types.Object:
-    bpy.ops.mesh.primitive_cube_add(location=location)
-    obj = bpy.context.object
-    obj.name = name
-    obj.data.name = f"{name}_Mesh"
-    obj.dimensions = dimensions
-    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    move_to_collection(obj, collection)
-    obj.parent = parent
-    obj.data.materials.append(material)
-    apply_bevel(obj, min(bevel, min(dimensions) * 0.24))
-    return obj
-
-
-
-
-def chamfered_outline(width: float, depth: float, chamfer: float, z: float) -> list[tuple[float, float, float]]:
-    half_width = width * 0.5
-    half_depth = depth * 0.5
-    cut = min(chamfer, half_width * 0.45, half_depth * 0.45)
-    return [
-        (-half_width + cut, -half_depth, z),
-        (half_width - cut, -half_depth, z),
-        (half_width, -half_depth + cut, z),
-        (half_width, half_depth - cut, z),
-        (half_width - cut, half_depth, z),
-        (-half_width + cut, half_depth, z),
-        (-half_width, half_depth - cut, z),
-        (-half_width, -half_depth + cut, z),
-    ]
-
-
-def create_chamfered_frustum(
-    name: str,
-    bottom_dimensions: tuple[float, float],
-    top_dimensions: tuple[float, float],
-    height: float,
-    location: tuple[float, float, float],
-    bottom_chamfer: float,
-    top_chamfer: float,
-    material: bpy.types.Material,
-    bevel: float,
-    collection: bpy.types.Collection,
-    parent: bpy.types.Object,
-) -> bpy.types.Object:
-    bottom = chamfered_outline(bottom_dimensions[0], bottom_dimensions[1], bottom_chamfer, -height * 0.5)
-    top = chamfered_outline(top_dimensions[0], top_dimensions[1], top_chamfer, height * 0.5)
-    vertices = bottom + top
-    faces: list[tuple[int, ...]] = [tuple(reversed(range(8))), tuple(range(8, 16))]
-    for index in range(8):
-        following = (index + 1) % 8
-        faces.append((index, following, following + 8, index + 8))
-    mesh = bpy.data.meshes.new(f"{name}_Mesh")
-    mesh.from_pydata(vertices, [], faces)
-    mesh.materials.append(material)
-    mesh.update()
-    obj = bpy.data.objects.new(name, mesh)
-    obj.location = location
-    collection.objects.link(obj)
-    obj.parent = parent
-    apply_bevel(obj, bevel, segments=5)
-    return obj
-
-
-def create_side_panel(
-    name: str,
-    width: float,
-    height: float,
-    depth: float,
-    location: tuple[float, float, float],
-    rotation_z: float,
-    material: bpy.types.Material,
-    collection: bpy.types.Collection,
-    parent: bpy.types.Object,
-) -> bpy.types.Object:
-    half_width = width * 0.5
-    half_height = height * 0.5
-    cut_x = min(0.045, width * 0.12)
-    cut_z = min(0.018, height * 0.24)
-    outline = [
-        (-half_width + cut_x, -half_height),
-        (half_width - cut_x, -half_height),
-        (half_width, -half_height + cut_z),
-        (half_width, half_height - cut_z),
-        (half_width - cut_x, half_height),
-        (-half_width + cut_x, half_height),
-        (-half_width, half_height - cut_z),
-        (-half_width, -half_height + cut_z),
-    ]
-    vertices = [(x, -depth * 0.5, z) for x, z in outline]
-    vertices += [(x, depth * 0.5, z) for x, z in outline]
-    faces: list[tuple[int, ...]] = [tuple(reversed(range(8))), tuple(range(8, 16))]
-    for index in range(8):
-        following = (index + 1) % 8
-        faces.append((index, following, following + 8, index + 8))
-    mesh = bpy.data.meshes.new(f"{name}_Mesh")
-    mesh.from_pydata(vertices, [], faces)
-    mesh.materials.append(material)
-    mesh.update()
-    obj = bpy.data.objects.new(name, mesh)
-    obj.location = location
-    obj.rotation_euler.z = rotation_z
-    collection.objects.link(obj)
-    obj.parent = parent
-    apply_bevel(obj, min(0.004, depth * 0.35), segments=4)
-    return obj
-
-
-def create_cylinder(
-    name: str,
-    radius: float,
-    depth: float,
-    location: tuple[float, float, float],
-    material: bpy.types.Material,
-    collection: bpy.types.Collection,
-    parent: bpy.types.Object,
-    rotation: tuple[float, float, float] = (0.0, 0.0, 0.0),
-) -> bpy.types.Object:
-    bpy.ops.mesh.primitive_cylinder_add(
-        vertices=64,
-        radius=radius,
-        depth=depth,
-        location=location,
-        rotation=rotation,
-    )
-    obj = bpy.context.object
-    obj.name = name
-    obj.data.name = f"{name}_Mesh"
-    move_to_collection(obj, collection)
-    obj.parent = parent
-    obj.data.materials.append(material)
-    for polygon in obj.data.polygons:
-        polygon.use_smooth = True
-    return obj
-
-
-def create_torus(
-    name: str,
-    major_radius: float,
-    minor_radius: float,
-    location: tuple[float, float, float],
-    material: bpy.types.Material,
-    collection: bpy.types.Collection,
-    parent: bpy.types.Object,
-) -> bpy.types.Object:
-    bpy.ops.mesh.primitive_torus_add(
-        major_radius=major_radius,
-        minor_radius=minor_radius,
-        major_segments=64,
-        minor_segments=12,
-        location=location,
-    )
-    obj = bpy.context.object
-    obj.name = name
-    obj.data.name = f"{name}_Mesh"
-    move_to_collection(obj, collection)
-    obj.parent = parent
-    obj.data.materials.append(material)
-    for polygon in obj.data.polygons:
-        polygon.use_smooth = True
-    return obj
-
-
-def new_group(name: str, collection: bpy.types.Collection, parent: bpy.types.Object) -> bpy.types.Object:
-    group = bpy.data.objects.new(name, None)
-    group.empty_display_type = "PLAIN_AXES"
-    group.empty_display_size = 0.08
-    collection.objects.link(group)
-    group.parent = parent
-    return group
-
-
-
-
-
-
-def build_table(
-    dimensions: TableDimensions,
-    collection: bpy.types.Collection,
-    materials: dict[str, bpy.types.Material],
-) -> tuple[bpy.types.Object, list[bpy.types.Object]]:
-    """按 94 cm 深色木纹参考图构建单柱全自动麻将桌。"""
-    root = bpy.data.objects.new(MODEL_ROOT_NAME, None)
-    root.empty_display_type = "CUBE"
-    root.empty_display_size = 0.12
-    collection.objects.link(root)
-
-    tabletop_group = new_group("AutomaticTabletop_Assembly", collection, root)
-    shell_group = new_group("WoodCabinet_Assembly", collection, root)
-    pedestal_group = new_group("PedestalAndCaster_Assembly", collection, root)
-    control_group = new_group("ControllerAndGrille_Assembly", collection, root)
-    details_group = new_group("CenterLift_Assembly", collection, root)
-    objects: list[bpy.types.Object] = []
-    d = dimensions
-
-    # 桌面机箱：上宽下窄的深色机身，四面嵌入烟熏橡木饰板。
-    shroud_height = d.shroud_top - d.shroud_bottom
-    objects.append(
-        create_chamfered_frustum(
-            "Table_DarkCabinetShell",
-            (d.shroud_bottom_width, d.shroud_bottom_depth),
-            (d.outer_width, d.outer_depth),
-            shroud_height,
-            (0.0, 0.0, d.shroud_bottom + shroud_height * 0.5),
-            bottom_chamfer=d.corner_chamfer * 1.12,
-            top_chamfer=d.corner_chamfer,
-            material=materials["glossy_black"],
-            bevel=0.007,
-            collection=collection,
-            parent=shell_group,
-        )
-    )
-
-    panel_z = d.shroud_bottom + shroud_height * 0.50
-    panel_face = 0.458
-    panel_specs = (
-        ("Table_WoodPanel_North", (0.0, panel_face, panel_z), 0.0),
-        ("Table_WoodPanel_South", (0.0, -panel_face, panel_z), 0.0),
-        ("Table_WoodPanel_East", (panel_face, 0.0, panel_z), math.radians(90.0)),
-        ("Table_WoodPanel_West", (-panel_face, 0.0, panel_z), math.radians(90.0)),
-    )
-    for name, location, rotation_z in panel_specs:
-        objects.append(
-            create_side_panel(
-                name,
-                d.side_panel_width,
-                d.side_panel_height,
-                d.side_panel_depth,
-                location,
-                rotation_z,
-                materials["wood"],
-                collection,
-                shell_group,
-            )
-        )
-
-    # 上下两道黑色压条夹住木纹面板，对应参考图的薄层机箱结构。
-    trim_width = 0.010
-    trim_height = 0.018
-    trim_z_values = (d.shroud_bottom + 0.018, d.shroud_top - 0.020)
-    for level_index, trim_z in enumerate(trim_z_values, start=1):
-        for name, size, location in (
-            ("North", (d.outer_width - 0.090, trim_width, trim_height), (0.0, 0.462, trim_z)),
-            ("South", (d.outer_width - 0.090, trim_width, trim_height), (0.0, -0.462, trim_z)),
-            ("East", (trim_width, d.outer_depth - 0.090, trim_height), (0.462, 0.0, trim_z)),
-            ("West", (trim_width, d.outer_depth - 0.090, trim_height), (-0.462, 0.0, trim_z)),
-        ):
-            objects.append(
-                create_rounded_box(
-                    f"Table_CabinetTrim_{level_index}_{name}",
-                    size,
-                    location,
-                    materials["metal"],
-                    0.003,
-                    collection,
-                    shell_group,
-                )
-            )
-
-    # 下沉式绿色桌布和内圈防撞条。
-    deck_height = d.felt_top - d.felt_thickness - d.shroud_top + 0.006
-    objects.append(
-        create_chamfered_frustum(
-            "Table_RecessedDeck",
-            (d.playing_width + 0.054, d.playing_depth + 0.054),
-            (d.playing_width + 0.054, d.playing_depth + 0.054),
-            deck_height,
-            (0.0, 0.0, d.shroud_top + deck_height * 0.5 - 0.003),
-            bottom_chamfer=0.025,
-            top_chamfer=0.025,
-            material=materials["deck"],
-            bevel=0.004,
-            collection=collection,
-            parent=tabletop_group,
-        )
-    )
-    objects.append(
-        create_chamfered_frustum(
-            "Table_GreenFeltSurface",
-            (d.playing_width, d.playing_depth),
-            (d.playing_width, d.playing_depth),
-            d.felt_thickness,
-            (0.0, 0.0, d.felt_top - d.felt_thickness * 0.5),
-            bottom_chamfer=0.020,
-            top_chamfer=0.020,
-            material=materials["felt"],
-            bevel=0.0025,
-            collection=collection,
-            parent=tabletop_group,
-        )
-    )
-
-    bezel_z = d.shroud_top + d.bezel_height * 0.5
-    y_bezel = d.outer_depth * 0.5 - d.bezel_width * 0.5
-    x_bezel = d.outer_width * 0.5 - d.bezel_width * 0.5
-    for name, size, location in (
-        ("Table_TopFrame_North", (d.outer_width, d.bezel_width, d.bezel_height), (0.0, y_bezel, bezel_z)),
-        ("Table_TopFrame_South", (d.outer_width, d.bezel_width, d.bezel_height), (0.0, -y_bezel, bezel_z)),
-        ("Table_TopFrame_East", (d.bezel_width, d.outer_depth - 2.0 * d.bezel_width, d.bezel_height), (x_bezel, 0.0, bezel_z)),
-        ("Table_TopFrame_West", (d.bezel_width, d.outer_depth - 2.0 * d.bezel_width, d.bezel_height), (-x_bezel, 0.0, bezel_z)),
-    ):
-        objects.append(
-            create_rounded_box(
-                name,
-                size,
-                location,
-                materials["metal"],
-                0.010,
-                collection,
-                tabletop_group,
-            )
-        )
-
-    bumper_height = 0.020
-    bumper_z = d.tabletop_height - bumper_height * 0.5 - 0.004
-    y_bumper = d.playing_depth * 0.5 + d.bumper_width * 0.5
-    x_bumper = d.playing_width * 0.5 + d.bumper_width * 0.5
-    for name, size, location in (
-        ("Table_InnerRail_North", (d.playing_width + 2.0 * d.bumper_width, d.bumper_width, bumper_height), (0.0, y_bumper, bumper_z)),
-        ("Table_InnerRail_South", (d.playing_width + 2.0 * d.bumper_width, d.bumper_width, bumper_height), (0.0, -y_bumper, bumper_z)),
-        ("Table_InnerRail_East", (d.bumper_width, d.playing_depth, bumper_height), (x_bumper, 0.0, bumper_z)),
-        ("Table_InnerRail_West", (d.bumper_width, d.playing_depth, bumper_height), (-x_bumper, 0.0, bumper_z)),
-    ):
-        objects.append(
-            create_rounded_box(
-                name,
-                size,
-                location,
-                materials["glossy_black"],
-                0.004,
-                collection,
-                tabletop_group,
-            )
-        )
-
-    # 550 x 550 mm 底座、斜面台阶和黑色中央立柱。
-    caster_radius = 0.025
-    base_bottom = 0.035
-    objects.append(
-        create_chamfered_frustum(
-            "Table_550mmPedestalFoot",
-            (d.plinth_width, d.plinth_depth),
-            (d.plinth_width * 0.965, d.plinth_depth * 0.965),
-            d.plinth_height,
-            (0.0, 0.0, base_bottom + d.plinth_height * 0.5),
-            bottom_chamfer=0.035,
-            top_chamfer=0.035,
-            material=materials["glossy_black"],
-            bevel=0.008,
-            collection=collection,
-            parent=pedestal_group,
-        )
-    )
-    slope_bottom = base_bottom + d.plinth_height - 0.004
-    objects.append(
-        create_chamfered_frustum(
-            "Table_PedestalSlopedBase",
-            (d.plinth_width * 0.91, d.plinth_depth * 0.91),
-            (0.315, 0.315),
-            d.plinth_slope_height,
-            (0.0, 0.0, slope_bottom + d.plinth_slope_height * 0.5),
-            bottom_chamfer=0.040,
-            top_chamfer=0.028,
-            material=materials["metal"],
-            bevel=0.007,
-            collection=collection,
-            parent=pedestal_group,
-        )
-    )
-    objects.append(
-        create_rounded_box(
-            "Table_ColumnLowerCollar",
-            (0.255, 0.255, 0.024),
-            (0.0, 0.0, d.pedestal_bottom - 0.008),
-            materials["glossy_black"],
-            0.007,
-            collection,
-            pedestal_group,
-        )
-    )
-    column_height = d.pedestal_top - d.pedestal_bottom
-    objects.append(
-        create_rounded_box(
-            "Table_CentralColumn",
-            (d.pedestal_width, d.pedestal_depth, column_height),
-            (0.0, 0.0, d.pedestal_bottom + column_height * 0.5),
-            materials["glossy_black"],
-            0.012,
-            collection,
-            pedestal_group,
-        )
-    )
-
-    # 四个带程序化网孔材质的立柱面板。
-    grille_width = 0.118
-    grille_height = 0.292
-    grille_z = d.pedestal_bottom + column_height * 0.48
-    for name, location, rotation_z in (
-        ("Table_ColumnGrille_Front", (0.0, -d.pedestal_depth * 0.5 - 0.003, grille_z), 0.0),
-        ("Table_ColumnGrille_Back", (0.0, d.pedestal_depth * 0.5 + 0.003, grille_z), 0.0),
-        ("Table_ColumnGrille_Right", (d.pedestal_width * 0.5 + 0.003, 0.0, grille_z), math.radians(90.0)),
-        ("Table_ColumnGrille_Left", (-d.pedestal_width * 0.5 - 0.003, 0.0, grille_z), math.radians(90.0)),
-    ):
-        objects.append(
-            create_side_panel(
-                name,
-                grille_width,
-                grille_height,
-                0.006,
-                location,
-                rotation_z,
-                materials["grille"],
-                collection,
-                control_group,
-            )
-        )
-
-    grille_front = -d.pedestal_depth * 0.5 - 0.0065
-    grille_right = d.pedestal_width * 0.5 + 0.0065
-    for index, offset in enumerate((-0.044, -0.022, 0.0, 0.022, 0.044), start=1):
-        objects.append(
-            create_rounded_box(
-                f"Table_GrilleFront_V{index}",
-                (0.0022, 0.0018, 0.252),
-                (offset, grille_front, grille_z),
-                materials["metal"],
-                0.0006,
-                collection,
-                control_group,
-            )
-        )
-        objects.append(
-            create_rounded_box(
-                f"Table_GrilleRight_V{index}",
-                (0.0018, 0.0022, 0.252),
-                (grille_right, offset, grille_z),
-                materials["metal"],
-                0.0006,
-                collection,
-                control_group,
-            )
-        )
-    for index in range(10):
-        z = grille_z - 0.117 + index * 0.026
-        objects.append(
-            create_rounded_box(
-                f"Table_GrilleFront_H{index + 1}",
-                (0.100, 0.0018, 0.0022),
-                (0.0, grille_front, z),
-                materials["metal"],
-                0.0006,
-                collection,
-                control_group,
-            )
-        )
-        objects.append(
-            create_rounded_box(
-                f"Table_GrilleRight_H{index + 1}",
-                (0.0018, 0.100, 0.0022),
-                (grille_right, 0.0, z),
-                materials["metal"],
-                0.0006,
-                collection,
-                control_group,
-            )
-        )
-
-    capital_height = 0.050
-    objects.append(
-        create_chamfered_frustum(
-            "Table_PedestalCapital",
-            (0.220, 0.220),
-            (0.330, 0.330),
-            capital_height,
-            (0.0, 0.0, d.pedestal_top - capital_height * 0.5),
-            bottom_chamfer=0.022,
-            top_chamfer=0.035,
-            material=materials["glossy_black"],
-            bevel=0.006,
-            collection=collection,
-            parent=pedestal_group,
-        )
-    )
-
-    # 前置控制盒与三枚物理按钮。
-    controller_z = d.shroud_bottom - 0.045
-    objects.append(
-        create_rounded_box(
-            "Table_FrontControllerHousing",
-            (0.300, 0.160, 0.068),
-            (0.0, -0.320, controller_z),
-            materials["glossy_black"],
-            0.009,
-            collection,
-            control_group,
-        )
-    )
-    objects.append(
-        create_rounded_box(
-            "Table_FrontControllerFace",
-            (0.205, 0.006, 0.038),
-            (0.0, -0.403, controller_z),
-            materials["controller_face"],
-            0.005,
-            collection,
-            control_group,
-        )
-    )
-    for index, (x, material_key) in enumerate(
-        ((-0.055, "indicator_green"), (0.0, "glossy_black"), (0.055, "indicator_red")),
-        start=1,
-    ):
-        objects.append(
-            create_cylinder(
-                f"Table_ControllerButton_{index}",
-                radius=0.011,
-                depth=0.008,
-                location=(x, -0.408, controller_z),
-                material=materials[material_key],
-                collection=collection,
-                parent=control_group,
-                rotation=(math.radians(90.0), 0.0, 0.0),
-            )
-        )
-
-    # 四组脚轮与支架，所有轮子保持在 550 mm 底座外廓内。
-    caster_positions = (
-        ("NE", 0.245, 0.282),
-        ("NW", -0.245, 0.282),
-        ("SE", 0.245, -0.282),
-        ("SW", -0.245, -0.282),
-    )
-    for suffix, x, y in caster_positions:
-        objects.append(
-            create_rounded_box(
-                f"Table_CasterBracket_{suffix}",
-                (0.040, 0.040, 0.034),
-                (x, y, 0.052),
-                materials["metal"],
-                0.005,
-                collection,
-                pedestal_group,
-            )
-        )
-        objects.append(
-            create_cylinder(
-                f"Table_CasterWheel_{suffix}",
-                radius=caster_radius,
-                depth=0.018,
-                location=(x, y, caster_radius),
-                material=materials["rubber"],
-                collection=collection,
-                parent=pedestal_group,
-                rotation=(0.0, math.radians(90.0), 0.0),
-            )
-        )
-
-    # 中央升降盘：黑底、红色功能环和绿色中心按钮。
-    hub_z = d.felt_top + 0.0015
-    objects.append(
-        create_cylinder(
-            "Table_CenterLiftBase",
-            radius=d.center_lift_radius,
-            depth=0.003,
-            location=(0.0, 0.0, hub_z),
-            material=materials["glossy_black"],
-            collection=collection,
-            parent=details_group,
-        )
-    )
-    objects.append(
-        create_torus(
-            "Table_CenterLiftRedRing",
-            major_radius=0.043,
-            minor_radius=0.0045,
-            location=(0.0, 0.0, hub_z + 0.0045),
-            material=materials["indicator_red"],
-            collection=collection,
-            parent=details_group,
-        )
-    )
-    objects.append(
-        create_torus(
-            "Table_CenterLiftChromeRing",
-            major_radius=0.030,
-            minor_radius=0.0025,
-            location=(0.0, 0.0, hub_z + 0.0060),
-            material=materials["chrome"],
-            collection=collection,
-            parent=details_group,
-        )
-    )
-    objects.append(
-        create_cylinder(
-            "Table_CenterLiftButton",
-            radius=0.018,
-            depth=0.003,
-            location=(0.0, 0.0, hub_z + 0.0065),
-            material=materials["indicator_green"],
-            collection=collection,
-            parent=details_group,
-        )
-    )
-
-    root["asset_type"] = "automatic_single_pedestal_mahjong_table"
-    root["reference_style"] = "dark frame, smoked oak panels, perforated column, controller, casters"
-    root["dimensions_mm"] = [
-        round(d.outer_width * 1000.0),
-        round(d.outer_depth * 1000.0),
-        round(d.tabletop_height * 1000.0),
-    ]
-    root["playing_surface_mm"] = [
-        round(d.playing_width * 1000.0),
-        round(d.playing_depth * 1000.0),
-    ]
-    root["base_footprint_mm"] = [round(d.plinth_width * 1000.0), round(d.plinth_depth * 1000.0)]
-    root["dimension_basis"] = "reference_image_940x940x780_mm_base_550x550_mm"
-    root["units"] = "meters"
-    root["pivot"] = "floor_center"
-    root["generator_version"] = SCRIPT_VERSION
-    root["blender_compatibility"] = "5.2+"
-    collection["asset_root"] = MODEL_ROOT_NAME
-    collection["nominal_dimensions_mm"] = root["dimensions_mm"]
-    return root, objects
-
-
-
-
-def point_at(obj: bpy.types.Object, target: tuple[float, float, float]) -> None:
-    direction = Vector(target) - obj.location
-    obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
-
-
-def add_presentation_scene(
-    collection: bpy.types.Collection,
-    materials: dict[str, bpy.types.Material],
-) -> bpy.types.Camera:
-    bpy.ops.mesh.primitive_plane_add(size=4.0, location=(0.0, 0.0, -0.001))
-    floor = bpy.context.object
-    floor.name = "Preview_Floor"
-    move_to_collection(floor, collection)
-    floor.data.materials.append(materials["floor"])
-
-    light_specs = (
-        ("Preview_Key", "AREA", (-1.20, -1.15, 2.10), 220.0, 1.25),
-        ("Preview_Fill", "AREA", (1.35, -0.30, 1.45), 95.0, 1.00),
-        ("Preview_Rim", "AREA", (0.30, 1.35, 1.80), 150.0, 0.95),
-        ("Preview_UnderFill", "AREA", (0.20, -1.10, 0.58), 85.0, 0.55),
-    )
-    for name, light_type, location, energy, size in light_specs:
-        bpy.ops.object.light_add(type=light_type, location=location)
-        light = bpy.context.object
-        light.name = name
-        light.data.energy = energy
-        light.data.shape = "DISK"
-        light.data.size = size
-        move_to_collection(light, collection)
-        point_at(light, (0.0, 0.0, 0.48))
-
-    bpy.ops.object.camera_add(location=(1.42, -1.52, 1.24))
-    camera = bpy.context.object
-    camera.name = "Preview_Camera"
-    camera.data.lens = 54.0
-    camera.data.sensor_width = 36.0
-    move_to_collection(camera, collection)
-    point_at(camera, (0.0, 0.0, 0.43))
-    bpy.context.scene.camera = camera
-    return camera.data
-
-
-def calculate_bounds(objects: Iterable[bpy.types.Object]) -> tuple[Vector, Vector]:
-    bpy.context.view_layer.update()
-    corners: list[Vector] = []
+def mesh_triangle_count(objects: list[bpy.types.Object]) -> int:
+    count = 0
+    depsgraph = bpy.context.evaluated_depsgraph_get()
     for obj in objects:
-        if obj.type != "MESH":
-            continue
-        corners.extend(obj.matrix_world @ Vector(corner) for corner in obj.bound_box)
-    if not corners:
-        return Vector((0.0, 0.0, 0.0)), Vector((0.0, 0.0, 0.0))
-    minimum = Vector(tuple(min(corner[index] for corner in corners) for index in range(3)))
-    maximum = Vector(tuple(max(corner[index] for corner in corners) for index in range(3)))
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        mesh.calc_loop_triangles()
+        count += len(mesh.loop_triangles)
+        evaluated.to_mesh_clear()
+    return count
+
+
+def mesh_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector]:
+    points = [obj.matrix_world @ Vector(corner) for obj in objects for corner in obj.bound_box]
+    minimum = Vector((min(p.x for p in points), min(p.y for p in points), min(p.z for p in points)))
+    maximum = Vector((max(p.x for p in points), max(p.y for p in points), max(p.z for p in points)))
     return minimum, maximum
 
 
-def select_model(objects: Iterable[bpy.types.Object]) -> None:
-    bpy.ops.object.select_all(action="DESELECT")
-    first = None
-    for obj in objects:
-        if obj.type != "MESH":
-            continue
-        obj.select_set(True)
-        first = first or obj
-    if first is not None:
-        bpy.context.view_layer.objects.active = first
+def create_preview(dimensions: TabletopDimensions, collection: bpy.types.Collection) -> None:
+    for name, location, energy, size, color in (
+        ("Key_Softbox", (-1.7, -1.8, 2.2), 650.0, 2.8, (1.0, 0.74, 0.52)),
+        ("Fill_Softbox", (1.6, -0.2, 1.4), 45.0, 2.2, (0.78, 0.86, 1.0)),
+        ("Rim_Softbox", (0.2, 1.7, 1.9), 110.0, 1.8, (0.70, 1.0, 0.82)),
+    ):
+        light_data = bpy.data.lights.new(name, "AREA")
+        light_data.energy = energy
+        light_data.shape = "DISK"
+        light_data.size = size
+        light_data.color = color
+        light = bpy.data.objects.new(name, light_data)
+        light.location = location
+        collection.objects.link(light)
+
+    camera_data = bpy.data.cameras.new("Preview_Camera")
+    camera = bpy.data.objects.new("Preview_Camera", camera_data)
+    camera.location = (1.92, -2.06, 1.12)
+    camera.data.lens = 60.0
+    camera.data.sensor_width = 36.0
+    collection.objects.link(camera)
+    target = Vector((0.0, 0.0, -0.010))
+    camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
+    bpy.context.scene.camera = camera
 
 
-def ensure_uv_maps(objects: Iterable[bpy.types.Object]) -> None:
-    """为所有桌体网格生成可供 UE 贴图采样的 Smart UV。"""
-    for obj in objects:
-        if obj.type != "MESH":
-            continue
-        bpy.ops.object.select_all(action="DESELECT")
-        obj.select_set(True)
-        bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.mode_set(mode="EDIT")
-        bpy.ops.mesh.select_all(action="SELECT")
-        bpy.ops.uv.smart_project(angle_limit=math.radians(66.0), island_margin=0.02)
-        bpy.ops.object.mode_set(mode="OBJECT")
-        obj.select_set(False)
+def sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def export_fbx(path: Path, objects: list[bpy.types.Object]) -> None:
-    ensure_uv_maps(objects)
-    select_model(objects)
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = objects[0]
     bpy.ops.export_scene.fbx(
         filepath=str(path),
         use_selection=True,
         object_types={"MESH"},
+        use_mesh_modifiers=True,
+        mesh_smooth_type="FACE",
+        use_tspace=True,
+        add_leaf_bones=False,
+        bake_anim=False,
         apply_unit_scale=True,
         apply_scale_options="FBX_SCALE_UNITS",
-        axis_forward="-Z",
-        axis_up="Y",
-        bake_space_transform=False,
-        use_mesh_modifiers=True,
-        add_leaf_bones=False,
-        path_mode="RELATIVE",
-        embed_textures=False,
+        axis_forward="-Y",
+        axis_up="Z",
     )
 
 
 def export_glb(path: Path, objects: list[bpy.types.Object]) -> None:
-    select_model(objects)
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in objects:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = objects[0]
     bpy.ops.export_scene.gltf(
         filepath=str(path),
         export_format="GLB",
         use_selection=True,
         export_apply=True,
-        export_yup=True,
         export_materials="EXPORT",
+        export_yup=True,
     )
 
 
-def file_record(path: Path, root: Path) -> dict[str, object]:
-    payload = path.read_bytes()
-    try:
-        relative_path = path.relative_to(root).as_posix()
-    except ValueError:
-        relative_path = path.as_posix()
-    return {
-        "path": relative_path,
-        "bytes": len(payload),
-        "sha256": hashlib.sha256(payload).hexdigest(),
-    }
-
-
 def write_manifest(
-    path: Path,
-    project_root: Path,
-    dimensions: TableDimensions,
-    root: bpy.types.Object,
+    output_dir: Path,
+    dimensions: TabletopDimensions,
     objects: list[bpy.types.Object],
-    materials: dict[str, bpy.types.Material],
     generated_files: list[Path],
 ) -> None:
-    minimum, maximum = calculate_bounds(objects)
-    measured = maximum - minimum
+    minimum, maximum = mesh_bounds(objects)
+    size = maximum - minimum
+    per_object = {}
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    for obj in objects:
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        mesh.calc_loop_triangles()
+        per_object[obj.name] = {
+            "vertices": len(mesh.vertices),
+            "polygons": len(mesh.polygons),
+            "triangles": len(mesh.loop_triangles),
+            "material": obj.data.materials[0].name if obj.data.materials else None,
+            "material_slots": [material.name for material in obj.data.materials],
+        }
+        evaluated.to_mesh_clear()
+
     manifest = {
         "generator": "Blender 5.2 GenerateStandardMahjongTable.py",
         "generator_version": SCRIPT_VERSION,
         "blender_version": bpy.app.version_string,
-        "asset_root": root.name,
-        "nominal_dimensions_mm": [
-            round(dimensions.outer_width * 1000.0, 3),
-            round(dimensions.outer_depth * 1000.0, 3),
-            round(dimensions.tabletop_height * 1000.0, 3),
-        ],
-        "measured_bounds_mm": {
-            "minimum": [round(value * 1000.0, 3) for value in minimum],
-            "maximum": [round(value * 1000.0, 3) for value in maximum],
-            "size": [round(value * 1000.0, 3) for value in measured],
+        "asset_root": ASSET_NAME,
+        "asset_scope": "tabletop_only",
+        "frame_construction": "four_independent_rails_with_45_degree_miter_joints",
+        "frame_mesh_layout": {
+            "object_count": 1,
+            "segment_count": 4,
+            "segments": list(FRAME_PART_NAMES),
+            "shared_uv": True,
+            "grain_direction": {
+                "Frame_Front": "longitudinal_X",
+                "Frame_Back": "longitudinal_X",
+                "Frame_Left": "longitudinal_Y",
+                "Frame_Right": "longitudinal_Y",
+            },
+            "uv_scale_consistent": True,
+            "uv_v_tiles_per_rail": 4.0,
         },
-        "playing_surface_mm": [
-            round(dimensions.playing_width * 1000.0, 3),
-            round(dimensions.playing_depth * 1000.0, 3),
+        "excluded_parts": ["legs", "center_controller", "mahjong_tiles", "mechanical_structure"],
+        "nominal_dimensions_mm": [1150.0, 1150.0, 65.0],
+        "measured_bounds_mm": {
+            "minimum": [round(value * 1000.0, 4) for value in minimum],
+            "maximum": [round(value * 1000.0, 4) for value in maximum],
+            "size": [round(value * 1000.0, 4) for value in size],
+        },
+        "playing_surface_mm": [dimensions.playing_size * 1000.0] * 2,
+        "playing_surface_z_mm": 0.0,
+        "pivot": "playing_surface_center",
+        "mesh_object_count": len(objects),
+        "geometry": per_object,
+        "triangle_count": mesh_triangle_count(objects),
+        "mobile_triangle_budget": 5000,
+        "materials": [
+            "M_Table_Walnut_PBR",
+            "M_Table_Joint_AO_PBR",
+            "M_Table_Felt_Green_PBR",
         ],
-        "base_footprint_mm": [
-            round(dimensions.plinth_width * 1000.0, 3),
-            round(dimensions.plinth_depth * 1000.0, 3),
-        ],
+        "material_workflow": "PBR metallic-roughness",
         "dimensions_m": asdict(dimensions),
-        "pivot": "floor_center",
-        "mesh_object_count": sum(obj.type == "MESH" for obj in objects),
-        "materials": sorted(material.name for material in materials.values() if material.users > 0),
-        "material_workflow": "Principled BSDF metallic-roughness PBR; procedural Blender nodes",
-        "files": [file_record(file, project_root) for file in generated_files if file.is_file()],
+        "files": [
+            {
+                "path": path.relative_to(output_dir.parents[2]).as_posix(),
+                "bytes": path.stat().st_size,
+                "sha256": sha256(path),
+            }
+            for path in generated_files
+            if path.is_file()
+        ],
     }
-    path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    (output_dir / "MahjongTableAssetManifest.json").write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 def main() -> None:
-    args = blender_arguments()
-    project_root = Path(args.project_root).resolve() if args.project_root else inferred_project_root()
+    args = arguments()
+    root = Path(args.project_root).resolve() if args.project_root else project_root_from_script()
     output_dir = (
-        Path(args.output_dir).resolve()
+        args.output_dir.resolve()
         if args.output_dir
-        else project_root / "SourceArt" / "3D" / "MahjongTable"
+        else root / "SourceArt" / "3D" / "MahjongTable"
     )
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    dimensions = TableDimensions()
-    reset_scene(keep_scene=args.keep_scene)
+    clean_scene()
     configure_scene()
-    model_collection = create_collection(MODEL_COLLECTION_NAME)
-    presentation_collection = create_collection(PRESENTATION_COLLECTION_NAME)
-    materials = create_simple_materials()
-    root, objects = build_table(dimensions, model_collection, materials)
-    add_presentation_scene(presentation_collection, materials)
+    dimensions = TabletopDimensions()
+    model_collection = create_collection(MODEL_COLLECTION)
+    presentation_collection = create_collection(PRESENTATION_COLLECTION)
+    walnut = create_walnut_material()
+    joint_material = create_joint_material()
+    felt_material = create_felt_material()
+    frame = create_mitered_frame(dimensions, walnut, joint_material, model_collection)
+    felt = create_felt_surface(dimensions, felt_material, model_collection)
+    objects = [frame, felt]
+    smart_uv(felt)
 
-    minimum, maximum = calculate_bounds(objects)
-    measured = maximum - minimum
-    expected = Vector((dimensions.outer_width, dimensions.outer_depth, dimensions.tabletop_height))
-    tolerance = 0.0005
-    if any(abs(measured[index] - expected[index]) > tolerance for index in range(3)):
-        raise RuntimeError(
-            "模型尺寸校验失败："
-            f"实测 {tuple(round(value, 6) for value in measured)} m，"
-            f"预期 {tuple(expected)} m"
-        )
+    root_empty = bpy.data.objects.new(ASSET_NAME, None)
+    model_collection.objects.link(root_empty)
+    root_empty["asset_scope"] = "tabletop_only"
+    root_empty["dimensions_mm"] = "1150x1150x65"
+    for obj in objects:
+        obj.parent = root_empty
 
+    create_preview(dimensions, presentation_collection)
     generated_files: list[Path] = []
-    preview_path = output_dir / "StandardMahjongTable_Preview.png"
-    if not args.no_render:
-        bpy.context.scene.render.filepath = str(preview_path)
-        bpy.ops.render.render(write_still=True)
-        generated_files.append(preview_path)
 
-    blend_path = output_dir / "SM_StandardMahjongTable.blend"
+    blend_path = output_dir / f"{ASSET_NAME}.blend"
     if not args.no_save:
         bpy.ops.wm.save_as_mainfile(filepath=str(blend_path), check_existing=False)
-        # 资产生成器每次都会完整重建文件，不保留 Blender 自动产生的旧版 .blend1。
-        backup_path = Path(f"{blend_path}1")
-        if backup_path.is_file():
-            backup_path.unlink()
         generated_files.append(blend_path)
 
     if args.export_fbx:
-        fbx_path = output_dir / "SM_StandardMahjongTable.fbx"
+        fbx_path = output_dir / f"{ASSET_NAME}.fbx"
         export_fbx(fbx_path, objects)
         generated_files.append(fbx_path)
 
     if args.export_glb:
-        glb_path = output_dir / "SM_StandardMahjongTable.glb"
+        glb_path = output_dir / f"{ASSET_NAME}.glb"
         export_glb(glb_path, objects)
         generated_files.append(glb_path)
 
-    manifest_path = output_dir / "MahjongTableAssetManifest.json"
-    write_manifest(
-        manifest_path,
-        project_root,
-        dimensions,
-        root,
-        objects,
-        materials,
-        generated_files,
-    )
+    if args.render:
+        preview_path = output_dir / "StandardMahjongTable_Preview.png"
+        bpy.context.scene.render.filepath = str(preview_path)
+        bpy.ops.render.render(write_still=True)
+        generated_files.append(preview_path)
 
-    print(f"MAHJONG_TABLE_ASSETS_GENERATED={output_dir}")
+    write_manifest(output_dir, dimensions, objects, generated_files)
+    minimum, maximum = mesh_bounds(objects)
+    dimensions_cm = (maximum - minimum) * 100.0
     print(
-        "NOMINAL_DIMENSIONS_MM="
-        f"{dimensions.outer_width * 1000.0:.0f}x"
-        f"{dimensions.outer_depth * 1000.0:.0f}x"
-        f"{dimensions.tabletop_height * 1000.0:.0f}"
+        "MAHJONG_TABLETOP_GENERATED "
+        f"blender={bpy.app.version_string} "
+        f"dimensions_cm=({dimensions_cm.x:.3f},{dimensions_cm.y:.3f},{dimensions_cm.z:.3f}) "
+        f"triangles={mesh_triangle_count(objects)} objects={len(objects)}"
     )
-    print(f"BASE_FOOTPRINT_MM={dimensions.plinth_width * 1000.0:.0f}x{dimensions.plinth_depth * 1000.0:.0f}")
-    print(f"MEASURED_DIMENSIONS_MM={'x'.join(f'{value * 1000.0:.3f}' for value in measured)}")
-    print(f"MESH_OBJECT_COUNT={sum(obj.type == 'MESH' for obj in objects)}")
-    print(f"BLENDER_VERSION={bpy.app.version_string}")
 
 
 if __name__ == "__main__":

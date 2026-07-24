@@ -16,9 +16,9 @@ namespace
     constexpr float TileTightPitch = TileWidth - 2.0f;
     constexpr float TileTightLongPitch = TileHeight - 2.0f;
     constexpr float Mahjong50ModelWidth = 3.6f;
-    // The imported table is authored at real-world centimeters. The UViewport layout uses a
-    // 10x presentation scale (for example a 4.4 cm tile is displayed at 44 units).
-    constexpr float ImportedTableSurfaceHeight = 76.5f;
+    // The tabletop-only asset pivot is authored at the felt playing surface (Z=0). The UViewport
+    // layout uses a 10x presentation scale (for example a 4.4 cm tile is displayed at 44 units).
+    constexpr float ImportedTableSurfaceHeight = 0.0f;
     constexpr float ImportedTableDisplayScale = 10.0f;
 
     FVector RotateAroundTable(const FVector& Position, const int32 RelativeSeat)

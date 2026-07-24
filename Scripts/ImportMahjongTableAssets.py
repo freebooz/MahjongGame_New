@@ -1,7 +1,9 @@
-"""Import the standard 94 cm Mahjong table, build PBR materials, and place it in MahjongRoomMap.
+"""Replace the legacy full Mahjong table with the Blender 5.2 tabletop-only asset.
 
-Run from UnrealEditor-Cmd with ``-ExecutePythonScript=...``. The script is idempotent:
-existing assets and the tagged level actor are updated in place.
+Run with UnrealEditor-Cmd and ``-ExecutePythonScript``.  The static mesh is
+reimported at the existing content path so native code, maps, and Blueprints keep
+their references.  Obsolete leg/controller materials and textures are removed
+only after the new two-slot mesh has been saved and validated.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import unreal
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = PROJECT_ROOT / "SourceArt" / "3D" / "MahjongTable"
 MODEL_FILE = SOURCE_ROOT / "SM_StandardMahjongTable.fbx"
+MODEL_MANIFEST = SOURCE_ROOT / "MahjongTableAssetManifest.json"
 TEXTURE_SOURCE = SOURCE_ROOT / "Textures"
 TEXTURE_MANIFEST = TEXTURE_SOURCE / "MahjongTableTextureManifest.json"
 
@@ -23,18 +26,27 @@ MESH_DEST = f"{DEST_ROOT}/Meshes"
 TEXTURE_DEST = f"{DEST_ROOT}/Textures"
 MATERIAL_DEST = f"{DEST_ROOT}/Materials"
 MESH_PATH = f"{MESH_DEST}/SM_StandardMahjongTable"
-MAP_PATH = "/Game/Maps/MahjongRoomVisualPreviewMap"
-LEVEL_ACTOR_LABEL = "MahjongRoomTable"
-LEVEL_ACTOR_TAG = "MahjongRoomTable"
 REPORT_PATH = PROJECT_ROOT / "Saved" / "Reports" / "MahjongTableImportReport.json"
 
+TEXTURED_SLOTS = ("M_Table_Walnut_PBR", "M_Table_Felt_Green_PBR")
+EXPECTED_SLOTS = (
+    "M_Table_Walnut_PBR",
+    "M_Table_Joint_AO_PBR",
+    "M_Table_Felt_Green_PBR",
+)
+MATERIAL_ASSET_BY_SLOT = {
+    "M_Table_Walnut_PBR": "M_Table_Walnut_Miter_PBR",
+    "M_Table_Joint_AO_PBR": "M_Table_Joint_AO_PBR",
+    "M_Table_Felt_Green_PBR": "M_Table_Felt_Green_Fiber_PBR",
+}
+EXPECTED_DIMENSIONS_CM = (115.0, 115.0, 6.5)
 
 def log(message: str) -> None:
-    unreal.log(f"[MahjongTableImport] {message}")
+    unreal.log(f"[MahjongTabletopImport] {message}")
 
 
 def warn(message: str) -> None:
-    unreal.log_warning(f"[MahjongTableImport] {message}")
+    unreal.log_warning(f"[MahjongTabletopImport] {message}")
 
 
 def set_prop(obj, name: str, value) -> bool:
@@ -46,48 +58,38 @@ def set_prop(obj, name: str, value) -> bool:
         return False
 
 
-def ensure_sources() -> dict:
-    if not MODEL_FILE.is_file():
-        raise RuntimeError(f"Missing FBX source: {MODEL_FILE}")
-    if not TEXTURE_MANIFEST.is_file():
-        raise RuntimeError(f"Missing PBR texture manifest: {TEXTURE_MANIFEST}")
-    manifest = json.loads(TEXTURE_MANIFEST.read_text(encoding="utf-8-sig"))
-    texture_files = sorted(TEXTURE_SOURCE.glob("T_Table_*.png"))
-    if len(manifest.get("materials", [])) != 11:
-        raise RuntimeError("Expected 11 material definitions in texture manifest")
-    if len(texture_files) != 33:
-        raise RuntimeError(f"Expected 33 PBR textures, found {len(texture_files)}")
-    for source in texture_files:
-        if not source.is_file():
-            raise RuntimeError(f"Missing texture source: {source}")
-    return manifest
+def ensure_sources() -> tuple[dict, dict]:
+    for path in (MODEL_FILE, MODEL_MANIFEST, TEXTURE_MANIFEST):
+        if not path.is_file():
+            raise RuntimeError(f"Missing generated source: {path}")
+    model_manifest = json.loads(MODEL_MANIFEST.read_text(encoding="utf-8-sig"))
+    texture_manifest = json.loads(TEXTURE_MANIFEST.read_text(encoding="utf-8-sig"))
+
+    if model_manifest.get("asset_scope") != "tabletop_only":
+        raise RuntimeError("Model manifest is not the tabletop-only Blender asset")
+    if model_manifest.get("frame_construction") != (
+        "four_independent_rails_with_45_degree_miter_joints"
+    ):
+        raise RuntimeError("Model manifest does not contain the required four mitered frame rails")
+    dimensions = tuple(float(value) for value in model_manifest.get("nominal_dimensions_mm", []))
+    if dimensions != (1150.0, 1150.0, 65.0):
+        raise RuntimeError(f"Unexpected model dimensions in manifest: {dimensions}")
+    if int(model_manifest.get("triangle_count", 999999)) >= 5000:
+        raise RuntimeError("Generated tabletop exceeds the 5000 triangle mobile budget")
+
+    specs = texture_manifest.get("materials", [])
+    slots = tuple(spec.get("material_slot") for spec in specs)
+    if set(slots) != set(TEXTURED_SLOTS) or len(specs) != 2:
+        raise RuntimeError(f"Expected exactly two PBR material definitions, found {slots}")
+    texture_files = sorted(TEXTURE_SOURCE.glob("T_*_2K.png"))
+    if len(texture_files) != 8:
+        raise RuntimeError(f"Expected eight 2K tabletop PBR textures, found {len(texture_files)}")
+    return model_manifest, texture_manifest
 
 
 def ensure_destination_folders() -> None:
     for path in (DEST_ROOT, MESH_DEST, TEXTURE_DEST, MATERIAL_DEST):
         unreal.EditorAssetLibrary.make_directory(path)
-
-
-def load_complete_asset_set(material_specs: list[dict]):
-    """Return the existing imported set when it is complete, avoiding destructive re-imports."""
-    mesh = unreal.EditorAssetLibrary.load_asset(MESH_PATH)
-    if not mesh:
-        return None
-    textures = []
-    for source in sorted(TEXTURE_SOURCE.glob("T_Table_*.png")):
-        texture = unreal.EditorAssetLibrary.load_asset(f"{TEXTURE_DEST}/{source.stem}")
-        if not texture:
-            return None
-        textures.append(texture)
-    materials = {}
-    for spec in material_specs:
-        material = unreal.EditorAssetLibrary.load_asset(f"{MATERIAL_DEST}/{spec['material_slot']}")
-        if not material:
-            return None
-        materials[spec["material_slot"]] = material
-    if len(textures) != 33 or len(materials) != 11:
-        return None
-    return mesh, textures, materials
 
 
 def import_model():
@@ -117,14 +119,21 @@ def import_model():
     task.destination_name = "SM_StandardMahjongTable"
     task.automated = True
     task.replace_existing = True
+    task.replace_existing_settings = True
     task.save = True
     task.options = options
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
 
     mesh = unreal.EditorAssetLibrary.load_asset(MESH_PATH)
     if not mesh:
-        imported = unreal.EditorAssetLibrary.list_assets(MESH_DEST, recursive=False, include_folder=False)
-        raise RuntimeError(f"FBX import did not create {MESH_PATH}; imported={imported}")
+        raise RuntimeError(f"FBX import did not create or replace {MESH_PATH}")
+    set_prop(mesh, "allow_cpu_access", False)
+    try:
+        nanite = mesh.get_editor_property("nanite_settings")
+        nanite.enabled = False
+        set_prop(mesh, "nanite_settings", nanite)
+    except Exception as exc:
+        warn(f"could not disable Nanite explicitly: {exc}")
     return mesh
 
 
@@ -135,6 +144,7 @@ def import_texture(source: Path):
     task.destination_name = source.stem
     task.automated = True
     task.replace_existing = True
+    task.replace_existing_settings = True
     task.save = True
     unreal.AssetToolsHelpers.get_asset_tools().import_asset_tasks([task])
     texture = unreal.EditorAssetLibrary.load_asset(f"{TEXTURE_DEST}/{source.stem}")
@@ -144,8 +154,8 @@ def import_texture(source: Path):
 
 
 def configure_texture(texture, name: str) -> None:
-    is_normal = name.endswith("_Normal")
-    is_mask = name.endswith("_ORM")
+    is_normal = "_Normal_" in name
+    is_mask = "_Roughness_" in name or "_AO_" in name
     set_prop(texture, "srgb", not (is_normal or is_mask))
     if is_normal:
         set_prop(texture, "compression_settings", unreal.TextureCompressionSettings.TC_NORMALMAP)
@@ -153,6 +163,7 @@ def configure_texture(texture, name: str) -> None:
     elif is_mask:
         set_prop(texture, "compression_settings", unreal.TextureCompressionSettings.TC_MASKS)
     set_prop(texture, "lod_group", unreal.TextureGroup.TEXTUREGROUP_WORLD)
+    set_prop(texture, "max_texture_size", 2048)
     post_edit_change = getattr(texture, "post_edit_change", None)
     if post_edit_change:
         post_edit_change()
@@ -169,19 +180,22 @@ def load_texture(name: str):
 def get_or_create_material(name: str):
     path = f"{MATERIAL_DEST}/{name}"
     material = unreal.EditorAssetLibrary.load_asset(path)
+    if material:
+        return material, False
     if not material:
         material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
             name, MATERIAL_DEST, unreal.Material, unreal.MaterialFactoryNew()
         )
     if not material:
         raise RuntimeError(f"Could not create material {path}")
-    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
     set_prop(material, "two_sided", False)
-    return material
+    return material, True
 
 
 def expression(material, expression_class, x: int, y: int):
-    return unreal.MaterialEditingLibrary.create_material_expression(material, expression_class, x, y)
+    return unreal.MaterialEditingLibrary.create_material_expression(
+        material, expression_class, x, y
+    )
 
 
 def texture_parameter(material, texture, parameter_name: str, x: int, y: int, sampler_type):
@@ -195,13 +209,14 @@ def texture_parameter(material, texture, parameter_name: str, x: int, y: int, sa
 def build_material(material_spec: dict):
     slot_name = material_spec["material_slot"]
     textures = material_spec["textures"]
-    material = get_or_create_material(slot_name)
-
+    material, created = get_or_create_material(MATERIAL_ASSET_BY_SLOT[slot_name])
+    if not created:
+        return material
     base_color = texture_parameter(
         material,
         load_texture(Path(textures["BaseColor"]).stem),
         "BaseColor",
-        -500,
+        -520,
         -220,
         unreal.MaterialSamplerType.SAMPLERTYPE_COLOR,
     )
@@ -209,24 +224,50 @@ def build_material(material_spec: dict):
         material,
         load_texture(Path(textures["Normal"]).stem),
         "Normal",
-        -500,
+        -520,
         20,
         unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL,
     )
-    orm = texture_parameter(
+    roughness = texture_parameter(
         material,
-        load_texture(Path(textures["ORM"]).stem),
-        "ORM",
-        -500,
-        250,
+        load_texture(Path(textures["Roughness"]).stem),
+        "Roughness",
+        -520,
+        260,
+        unreal.MaterialSamplerType.SAMPLERTYPE_MASKS,
+    )
+    ao = texture_parameter(
+        material,
+        load_texture(Path(textures["AO"]).stem),
+        "AO",
+        -520,
+        470,
         unreal.MaterialSamplerType.SAMPLERTYPE_MASKS,
     )
     library = unreal.MaterialEditingLibrary
     library.connect_material_property(base_color, "", unreal.MaterialProperty.MP_BASE_COLOR)
     library.connect_material_property(normal, "", unreal.MaterialProperty.MP_NORMAL)
-    library.connect_material_property(orm, "R", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
-    library.connect_material_property(orm, "G", unreal.MaterialProperty.MP_ROUGHNESS)
-    library.connect_material_property(orm, "B", unreal.MaterialProperty.MP_METALLIC)
+    library.connect_material_property(roughness, "R", unreal.MaterialProperty.MP_ROUGHNESS)
+    library.connect_material_property(ao, "R", unreal.MaterialProperty.MP_AMBIENT_OCCLUSION)
+    library.recompile_material(material)
+    unreal.EditorAssetLibrary.save_loaded_asset(material, only_if_is_dirty=False)
+    return material
+
+
+def build_joint_material():
+    slot_name = "M_Table_Joint_AO_PBR"
+    material, created = get_or_create_material(MATERIAL_ASSET_BY_SLOT[slot_name])
+    if not created:
+        return material
+    color = expression(material, unreal.MaterialExpressionConstant3Vector, -320, -60)
+    set_prop(color, "constant", unreal.LinearColor(0.002, 0.0005, 0.00012, 1.0))
+    roughness = expression(material, unreal.MaterialExpressionConstant, -320, 130)
+    set_prop(roughness, "r", 0.88)
+    library = unreal.MaterialEditingLibrary
+    library.connect_material_property(color, "", unreal.MaterialProperty.MP_BASE_COLOR)
+    library.connect_material_property(
+        roughness, "", unreal.MaterialProperty.MP_ROUGHNESS
+    )
     library.recompile_material(material)
     unreal.EditorAssetLibrary.save_loaded_asset(material, only_if_is_dirty=False)
     return material
@@ -241,29 +282,19 @@ def material_slot_names(mesh) -> list[str]:
     return names
 
 
-def resolve_slot_material(slot_name: str, materials: dict[str, object]):
-    lowered = slot_name.lower()
-    exact = materials.get(slot_name)
-    if exact:
-        return exact
-    for material_name, material in materials.items():
-        material_lower = material_name.lower()
-        if lowered.startswith(material_lower) or material_lower in lowered:
-            return material
-    return None
-
-
 def assign_materials(mesh, materials: dict[str, object]) -> list[str]:
     slots = material_slot_names(mesh)
+    if len(slots) != 3:
+        raise RuntimeError(f"Reimported mesh must have three material slots, found {slots}")
     missing = []
     for index, slot_name in enumerate(slots):
-        material = resolve_slot_material(slot_name, materials)
-        if material:
-            mesh.set_material(index, material)
-        else:
+        material = materials.get(slot_name)
+        if not material:
             missing.append(slot_name)
+        else:
+            mesh.set_material(index, material)
     if missing:
-        raise RuntimeError(f"No generated material for imported FBX slots: {missing}")
+        raise RuntimeError(f"No generated material for FBX slots: {missing}")
     post_edit_change = getattr(mesh, "post_edit_change", None)
     if post_edit_change:
         post_edit_change()
@@ -271,109 +302,150 @@ def assign_materials(mesh, materials: dict[str, object]) -> list[str]:
     return slots
 
 
-def actor_tags(actor) -> list[str]:
+def triangle_count(mesh) -> int:
     try:
-        return [str(tag) for tag in actor.get_editor_property("tags")]
+        subsystem = unreal.get_editor_subsystem(unreal.StaticMeshEditorSubsystem)
+        return int(subsystem.get_number_triangles(mesh, 0))
     except Exception:
-        return []
+        try:
+            return int(unreal.EditorStaticMeshLibrary.get_number_triangles(mesh, 0))
+        except Exception as exc:
+            warn(f"triangle count API unavailable: {exc}")
+            return -1
 
 
-def place_in_room_level(mesh):
-    if not unreal.EditorAssetLibrary.does_asset_exist(MAP_PATH):
-        unreal.EditorLevelLibrary.new_level(MAP_PATH)
-    else:
-        unreal.EditorLevelLibrary.load_level(MAP_PATH)
+def validate(mesh, slots: list[str], texture_count: int) -> tuple[tuple[float, float, float], int]:
+    if set(slots) != set(EXPECTED_SLOTS) or len(slots) != 3:
+        raise RuntimeError(f"Unexpected material slots: {slots}")
+    if texture_count != 8:
+        raise RuntimeError(f"Expected eight imported PBR textures, found {texture_count}")
+    for index, slot in enumerate(mesh.get_editor_property("static_materials")):
+        material = slot.get_editor_property("material_interface")
+        if not material:
+            raise RuntimeError(f"Material slot {index} is unassigned")
 
-    for actor in list(unreal.EditorLevelLibrary.get_all_level_actors()):
-        label = actor.get_actor_label() if hasattr(actor, "get_actor_label") else ""
-        if label == LEVEL_ACTOR_LABEL or LEVEL_ACTOR_TAG in actor_tags(actor):
-            unreal.EditorLevelLibrary.destroy_actor(actor)
-
-    actor = unreal.EditorLevelLibrary.spawn_actor_from_class(
-        unreal.StaticMeshActor,
-        unreal.Vector(0.0, 0.0, 0.0),
-        unreal.Rotator(0.0, 0.0, 0.0),
-    )
-    if not actor:
-        raise RuntimeError("Could not spawn Mahjong room table actor")
-    actor.set_actor_label(LEVEL_ACTOR_LABEL)
-    set_prop(actor, "tags", [unreal.Name(LEVEL_ACTOR_TAG)])
-    component = actor.get_component_by_class(unreal.StaticMeshComponent)
-    if not component:
-        raise RuntimeError("Spawned StaticMeshActor has no StaticMeshComponent")
-    component.set_static_mesh(mesh)
-    set_prop(component, "mobility", unreal.ComponentMobility.STATIC)
-    set_prop(component, "cast_shadow", True)
-    set_prop(component, "collision_enabled", unreal.CollisionEnabled.NO_COLLISION)
-    if not unreal.EditorLevelLibrary.save_current_level():
-        raise RuntimeError(f"Could not save level {MAP_PATH}")
-    return actor
-
-
-def validate(mesh, slots: list[str], actor, imported_textures: list) -> tuple[float, float, float]:
-    if len(imported_textures) != 33:
-        raise RuntimeError(f"Expected 33 imported textures, found {len(imported_textures)}")
-    if len(slots) != 11:
-        raise RuntimeError(f"Expected 11 material slots, found {len(slots)}: {slots}")
-    bounds = mesh.get_bounds()
-    size = bounds.box_extent * 2.0
+    size = mesh.get_bounds().box_extent * 2.0
     actual = (float(size.x), float(size.y), float(size.z))
-    expected = sorted((94.0, 94.0, 78.0))
-    if any(abs(a - e) > 1.0 for a, e in zip(sorted(actual), expected)):
-        raise RuntimeError(f"Unexpected imported mesh dimensions cm: {actual}")
-    component = actor.get_component_by_class(unreal.StaticMeshComponent)
-    if not component or component.get_editor_property("static_mesh") != mesh:
-        raise RuntimeError("Level actor does not reference the imported Mahjong table mesh")
-    return actual
+    if any(
+        abs(value - expected) > 0.25
+        for value, expected in zip(sorted(actual), sorted(EXPECTED_DIMENSIONS_CM))
+    ):
+        raise RuntimeError(f"Unexpected imported dimensions in centimeters: {actual}")
+    triangles = triangle_count(mesh)
+    if triangles >= 5000:
+        raise RuntimeError(f"Imported mesh exceeds mobile triangle budget: {triangles}")
+    return actual, triangles
 
 
-def write_report(dimensions: tuple[float, float, float], slots: list[str], material_specs: list[dict]) -> None:
-    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+def delete_obsolete_assets() -> list[str]:
+    deleted = []
+    keep = {
+        f"{MATERIAL_DEST}/{asset_name}"
+        for asset_name in MATERIAL_ASSET_BY_SLOT.values()
+    }
+    keep.update(
+        f"{TEXTURE_DEST}/{Path(filename).stem}"
+        for filename in (
+            "T_Wood_BaseColor_2K.png",
+            "T_Wood_Normal_2K.png",
+            "T_Wood_Roughness_2K.png",
+            "T_Wood_AO_2K.png",
+            "T_Felt_BaseColor_2K.png",
+            "T_Felt_Normal_2K.png",
+            "T_Felt_Roughness_2K.png",
+            "T_Felt_AO_2K.png",
+        )
+    )
+    candidates = []
+    for directory in (MATERIAL_DEST, TEXTURE_DEST):
+        for asset in unreal.EditorAssetLibrary.list_assets(
+            directory, recursive=True, include_folder=False
+        ):
+            candidates.append(asset.split(".")[0])
+    candidates.sort(key=lambda path: (0 if path.startswith(MATERIAL_DEST) else 1, path))
+    for path in candidates:
+        if path in keep:
+            continue
+        if not unreal.EditorAssetLibrary.does_asset_exist(path):
+            continue
+        referencers = unreal.EditorAssetLibrary.find_package_referencers_for_asset(
+            path, load_assets_to_confirm=True
+        )
+        live_referencers = [
+            ref
+            for ref in referencers
+            if ref != path and not ref.startswith("/Temp/")
+        ]
+        if live_referencers:
+            raise RuntimeError(
+                f"Refusing to delete obsolete asset still referenced by {live_referencers}: {path}"
+            )
+        if not unreal.EditorAssetLibrary.delete_asset(path):
+            raise RuntimeError(f"Could not delete obsolete asset: {path}")
+        deleted.append(path)
+    return deleted
+
+
+def write_report(
+    dimensions: tuple[float, float, float],
+    triangles: int,
+    slots: list[str],
+    deleted_assets: list[str],
+    model_manifest: dict,
+) -> None:
     report = {
         "status": "ok",
+        "replacement": "legacy_full_table_to_tabletop_only",
         "source_fbx": str(MODEL_FILE),
         "unreal_mesh": MESH_PATH,
         "dimensions_cm": list(dimensions),
+        "triangle_count": triangles,
         "material_slots": slots,
-        "materials": [f"{MATERIAL_DEST}/{spec['material_slot']}" for spec in material_specs],
-        "texture_count": 33,
-        "level": MAP_PATH,
-        "level_actor": LEVEL_ACTOR_LABEL,
-        "runtime_actor": "/Script/GuiyangMahjong.Mahjong3DTableActor",
+        "texture_count": 8,
+        "pivot": model_manifest.get("pivot"),
+        "playing_surface_z_cm": 0.0,
+        "deleted_obsolete_assets": deleted_assets,
+        "runtime_actor": "/Script/GuiyangMahjongClient.Mahjong3DTableActor",
     }
-    REPORT_PATH.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    REPORT_PATH.write_text(
+        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 def main() -> None:
-    log(f"source={SOURCE_ROOT} destination={DEST_ROOT}")
-    manifest = ensure_sources()
+    log(f"replace source={MODEL_FILE} destination={MESH_PATH}")
+    model_manifest, texture_manifest = ensure_sources()
     ensure_destination_folders()
-    existing = load_complete_asset_set(manifest["materials"])
-    if existing:
-        mesh, imported_textures, materials = existing
-        log("complete imported asset set found; skipping FBX/texture/material rebuild")
-    else:
-        mesh = import_model()
-        imported_textures = []
-        for source in sorted(TEXTURE_SOURCE.glob("T_Table_*.png")):
-            texture = import_texture(source)
-            configure_texture(texture, source.stem)
-            imported_textures.append(texture)
 
-        materials = {}
-        for material_spec in manifest["materials"]:
-            material = build_material(material_spec)
-            materials[material_spec["material_slot"]] = material
+    mesh = import_model()
+    imported_textures = []
+    for source in sorted(TEXTURE_SOURCE.glob("T_*_2K.png")):
+        texture = import_texture(source)
+        configure_texture(texture, source.stem)
+        imported_textures.append(texture)
+
+    materials = {}
+    for material_spec in texture_manifest["materials"]:
+        material = build_material(material_spec)
+        materials[material_spec["material_slot"]] = material
+    materials["M_Table_Joint_AO_PBR"] = build_joint_material()
     slots = assign_materials(mesh, materials)
-    actor = place_in_room_level(mesh)
-    dimensions = validate(mesh, slots, actor, imported_textures)
+    dimensions, triangles = validate(mesh, slots, len(imported_textures))
 
-    unreal.EditorAssetLibrary.save_directory(DEST_ROOT, only_if_is_dirty=False, recursive=True)
-    write_report(dimensions, slots, manifest["materials"])
+    unreal.EditorAssetLibrary.save_directory(
+        DEST_ROOT, only_if_is_dirty=False, recursive=True
+    )
+    deleted_assets = delete_obsolete_assets()
+    unreal.EditorAssetLibrary.save_directory(
+        DEST_ROOT, only_if_is_dirty=False, recursive=True
+    )
+    write_report(dimensions, triangles, slots, deleted_assets, model_manifest)
     log(
-        "MAHJONG_TABLE_IMPORT_OK "
-        f"dimensions_cm=({dimensions[0]:.3f}, {dimensions[1]:.3f}, {dimensions[2]:.3f}) "
-        f"slots={len(slots)} textures={len(imported_textures)} map={MAP_PATH}"
+        "MAHJONG_TABLETOP_IMPORT_OK "
+        f"dimensions_cm=({dimensions[0]:.3f},{dimensions[1]:.3f},{dimensions[2]:.3f}) "
+        f"triangles={triangles} slots={len(slots)} textures={len(imported_textures)} "
+        f"deleted_obsolete_assets={len(deleted_assets)}"
     )
 
 

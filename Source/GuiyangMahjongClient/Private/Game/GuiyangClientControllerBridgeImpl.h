@@ -8,6 +8,7 @@ class ACameraActor;
 class AGuiyangMahjongPlayerController;
 class AMahjong3DTableActor;
 class AMahjongRoomPresentationActor;
+struct FStreamableHandle;
 class UMobileRootHUDWidget;
 
 UCLASS(Transient)
@@ -16,6 +17,7 @@ class UGuiyangClientControllerBridgeImpl final : public UObject, public IGuiyang
     GENERATED_BODY()
 
 public:
+    virtual void BeginDestroy() override;
     virtual UWorld* GetWorld() const override;
     virtual void InitializeClient(AGuiyangMahjongPlayerController& InController) override;
     virtual AActor* EnsureRoomPresentation() override;
@@ -39,8 +41,14 @@ private:
     UPROPERTY(Transient) TObjectPtr<ACameraActor> RoomCameraActor;
     UPROPERTY(Transient) FGuiyangGameServerRoute PendingAllocatedRoute;
     FTimerHandle CreatingRoomTravelDelayTimer;
+    TSharedPtr<FStreamableHandle> PresentationLoadHandle;
     double CreatingRoomLoadingShownAtSeconds = 0.0;
+    bool bPresentationLoadFailed = false;
 
+    void RequestRoomPresentationClassLoad();
+    void HandleRoomPresentationClassLoaded();
+    AMahjongRoomPresentationActor* SpawnRoomPresentation(UClass& PresentationClass);
+    void ApplyRoomPresentationViewTarget();
     void CompleteDelayedAllocatedServerConnection();
     void TravelToAllocatedServer(FGuiyangGameServerRoute Route);
 };

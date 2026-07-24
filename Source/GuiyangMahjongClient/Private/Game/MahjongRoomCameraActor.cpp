@@ -24,14 +24,6 @@ AMahjongRoomCameraActor::AMahjongRoomCameraActor(const FObjectInitializer& Objec
     ConfigureStablePostProcess();
 }
 
-void AMahjongRoomCameraActor::BeginPlay()
-{
-    Super::BeginPlay();
-    // Older placed map instances may contain serialized camera defaults. Reapply this preset at
-    // runtime so eye adaptation and bloom cannot return when the client enters the room.
-    ConfigureStablePostProcess();
-}
-
 void AMahjongRoomCameraActor::ConfigureStablePostProcess()
 {
     UCineCameraComponent* Camera = GetCineCameraComponent();
@@ -43,7 +35,7 @@ void AMahjongRoomCameraActor::ConfigureStablePostProcess()
     Settings.bOverride_AutoExposureApplyPhysicalCameraExposure = true;
     Settings.AutoExposureApplyPhysicalCameraExposure = false;
     Settings.bOverride_AutoExposureBias = true;
-    Settings.AutoExposureBias = -0.7f;
+    Settings.AutoExposureBias = 0.35f;
     Settings.bOverride_BloomIntensity = true;
     Settings.BloomIntensity = 0.0f;
     Settings.bOverride_LensFlareIntensity = true;

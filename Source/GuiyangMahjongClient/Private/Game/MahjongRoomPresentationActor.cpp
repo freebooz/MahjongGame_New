@@ -2,7 +2,9 @@
 
 #include "Camera/CameraActor.h"
 #include "Components/ChildActorComponent.h"
+#include "Components/DirectionalLightComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkyLightComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Game/Mahjong3DTableActor.h"
 #include "Game/MahjongRoomCameraActor.h"
@@ -12,6 +14,8 @@ const FName AMahjongRoomPresentationActor::PresentationTag(TEXT("MahjongRoomPres
 AMahjongRoomPresentationActor::AMahjongRoomPresentationActor()
 {
     PrimaryActorTick.bCanEverTick = false;
+    SetReplicates(false);
+    SetCanBeDamaged(false);
     Tags.AddUnique(PresentationTag);
 
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
@@ -27,11 +31,29 @@ AMahjongRoomPresentationActor::AMahjongRoomPresentationActor()
     Camera->SetRelativeLocation(FVector(0.0f, -950.0f, 1320.0f));
     Camera->SetRelativeRotation(FRotator(-54.25f, 90.0f, 0.0f));
 
+    // The runtime room map is deliberately target-neutral, so all client lighting required
+    // for a readable table must live on this client-only presentation actor.
+    DirectionalLight = CreateDefaultSubobject<UDirectionalLightComponent>(TEXT("StableDirectionalLight"));
+    DirectionalLight->SetupAttachment(SceneRoot);
+    DirectionalLight->SetRelativeRotation(FRotator(-31.0f, -14.0f, -105.0f));
+    DirectionalLight->SetIntensity(1200.0f);
+    DirectionalLight->SetLightColor(FLinearColor(1.0f, 0.965f, 0.90f));
+    DirectionalLight->SetCastShadows(false);
+    DirectionalLight->SetMobility(EComponentMobility::Movable);
+
+    SkyLight = CreateDefaultSubobject<USkyLightComponent>(TEXT("StableSkyLight"));
+    SkyLight->SetupAttachment(SceneRoot);
+    SkyLight->SetIntensity(0.8f);
+    SkyLight->SetLightColor(FLinearColor(0.78f, 0.86f, 1.0f));
+    SkyLight->SetCastShadows(false);
+    SkyLight->SetMobility(EComponentMobility::Movable);
+
     KeyLight = CreateDefaultSubobject<USpotLightComponent>(TEXT("StableKeyLight"));
     KeyLight->SetupAttachment(SceneRoot);
     KeyLight->SetRelativeLocation(FVector(0.0f, 0.0f, 1200.0f));
     KeyLight->SetRelativeRotation(FRotator(-90.0f, 0.0f, 0.0f));
-    KeyLight->SetIntensity(800.0f);
+    KeyLight->SetIntensityUnits(ELightUnits::Lumens);
+    KeyLight->SetIntensity(4200.0f);
     KeyLight->SetAttenuationRadius(3000.0f);
     KeyLight->SetInnerConeAngle(40.0f);
     KeyLight->SetOuterConeAngle(65.0f);
@@ -43,7 +65,8 @@ AMahjongRoomPresentationActor::AMahjongRoomPresentationActor()
     FillLight->SetupAttachment(SceneRoot);
     FillLight->SetRelativeLocation(FVector(0.0f, -650.0f, 720.0f));
     FillLight->SetRelativeRotation(FRotator(-48.0f, 90.0f, 0.0f));
-    FillLight->SetIntensity(260.0f);
+    FillLight->SetIntensityUnits(ELightUnits::Lumens);
+    FillLight->SetIntensity(1800.0f);
     FillLight->SetAttenuationRadius(2200.0f);
     FillLight->SetInnerConeAngle(45.0f);
     FillLight->SetOuterConeAngle(75.0f);

@@ -7,7 +7,9 @@
 class ACameraActor;
 class AMahjong3DTableActor;
 class UChildActorComponent;
+class UDirectionalLightComponent;
 class USceneComponent;
+class USkyLightComponent;
 class USpotLightComponent;
 
 /**
@@ -17,8 +19,8 @@ class USpotLightComponent;
  * lights in the editor. The shipping client spawns the same actor locally after
  * joining MahjongRoomMap; dedicated servers never build or load this class.
  */
-UCLASS()
-class GUIYANGMAHJONGCLIENT_API AMahjongRoomPresentationActor final : public AActor
+UCLASS(Blueprintable)
+class GUIYANGMAHJONGCLIENT_API AMahjongRoomPresentationActor : public AActor
 {
     GENERATED_BODY()
 
@@ -30,19 +32,25 @@ public:
     AMahjong3DTableActor* GetTableActor() const;
     ACameraActor* GetRoomCameraActor() const;
 
-private:
-    UPROPERTY(VisibleAnywhere, Category="Mahjong|Presentation")
+protected:
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mahjong|Presentation")
     TObjectPtr<USceneComponent> SceneRoot;
 
-    UPROPERTY(VisibleAnywhere, Category="Mahjong|Presentation")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mahjong|Presentation")
     TObjectPtr<UChildActorComponent> Table;
 
-    UPROPERTY(VisibleAnywhere, Category="Mahjong|Presentation")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mahjong|Presentation")
     TObjectPtr<UChildActorComponent> Camera;
 
-    UPROPERTY(VisibleAnywhere, Category="Mahjong|Lighting")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mahjong|Lighting")
+    TObjectPtr<UDirectionalLightComponent> DirectionalLight;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mahjong|Lighting")
+    TObjectPtr<USkyLightComponent> SkyLight;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mahjong|Lighting")
     TObjectPtr<USpotLightComponent> KeyLight;
 
-    UPROPERTY(VisibleAnywhere, Category="Mahjong|Lighting")
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Mahjong|Lighting")
     TObjectPtr<USpotLightComponent> FillLight;
 };
