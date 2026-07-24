@@ -16,10 +16,6 @@ namespace
     constexpr float TileTightPitch = TileWidth - 2.0f;
     constexpr float TileTightLongPitch = TileHeight - 2.0f;
     constexpr float Mahjong50ModelWidth = 3.6f;
-    // The tabletop-only asset pivot is authored at the felt playing surface (Z=0). The UViewport
-    // layout uses a 10x presentation scale (for example a 4.4 cm tile is displayed at 44 units).
-    constexpr float ImportedTableSurfaceHeight = 0.0f;
-    constexpr float ImportedTableDisplayScale = 10.0f;
 
     FVector RotateAroundTable(const FVector& Position, const int32 RelativeSeat)
     {
@@ -43,15 +39,7 @@ AMahjong3DTableActor::AMahjong3DTableActor()
     PrimaryActorTick.bCanEverTick = false;
     SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
     SetRootComponent(SceneRoot);
-    TableComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MahjongTableMesh"));
-    TableComponent->SetupAttachment(SceneRoot);
-    TableComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-    TableComponent->SetCastShadow(true);
-    TableComponent->SetRelativeLocation(
-        FVector(0.0f, 0.0f, -ImportedTableSurfaceHeight * ImportedTableDisplayScale));
-    TableComponent->SetRelativeScale3D(FVector(ImportedTableDisplayScale));
     InitializePresentationAssets();
-    TableComponent->SetStaticMesh(TableMesh);
 }
 
 void AMahjong3DTableActor::BeginPlay()
@@ -62,10 +50,6 @@ void AMahjong3DTableActor::BeginPlay()
     // must not rely solely on values copied from the native constructor/CDO during map loading.
     // Rebuilding them here also replaces stale references saved by older room-map revisions.
     InitializePresentationAssets();
-    if (TableComponent && !TableComponent->GetStaticMesh())
-    {
-        TableComponent->SetStaticMesh(TableMesh);
-    }
 
     int32 LoadedTileMeshCount = 0;
     for (const UStaticMesh* Mesh : TileMeshes)
@@ -78,8 +62,6 @@ void AMahjong3DTableActor::BeginPlay()
 
 void AMahjong3DTableActor::InitializePresentationAssets()
 {
-    TableMesh = LoadObject<UStaticMesh>(nullptr,
-        TEXT("/Game/Art/Mahjong/Table/Meshes/SM_StandardMahjongTable.SM_StandardMahjongTable"));
     CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
     static const TCHAR* TileAssetNames[] = {
         TEXT("Characters_1"), TEXT("Characters_2"), TEXT("Characters_3"),
@@ -134,7 +116,6 @@ void AMahjong3DTableActor::SetSelectedTile(const int32 UniqueId)
 void AMahjong3DTableActor::RebuildLayout()
 {
     ClearRuntimeComponents();
-    AddTableAndFrame();
     AddRemainingWall();
     AddHands();
     AddDiscards();
@@ -229,27 +210,6 @@ UStaticMesh* AMahjong3DTableActor::ResolveTileMesh(const FMahjongTile* Tile, con
     return RuleIndex >= 0 && RuleIndex < 27 && TileMeshes.IsValidIndex(RuleIndex) && TileMeshes[RuleIndex]
         ? TileMeshes[RuleIndex]
         : DefaultTileMesh;
-}
-
-void AMahjong3DTableActor::AddTableAndFrame()
-{
-    if (TableComponent && TableComponent->GetStaticMesh())
-    {
-        return;
-    }
-
-    // Keep the original primitive table as a safe fallback if the content asset is unavailable.
-    AddBox(FVector(0.0f, 0.0f, -18.0f), FVector(1040.0f, 760.0f, 36.0f), FRotator::ZeroRotator,
-        FLinearColor(0.05f, 0.18f, 0.11f));
-    AddBox(FVector(0.0f, 0.0f, 1.0f), FVector(970.0f, 690.0f, 8.0f), FRotator::ZeroRotator,
-        FLinearColor(0.015f, 0.32f, 0.25f));
-    const FLinearColor Wood(0.24f, 0.10f, 0.035f);
-    AddBox(FVector(0.0f, -372.0f, 8.0f), FVector(1060.0f, 26.0f, 34.0f), FRotator::ZeroRotator, Wood);
-    AddBox(FVector(0.0f, 372.0f, 8.0f), FVector(1060.0f, 26.0f, 34.0f), FRotator::ZeroRotator, Wood);
-    AddBox(FVector(-522.0f, 0.0f, 8.0f), FVector(26.0f, 770.0f, 34.0f), FRotator::ZeroRotator, Wood);
-    AddBox(FVector(522.0f, 0.0f, 8.0f), FVector(26.0f, 770.0f, 34.0f), FRotator::ZeroRotator, Wood);
-    AddBox(FVector(0.0f, 0.0f, 7.0f), FVector(150.0f, 150.0f, 10.0f), FRotator::ZeroRotator,
-        FLinearColor(0.02f, 0.08f, 0.07f));
 }
 
 void AMahjong3DTableActor::AddRemainingWall()

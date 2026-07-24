@@ -39,8 +39,8 @@ class MaterialSpec:
 
 
 MATERIALS = (
-    MaterialSpec("M_Table_Walnut_PBR", "Wood", (72, 28, 11), 0.32, 0.0, "wood", 0.82),
-    MaterialSpec("M_Table_Felt_Green_PBR", "Felt", (6, 92, 31), 0.87, 0.0, "felt", 1.08),
+    MaterialSpec("M_Table_Walnut_PBR", "Wood", (94, 36, 12), 0.24, 0.0, "wood", 0.95),
+    MaterialSpec("M_Table_Felt_Green_PBR", "Felt", (13, 74, 28), 0.86, 0.0, "felt", 1.02),
 )
 
 
@@ -112,9 +112,9 @@ def color_variation(spec: MaterialSpec, x: int, y: int, size: int) -> float:
     h = height_value(spec, x, y, size)
     if spec.pattern == "felt":
         directional_nap = math.sin((x * 0.18 + y) * math.tau / 113.0)
-        return h * 0.060 + directional_nap * 0.012
+        return h * 0.045 + directional_nap * 0.010
     if spec.pattern == "wood":
-        return h * 0.26
+        return h * 0.50
     if spec.pattern == "grille":
         return -0.58 if h < -0.5 else h * 0.12
     if spec.pattern == "powder":

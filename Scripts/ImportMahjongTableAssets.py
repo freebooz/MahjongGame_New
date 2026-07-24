@@ -203,13 +203,13 @@ def load_texture(name: str):
 
 def get_or_create_material(name: str):
     path = f"{MATERIAL_DEST}/{name}"
-    material = unreal.EditorAssetLibrary.load_asset(path)
-    if material:
-        return material, False
+    material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+        name, MATERIAL_DEST, unreal.Material, unreal.MaterialFactoryNew()
+    )
     if not material:
-        material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-            name, MATERIAL_DEST, unreal.Material, unreal.MaterialFactoryNew()
-        )
+        material = unreal.EditorAssetLibrary.load_asset(path)
+        if material:
+            return material, False
     if not material:
         raise RuntimeError(f"Could not create material {path}")
     set_prop(material, "two_sided", False)

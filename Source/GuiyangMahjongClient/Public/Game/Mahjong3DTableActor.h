@@ -33,10 +33,7 @@ private:
     virtual void BeginPlay() override;
 
     UPROPERTY(VisibleAnywhere, Category="Mahjong|Presentation") TObjectPtr<USceneComponent> SceneRoot;
-    /** Persistent editor-visible table mesh; runtime tile components are rebuilt around it. */
-    UPROPERTY(VisibleAnywhere, Category="Mahjong|Presentation") TObjectPtr<UStaticMeshComponent> TableComponent;
     UPROPERTY(Transient) TArray<TObjectPtr<UActorComponent>> RuntimeComponents;
-    UPROPERTY(Transient) TObjectPtr<UStaticMesh> TableMesh;
     UPROPERTY(Transient) TObjectPtr<UStaticMesh> CubeMesh;
     UPROPERTY(Transient) TObjectPtr<UStaticMesh> DefaultTileMesh;
     UPROPERTY(Transient) TArray<TObjectPtr<UStaticMesh>> TileMeshes;
@@ -56,7 +53,6 @@ private:
     UStaticMesh* ResolveTileMesh(const FMahjongTile* Tile, bool bFaceUp) const;
     void AddTile(const FMahjongTile* Tile, bool bFaceUp, bool bUpright,
         const FVector& Location, const FRotator& Rotation, bool bSelected = false);
-    void AddTableAndFrame();
     void AddRemainingWall();
     void AddHands();
     void AddDiscards();

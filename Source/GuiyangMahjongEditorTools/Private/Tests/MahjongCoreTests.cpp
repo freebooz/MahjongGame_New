@@ -32,9 +32,11 @@
 #include "Game/MahjongRoomPresentationActor.h"
 #include "Settings/MahjongRoomPresentationSettings.h"
 #include "CineCameraComponent.h"
+#include "Components/ChildActorComponent.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/SkyLightComponent.h"
 #include "Components/SpotLightComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/Level.h"
 #include "Engine/SkyLight.h"
@@ -1415,19 +1417,72 @@ bool FMahjongThreeDTableLayoutTest::RunTest(const FString& Parameters)
             TestNotNull(TEXT("运行时展示必须包含跨平台主方向光"), Directional);
             if (Directional)
             {
-                TestTrue(TEXT("主方向光强度必须足以照亮牌桌"), Directional->Intensity >= 500.0f);
+                TestEqual(TEXT("主方向光必须由展示蓝图拥有"),
+                    Directional->CreationMethod, EComponentCreationMethod::SimpleConstructionScript);
+                TestTrue(TEXT("主方向光必须处于手动曝光安全范围"),
+                    Directional->Intensity > 0.0f && Directional->Intensity <= 50.0f);
                 TestFalse(TEXT("移动端稳定主光默认不得投射高成本阴影"), Directional->CastShadows);
             }
             const USkyLightComponent* Sky =
                 PresentationDefault->FindComponentByClass<USkyLightComponent>();
             TestNotNull(TEXT("运行时展示必须包含环境补光"), Sky);
+            if (Sky)
+            {
+                TestEqual(TEXT("天光必须由展示蓝图拥有"),
+                    Sky->CreationMethod, EComponentCreationMethod::SimpleConstructionScript);
+            }
             TArray<USpotLightComponent*> SpotLights;
             PresentationDefault->GetComponents<USpotLightComponent>(SpotLights);
             TestEqual(TEXT("运行时展示必须包含主灯与补光灯"), SpotLights.Num(), 2);
             for (const USpotLightComponent* Spot : SpotLights)
             {
+                TestEqual(TEXT("局部灯必须由展示蓝图拥有"),
+                    Spot->CreationMethod, EComponentCreationMethod::SimpleConstructionScript);
                 TestEqual(TEXT("本地灯必须使用明确的流明单位"), Spot->IntensityUnits, ELightUnits::Lumens);
+                TestTrue(TEXT("局部灯必须处于安全流明范围"),
+                    Spot->Intensity > 0.0f && Spot->Intensity <= 1000.0f);
                 TestFalse(TEXT("移动端本地灯默认不得投射高成本阴影"), Spot->CastShadows);
+            }
+            const UCineCameraComponent* PresentationCamera =
+                PresentationDefault->FindComponentByClass<UCineCameraComponent>();
+            TestNotNull(TEXT("展示蓝图必须直接拥有可编辑电影摄像机"), PresentationCamera);
+            if (PresentationCamera)
+            {
+                TestEqual(TEXT("电影摄像机必须由展示蓝图拥有"),
+                    PresentationCamera->CreationMethod,
+                    EComponentCreationMethod::SimpleConstructionScript);
+            }
+            TArray<UStaticMeshComponent*> StaticMeshes;
+            PresentationDefault->GetComponents<UStaticMeshComponent>(StaticMeshes);
+            const UStaticMeshComponent* TableMeshComponent = nullptr;
+            for (const UStaticMeshComponent* Component : StaticMeshes)
+            {
+                if (Component && Component->GetName() == TEXT("MahjongTableMesh"))
+                {
+                    TableMeshComponent = Component;
+                    break;
+                }
+            }
+            TestNotNull(TEXT("展示蓝图必须直接拥有可编辑麻将桌模型"), TableMeshComponent);
+            if (TableMeshComponent)
+            {
+                TestEqual(TEXT("麻将桌模型必须由展示蓝图拥有"),
+                    TableMeshComponent->CreationMethod,
+                    EComponentCreationMethod::SimpleConstructionScript);
+                TestNotNull(TEXT("麻将桌模型组件必须配置静态网格"),
+                    TableMeshComponent->GetStaticMesh());
+            }
+            TArray<UChildActorComponent*> ChildActors;
+            PresentationDefault->GetComponents<UChildActorComponent>(ChildActors);
+            TestEqual(TEXT("展示蓝图只保留一个动态麻将牌布局 Child Actor"),
+                ChildActors.Num(), 1);
+            if (ChildActors.Num() == 1)
+            {
+                TestEqual(TEXT("麻将牌布局 Child Actor 必须由展示蓝图拥有"),
+                    ChildActors[0]->CreationMethod,
+                    EComponentCreationMethod::SimpleConstructionScript);
+                TestEqual(TEXT("麻将牌布局必须使用运行时 AMahjong3DTableActor"),
+                    ChildActors[0]->GetChildActorClass(), AMahjong3DTableActor::StaticClass());
             }
         }
     }

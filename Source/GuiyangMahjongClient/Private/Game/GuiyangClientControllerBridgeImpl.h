@@ -38,7 +38,7 @@ private:
     UPROPERTY(Transient) TObjectPtr<UMobileRootHUDWidget> RootHUDInstance;
     UPROPERTY(Transient) TObjectPtr<AMahjongRoomPresentationActor> RoomPresentationActor;
     UPROPERTY(Transient) TObjectPtr<AMahjong3DTableActor> RoomTableActor;
-    UPROPERTY(Transient) TObjectPtr<ACameraActor> RoomCameraActor;
+    UPROPERTY(Transient) TObjectPtr<AActor> RoomCameraActor;
     UPROPERTY(Transient) FGuiyangGameServerRoute PendingAllocatedRoute;
     FTimerHandle CreatingRoomTravelDelayTimer;
     TSharedPtr<FStreamableHandle> PresentationLoadHandle;

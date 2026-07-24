@@ -8,7 +8,6 @@
 #include "Game/GuiyangMahjongPlayerController.h"
 #include "Game/GuiyangMahjongPlayerState.h"
 #include "Game/Mahjong3DTableActor.h"
-#include "Game/MahjongRoomCameraActor.h"
 #include "Game/MahjongRoomPresentationActor.h"
 #include "GenericPlatform/GenericPlatformHttp.h"
 #include "GuiyangMahjong.h"

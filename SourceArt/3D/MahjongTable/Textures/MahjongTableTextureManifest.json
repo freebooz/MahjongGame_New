@@ -20,7 +20,7 @@
         "Roughness": "T_Wood_Roughness_2K.png",
         "AO": "T_Wood_AO_2K.png"
       },
-      "roughness": 0.32,
+      "roughness": 0.24,
       "metallic": 0.0
     },
     {
@@ -31,7 +31,7 @@
         "Roughness": "T_Felt_Roughness_2K.png",
         "AO": "T_Felt_AO_2K.png"
       },
-      "roughness": 0.87,
+      "roughness": 0.86,
       "metallic": 0.0
     }
   ],
@@ -43,18 +43,18 @@
     },
     {
       "name": "T_Felt_BaseColor_2K.png",
-      "bytes": 1355666,
-      "sha256": "74a90781af261790a43b64bfc276d2c742e7ea4fe1e8a5665d10804fbb24199e"
+      "bytes": 1082868,
+      "sha256": "cd9e86e5319ba18b0547a296229b928f576a7372e5f0a9a8c76d0a1989e795c4"
     },
     {
       "name": "T_Felt_Normal_2K.png",
-      "bytes": 11136518,
-      "sha256": "4b0593f687ac16129d9851ddc22a625d25d7cdeccab7109597f7a46c5e86efe6"
+      "bytes": 11024206,
+      "sha256": "ada91abb58df0c392980bc02c25e273493bd8256c08a4542b41154223df230ed"
     },
     {
       "name": "T_Felt_Roughness_2K.png",
-      "bytes": 2284481,
-      "sha256": "16294128f51ed4d13fdf43bbd3d0454f1693ea500d69f75212d34f678c497be0"
+      "bytes": 2284105,
+      "sha256": "357daa0020cc6059035f268555785ea69bb8cd8543bf4f016807b487efa16dc0"
     },
     {
       "name": "T_Wood_AO_2K.png",
@@ -63,18 +63,18 @@
     },
     {
       "name": "T_Wood_BaseColor_2K.png",
-      "bytes": 2376493,
-      "sha256": "4b6ae0ba63262bb6b205126c30191ced59fca6a930e566273ed3b993cfb739d4"
+      "bytes": 3571143,
+      "sha256": "55e8f1a1df1f8c873528f279d9c4f789bef910d8715ff93e59ea5787227efb9f"
     },
     {
       "name": "T_Wood_Normal_2K.png",
-      "bytes": 6986140,
-      "sha256": "40d1e7044de7fe2ddcfbc29951b63f4812937757b97f44901807c81d10548fe1"
+      "bytes": 7349267,
+      "sha256": "d89a587ab6fa2b95c3c0d88880a41535aba36b89d005ebfd3d559b76560f11a7"
     },
     {
       "name": "T_Wood_Roughness_2K.png",
-      "bytes": 1584510,
-      "sha256": "a90326a0fc3ff0a4e18ece3da341e4a7de5c5c31114ce5d12c7b7048cf1e4954"
+      "bytes": 1584615,
+      "sha256": "e1d1dbe3b3a07ee0b6d8f035d9000a0a7bc3a93123cf797bd47e5f59e5a75ed6"
     }
   ]
 }

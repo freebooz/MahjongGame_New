@@ -92,6 +92,30 @@ def main() -> None:
     runtime_cdo = unreal.get_default_object(runtime_class)
     if not runtime_cdo:
         raise RuntimeError("Runtime Mahjong3DTableActor CDO could not be constructed")
+    table_components = runtime_cdo.get_components_by_class(unreal.StaticMeshComponent)
+    table_component = next(
+        (
+            component
+            for component in table_components
+            if component.get_name() == "MahjongTableMesh"
+        ),
+        None,
+    )
+    if not table_component:
+        raise RuntimeError("Runtime MahjongTableMesh component is missing")
+    table_location = table_component.get_editor_property("relative_location")
+    table_scale = table_component.get_editor_property("relative_scale3d")
+    runtime_mesh = table_component.get_editor_property("static_mesh")
+    if abs(float(table_location.z)) > 0.01:
+        raise RuntimeError(
+            f"Runtime table component is not aligned to the Z=0 surface pivot: {table_location}"
+        )
+    if any(abs(float(value) - 10.0) > 0.01 for value in (table_scale.x, table_scale.y, table_scale.z)):
+        raise RuntimeError(f"Unexpected runtime table presentation scale: {table_scale}")
+    if not runtime_mesh or runtime_mesh.get_path_name() != (
+        f"{MESH_PATH}.SM_StandardMahjongTable"
+    ):
+        raise RuntimeError(f"Runtime actor references the wrong table mesh: {runtime_mesh}")
 
     report = {
         "status": "ok",
@@ -106,6 +130,13 @@ def main() -> None:
         "playing_surface_z_cm": 0.0,
         "runtime_class": RUNTIME_CLASS_PATH,
         "runtime_class_loaded": True,
+        "runtime_table_component_z": float(table_location.z),
+        "runtime_table_scale": [
+            float(table_scale.x),
+            float(table_scale.y),
+            float(table_scale.z),
+        ],
+        "runtime_mesh": runtime_mesh.get_path_name(),
     }
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text(
